@@ -7,6 +7,7 @@ class DB
   public static $affected_rows = 0;
   public static $stmt = null;
   public static $queryResult = null;
+  public static $queryResultType = null;
   public static $old_db = null;
   public static $current_db = null;
   public static $current_db_limit = 0;
@@ -15,8 +16,6 @@ class DB
   public static $password = '';
   public static $host = 'localhost';
   public static $encoding = 'latin1';
-  public static $remap_db = array();
-  public static $remap_query = false;
   
   public static function get($dbName = '') {
     static $mysql = null;
@@ -25,7 +24,7 @@ class DB
       if (DB::$dbName != '') $dbName = DB::$dbName;
       DB::$current_db = $dbName;
       $mysql = new mysqli(DB::$host, DB::$user, DB::$password, $dbName);
-      DB::query("SET NAMES %s", DB::$encoding);
+      DB::queryNull("SET NAMES %s", DB::$encoding);
     } 
     
     return $mysql;
@@ -36,14 +35,12 @@ class DB
   }
   
   public static function insertId() { return DB::$insert_id; }
-  public static function numRows() { return DB::$num_rows; }
-  public static function count() { return call_user_func_array('DB::numRows', func_get_args()); }
   public static function affectedRows() { return DB::$affected_rows; }
+  public static function count() { return call_user_func_array('DB::numRows', func_get_args()); }
+  public static function numRows() { return DB::$num_rows; }
   
   public static function useDB() { return call_user_func_array('DB::setDB', func_get_args()); }
   public static function setDB($dbName, $limit=0) {
-    if (DB::$remap_db[$dbName]) $dbName = DB::$remap_db[$dbName];
-    
     if (DB::$current_db == $dbName) return true;
     $db = DB::get();
     DB::$old_db = DB::$current_db;
@@ -59,15 +56,15 @@ class DB
   
   
   public static function startTransaction() {
-    DB::query('START TRANSACTION');
+    DB::queryNull('START TRANSACTION');
   }
   
   public static function commit() {
-    DB::query('COMMIT');
+    DB::queryNull('COMMIT');
   }
   
   public static function rollback() {
-    DB::query('ROLLBACK');
+    DB::queryNull('ROLLBACK');
   }
   
   public static function escape($str) {
@@ -84,6 +81,11 @@ class DB
     }
     
     return $table;
+  }
+  
+  private static function prependCall($function, $args, $prepend) {
+    array_unshift($args, $prepend);
+    return call_user_func_array($function, $args);
   }
   
   public static function freeResult($result) {
@@ -104,7 +106,7 @@ class DB
     
     $buildquery = "UPDATE " . self::formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
     array_unshift($args, $buildquery);
-    call_user_func_array('DB::query', &$args);
+    call_user_func_array('DB::queryNull', $args);
   }
   
   public static function insertOrReplace($which, $table, $data) {
@@ -119,7 +121,7 @@ class DB
     
     $table = self::formatTableName($table);
     
-    DB::query("$which INTO $table ($keys_str) VALUES ($values_str)");
+    DB::queryNull("$which INTO $table ($keys_str) VALUES ($values_str)");
   }
   
   public static function insert($table, $data) {
@@ -131,25 +133,13 @@ class DB
   }
   
   public static function columnList($table) {
-    DB::query("SHOW COLUMNS FROM $table");
-    $A = array();
-    while ($row = DB::fetchRow()) {
-      $A[] = $row['Field'];
-    }
-    
-    return $A;
+    return DB::queryOneColumn('Field', "SHOW COLUMNS FROM $table");
   }
   
   public static function tableList($db = null) {
     if ($db) DB::useDB($db);
-    else return;
-    DB::query("SHOW TABLES");
-    $A = array();
-    while ($row = DB::fetchRow()) {
-      $A[] = $row['Tables_in_' . $db];
-    }
-    
-    return $A;
+    $db = DB::$current_db;
+    return DB::queryOneColumn('Tables_in_' . $db, "SHOW TABLES");
   }
   
   private static function checkUseDB() {
@@ -257,39 +247,54 @@ class DB
   }
   
   public static function quickPrepare() { return call_user_func_array('DB::query', func_get_args()); }
-  public static function query() {
-    $args = $allArgs = func_get_args();
+  public static function query() { return DB::prependCall('DB::queryHelper', func_get_args(), 'buffered'); }
+  
+  public static function queryNull() { return DB::prependCall('DB::queryHelper', func_get_args(), 'null'); }
+  public static function queryBuf() { return DB::prependCall('DB::queryHelper', func_get_args(), 'buffered'); }
+  public static function queryUnbuf() { return DB::prependCall('DB::queryHelper', func_get_args(), 'unbuffered'); }
+  
+  public static function queryHelper() {
+    $args = func_get_args();
+    $type = array_shift($args);
+    if ($type != 'buffered' && $type != 'unbuffered' && $type != 'null') die("Error -- first argument to queryHelper must be buffered or unbuffered!");
+    $is_buffered = ($type == 'buffered');
+    $is_null = ($type == 'null');
     
-    $sql = array_shift($args);
-    
-    if (DB::$remap_query && count(DB::$remap_db) > 0) {
-      $sql = str_replace(array_keys(DB::$remap_db), array_values(DB::$remap_db), $sql);
-    }
-    
-    $sql = call_user_func_array('DB::parseQueryParams', $allArgs);
+    $sql = call_user_func_array('DB::parseQueryParams', $args);
     
     $db = DB::get();
     
     if (DB::$debug) $starttime = microtime(true);
-    $result = $db->query($sql);
+    $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
     if (DB::$debug) $runtime = microtime(true) - $starttime;
     
+    $sqlShow = "$sql (" . ($is_buffered ? 'MYSQLI_STORE_RESULT' : 'MYSQLI_USE_RESULT') . ")";
     if (!$sql || $error = DB::checkError()) {
-      echo "ATTEMPTED QUERY: $sql<br>\n";
+      echo "ATTEMPTED QUERY: $sqlShow<br>\n";
       echo "ERROR: $error<br>\n";
       debug_print_backtrace();
       die;
     } else if (DB::$debug) {
       $runtime = sprintf('%f', $runtime * 1000);
-      echo "QUERY: $sql [$runtime ms]<br>\n";
+      echo "QUERY: $sqlShow [$runtime ms]<br>\n";
     }
     
-    DB::$insert_id = $db->insert_id;
-    DB::$num_rows = $result->num_rows;
-    DB::$affected_rows = $db->affected_rows;
     DB::$queryResult = $result;
+    DB::$queryResultType = $type;
+    DB::$insert_id = $db->insert_id;
+    DB::$affected_rows = $db->affected_rows;
     
-    DB::checkUseDB();
+    if ($is_buffered) DB::$num_rows = $result->num_rows;
+    else DB::$num_rows = null;
+    
+    //TODO: fix DB switch back 
+    //DB::checkUseDB();
+    
+    if ($is_null) {
+      DB::freeResult($result);
+      DB::$queryResult = DB::$queryResultType = null;
+      return null;
+    }
     
     return $result;
   }
@@ -297,9 +302,10 @@ class DB
   public static function queryAllRows() {
     $args = func_get_args();
     
-    $query = call_user_func_array('DB::query', &$args);
+    $query = call_user_func_array('DB::queryUnbuf', &$args);
     $result = DB::fetchAllRows($query);
     DB::freeResult($query);
+    DB::$num_rows = count($result);
     
     return $result;
   }
@@ -307,21 +313,14 @@ class DB
   public static function queryOneRow() { return call_user_func_array('DB::queryFirstRow', func_get_args()); }
   public static function queryFirstRow() {
     $args = func_get_args();
-    
-    $query = call_user_func_array('DB::query', &$args);
-    
-    if (DB::numRows() == 0) return null;
+    $query = call_user_func_array('DB::queryUnbuf', $args);
     $result = DB::fetchRow($query);
     DB::freeResult($query);
     return $result;
   }
   
-  public static function queryFirstColumn() {
-    $args = func_get_args();
-    array_unshift($args, null);
-    return call_user_func_array('DB::queryOneColumn', $args);
-  }
   
+  public static function queryFirstColumn() { return DB::prependCall('DB::queryOneColumn', func_get_args(), null); }
   public static function queryOneColumn() {
     $args = func_get_args();
     $column = array_shift($args);
@@ -341,12 +340,7 @@ class DB
     return $ret;
   }
   
-  public static function queryFirstField() {
-    $args = func_get_args();
-    array_unshift($args, null);
-    return call_user_func_array('DB::queryOneField', $args);
-  }
-  
+  public static function queryFirstField() { return DB::prependCall('DB::queryOneField', func_get_args(), null); }
   public static function queryOneField() {
     $args = func_get_args();
     $column = array_shift($args);
@@ -375,6 +369,7 @@ class DB
   
   public static function fetchRow($result = null) {
     if ($result === null) $result = DB::$queryResult;
+    if (! ($result instanceof MySQLi_Result)) return null;
     return $result->fetch_assoc();
   }
   
