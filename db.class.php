@@ -16,6 +16,7 @@ class DB
   public static $password = '';
   public static $host = 'localhost';
   public static $encoding = 'latin1';
+  public static $queryMode = 'buffered'; //buffered, unbuffered, queryAllRows
   
   public static function get($dbName = '') {
     static $mysql = null;
@@ -247,7 +248,14 @@ class DB
   }
   
   public static function quickPrepare() { return call_user_func_array('DB::query', func_get_args()); }
-  public static function query() { return DB::prependCall('DB::queryHelper', func_get_args(), 'buffered'); }
+  
+  public static function query() {
+    if (DB::$queryMode == 'buffered' || DB::$queryMode == 'unbuffered') {
+      return DB::prependCall('DB::queryHelper', func_get_args(), DB::$queryMode);
+    } else {
+      return call_user_func_array('DB::queryAllRows', func_get_args());
+    }
+  }
   
   public static function queryNull() { return DB::prependCall('DB::queryHelper', func_get_args(), 'null'); }
   public static function queryBuf() { return DB::prependCall('DB::queryHelper', func_get_args(), 'buffered'); }
