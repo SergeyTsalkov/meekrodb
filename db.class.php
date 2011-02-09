@@ -86,6 +86,11 @@ class DB
     return $table;
   }
   
+  public static function freeResult($result) {
+    if (! ($result instanceof MySQLi_Result)) return;
+    return $result->free();
+  }
+  
   public static function update() {
     $args = func_get_args();
     $table = array_shift($args);
@@ -292,18 +297,23 @@ class DB
   public static function queryAllRows() {
     $args = func_get_args();
     
-    $q = call_user_func_array('DB::query', &$args);
-    return DB::fetchAllRows($q);
+    $query = call_user_func_array('DB::query', &$args);
+    $result = DB::fetchAllRows($query);
+    DB::freeResult($query);
+    
+    return $result;
   }
   
   public static function queryOneRow() { return call_user_func_array('DB::queryFirstRow', func_get_args()); }
   public static function queryFirstRow() {
     $args = func_get_args();
     
-    call_user_func_array('DB::query', &$args);
+    $query = call_user_func_array('DB::query', &$args);
     
     if (DB::numRows() == 0) return null;
-    return DB::fetchRow();
+    $result = DB::fetchRow($query);
+    DB::freeResult($query);
+    return $result;
   }
   
   public static function queryFirstColumn() {
