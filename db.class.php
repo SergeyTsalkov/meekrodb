@@ -42,7 +42,6 @@ class DB
   
   public static function useDB() { return call_user_func_array('DB::setDB', func_get_args()); }
   public static function setDB($dbName, $limit=0) {
-    if (DB::$current_db == $dbName) return true;
     $db = DB::get();
     DB::$old_db = DB::$current_db;
     if (! $db->select_db($dbName)) die("unable to set db to $dbName");
@@ -74,6 +73,7 @@ class DB
   }
   
   private static function formatTableName($table) {
+    $table = str_replace('`', '', $table);
     if (strpos($table, '.')) {
       list($table_db, $table_table) = explode('.', $table, 2);
       $table = "`$table_db`.`$table_table`";
