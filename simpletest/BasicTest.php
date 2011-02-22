@@ -78,9 +78,15 @@ class BasicTest extends SimpleTest {
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
     $this->assert($charlie_password === 'goodbye');
+  }
+  
+  function test_4_query() {
+    $results = DB::query("SELECT * FROM accounts WHERE username=%s", 'Charlie\'s Friend');
+    $this->assert(count($results) === 1);
+    $this->assert($results[0]['age'] == 30 && $results[0]['password'] == 'goodbye');
     
-    
-    
+    $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
+    $this->assert(count($results) === 2);
   }
 
 }

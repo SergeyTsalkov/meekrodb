@@ -16,7 +16,7 @@ class DB
   public static $password = '';
   public static $host = 'localhost';
   public static $encoding = 'latin1';
-  public static $queryMode = 'buffered'; //buffered, unbuffered, queryAllRows
+  public static $queryMode = 'queryAllRows'; //buffered, unbuffered, queryAllRows
   
   public static function get($dbName = '') {
     static $mysql = null;
