@@ -68,6 +68,8 @@ class BasicTest extends SimpleTest {
       'height' => 155.23
     ));
     
+    $this->assert(DB::insertId() === 3);
+    
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
     
