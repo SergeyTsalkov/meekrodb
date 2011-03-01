@@ -1,4 +1,4 @@
-<?
+<?php
 class DB
 {
   public static $debug = false;
@@ -68,7 +68,7 @@ class DB
   }
   
   public static function escape($str) {
-    $db = DB::get($dbName);
+    $db = DB::get(DB::$dbName);
     return $db->real_escape_string($str);
   }
   
@@ -195,7 +195,7 @@ class DB
       $lastPos = 0;
       while (($pos = strpos($sql, $type, $lastPos)) !== false) {
         $lastPos = $pos + 1;
-        if ($posList[$pos] && strlen($posList[$pos]) > strlen($type)) continue;
+        if (isset($posList[$pos]) && strlen($posList[$pos]) > strlen($type)) continue;
         $posList[$pos] = $type;
       }
     }
@@ -310,7 +310,7 @@ class DB
   public static function queryAllRows() {
     $args = func_get_args();
     
-    $query = call_user_func_array('DB::queryUnbuf', &$args);
+    $query = call_user_func_array('DB::queryUnbuf', $args);
     $result = DB::fetchAllRows($query);
     DB::freeResult($query);
     DB::$num_rows = count($result);
@@ -356,7 +356,7 @@ class DB
     $row = call_user_func_array('DB::queryOneRow', $args);
     if ($row == null) { 
       return null;
-    } else if ($field === null) {
+    } else if ($column === null) {
       $keys = array_keys($row);
       $column = $keys[0];
     }  

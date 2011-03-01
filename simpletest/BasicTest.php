@@ -1,6 +1,7 @@
 <?
 class BasicTest extends SimpleTest {
   function __construct() {
+    error_reporting(E_ALL);
     require_once '../db.class.php';
     DB::$user = 'libdb_user';
     DB::$password = 'sdf235sklj';
@@ -78,6 +79,10 @@ class BasicTest extends SimpleTest {
     $this->assert($bart['username'] === 'Bart');
     
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
+      array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
+    $this->assert($charlie_password === 'goodbye');
+    
+    $charlie_password = DB::queryOneField('password', "SELECT * FROM accounts WHERE username IN %ls AND username = %s", 
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
     $this->assert($charlie_password === 'goodbye');
   }
