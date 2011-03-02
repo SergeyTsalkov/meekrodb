@@ -89,6 +89,20 @@ class DB
     return call_user_func_array($function, $args);
   }
   
+  private static function wrapStr($strOrArray, $wrapChar, $escape = false) {
+    if (! is_array($strOrArray)) {
+      if ($escape) return $wrapChar . DB::escape($strOrArray) . $wrapChar;
+      else return $wrapChar . $strOrArray . $wrapChar;
+    } else {
+      $R = array();
+      foreach ($strOrArray as $element) {
+        $R[] = DB::wrapStr($element, $wrapChar, $escape);
+      }
+      return $R;
+    }
+      
+  }
+  
   public static function freeResult($result) {
     if (! ($result instanceof MySQLi_Result)) return;
     return $result->free();
@@ -112,7 +126,7 @@ class DB
   
   public static function insertOrReplace($which, $table, $data) {
     $data = unserialize(serialize($data)); // break references within array
-    $keys_str = implode(', ', array_map(function($x) { return "`" . $x . "`"; }, array_keys($data)));
+    $keys_str = implode(', ', DB::wrapStr(array_keys($data), '`'));
     
     foreach ($data as &$datum) {
       if (is_array($datum)) $datum = serialize($datum);
@@ -219,7 +233,7 @@ class DB
         if (! is_array($arg)) die("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
       }
       
-      if ($type == '%ls') $result = array_map(function($x) { return "'" . DB::escape($x) . "'"; }, $arg);
+      if ($type == '%ls') $result = DB::wrapStr($arg, "'", true);
       else if ($type == '%li') $result = array_map('intval', $arg);
       else if ($type == '%ld') $result = array_map('floatval', $arg);
       else if ($type == '%lb') $result = array_map('DB::formatTableName', $arg);
