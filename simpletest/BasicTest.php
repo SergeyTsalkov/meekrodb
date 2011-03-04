@@ -1,4 +1,11 @@
 <?
+function new_error_callback($params) {
+  global $error_callback_worked;
+  
+  if (substr_count($params['error'], 'You have an error in your SQL syntax')) $error_callback_worked = 1;
+}
+
+
 class BasicTest extends SimpleTest {
   function __construct() {
     error_reporting(E_ALL);
@@ -94,6 +101,15 @@ class BasicTest extends SimpleTest {
     
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     $this->assert(count($results) === 2);
+  }
+  
+  function test_5_error_handler() {
+    global $error_callback_worked;
+    
+    DB::$error_handler = 'new_error_callback';
+    DB::query("SELET * FROM accounts");
+    
+    $this->assert($error_callback_worked === 1);
   }
 
 }

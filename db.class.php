@@ -17,6 +17,7 @@ class DB
   public static $host = 'localhost';
   public static $encoding = 'latin1';
   public static $queryMode = 'queryAllRows'; //buffered, unbuffered, queryAllRows
+  public static $error_handler = 'meekrodb_error_handler';
   
   public static function get($dbName = '') {
     static $mysql = null;
@@ -290,14 +291,16 @@ class DB
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
     if (DB::$debug) $runtime = microtime(true) - $starttime;
     
-    $sqlShow = "$sql (" . ($is_buffered ? 'MYSQLI_STORE_RESULT' : 'MYSQLI_USE_RESULT') . ")";
     if (!$sql || $error = DB::checkError()) {
-      echo "ATTEMPTED QUERY: $sqlShow<br>\n";
-      echo "ERROR: $error<br>\n";
-      debug_print_backtrace();
-      die;
+      if (function_exists(DB::$error_handler)) {
+        call_user_func(DB::$error_handler, array(
+          'query' => $sql,
+          'error' => $error
+        ));
+      }
     } else if (DB::$debug) {
       $runtime = sprintf('%f', $runtime * 1000);
+      $sqlShow = "$sql (" . ($is_buffered ? 'MYSQLI_STORE_RESULT' : 'MYSQLI_USE_RESULT') . ")";
       echo "QUERY: $sqlShow [$runtime ms]<br>\n";
     }
     
@@ -480,6 +483,22 @@ class DBTransaction {
   }
   
   
+}
+
+function meekrodb_error_handler($params) {
+  $out[] = "QUERY: " . $params['query'];
+  $out[] = "ERROR: " . $params['error'];
+  $out[] = "";
+  
+  if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
+    echo implode("\n", $out);
+  } else {
+    echo implode("<br>\n", $out);
+  }
+  
+  debug_print_backtrace();
+  
+  die;
 }
 
 ?>
