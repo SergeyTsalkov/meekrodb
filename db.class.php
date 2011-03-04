@@ -16,8 +16,9 @@ class DB
   public static $password = '';
   public static $host = 'localhost';
   public static $encoding = 'latin1';
-  public static $queryMode = 'queryAllRows'; //buffered, unbuffered, queryAllRows
+  public static $queryMode = 'queryAllRows';
   public static $error_handler = 'meekrodb_error_handler';
+  public static $throw_exception_on_error = false;
   
   public static function get($dbName = '') {
     static $mysql = null;
@@ -298,6 +299,11 @@ class DB
           'error' => $error
         ));
       }
+      
+      if (DB::$throw_exception_on_error) {
+        $e = new MeekroDBException($error, $sql);
+        throw $e;
+      }
     } else if (DB::$debug) {
       $runtime = sprintf('%f', $runtime * 1000);
       $sqlShow = "$sql (" . ($is_buffered ? 'MYSQLI_STORE_RESULT' : 'MYSQLI_USE_RESULT') . ")";
@@ -483,6 +489,17 @@ class DBTransaction {
   }
   
   
+}
+
+class MeekroDBException extends Exception {
+  protected $query = '';
+  
+  function __construct($message='', $query='') {
+    parent::__construct($message);
+    $this->query = $query;
+  }
+  
+  public function getQuery() { return $this->query; }
 }
 
 function meekrodb_error_handler($params) {

@@ -108,8 +108,36 @@ class BasicTest extends SimpleTest {
     
     DB::$error_handler = 'new_error_callback';
     DB::query("SELET * FROM accounts");
-    
     $this->assert($error_callback_worked === 1);
+  }
+  
+  function test_6_exception_catch() {
+    DB::$error_handler = '';
+    DB::$throw_exception_on_error = true;
+    try {
+      DB::query("SELET * FROM accounts");
+    } catch(MeekroDBException $e) {
+      $this->assert(substr_count($e->getMessage(), 'You have an error in your SQL syntax'));
+      $this->assert($e->getQuery() === 'SELET * FROM accounts');
+      $exception_was_caught = 1;
+    }
+    $this->assert($exception_was_caught === 1);
+    
+    try {
+      DB::insert('`libdb_test`.`accounts`', array(
+        'id' => 2,
+        'username' => 'Another Dude\'s \'Mom"',
+        'password' => 'asdfsdse',
+        'age' => 35,
+        'height' => 555.23
+      ));
+    } catch(MeekroDBException $e) {
+      $this->assert(substr_count($e->getMessage(), 'Duplicate entry'));
+      $exception_was_caught = 2;
+    }
+    $this->assert($exception_was_caught === 2);
+    
+    
   }
 
 }
