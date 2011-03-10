@@ -19,6 +19,7 @@ class DB
   public static $queryMode = 'queryAllRows';
   public static $error_handler = 'meekrodb_error_handler';
   public static $throw_exception_on_error = false;
+  public static $tbPrefix = '';
   
   public static function get($dbName = '') {
     static $mysql = null;
@@ -76,11 +77,12 @@ class DB
   
   private static function formatTableName($table) {
     $table = str_replace('`', '', $table);
+	$prefix = $this->tbPrefix;
     if (strpos($table, '.')) {
       list($table_db, $table_table) = explode('.', $table, 2);
-      $table = "`$table_db`.`$table_table`";
+      $table = "`$table_db`.`$prefix$table_table`";
     } else {
-      $table = "`$table`";
+      $table = "`$prefix$table`";
     }
     
     return $table;
