@@ -5,6 +5,11 @@ function new_error_callback($params) {
   if (substr_count($params['error'], 'You have an error in your SQL syntax')) $error_callback_worked = 1;
 }
 
+function my_debug_handler($params) {
+  global $debug_callback_worked;
+  if (substr_count($params['query'], 'SELECT')) $debug_callback_worked = 1;
+}
+
 
 class BasicTest extends SimpleTest {
   function __construct() {
@@ -136,8 +141,17 @@ class BasicTest extends SimpleTest {
       $exception_was_caught = 2;
     }
     $this->assert($exception_was_caught === 2);
+  }
+  
+  function test_7_debugmode_handler() {
+    global $debug_callback_worked;
     
+    DB::debugMode('my_debug_handler');
+    DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     
+    $this->assert($debug_callback_worked === 1);
+    
+    DB::debugMode(false);
   }
 
 }

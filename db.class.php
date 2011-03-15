@@ -19,7 +19,6 @@
 
 class DB
 {
-  public static $debug = false;
   public static $insert_id = 0;
   public static $num_rows = 0;
   public static $affected_rows = 0;
@@ -36,6 +35,7 @@ class DB
   public static $port = null;
   public static $encoding = 'latin1';
   public static $queryMode = 'queryAllRows';
+  public static $success_handler = false;
   public static $error_handler = 'meekrodb_error_handler';
   public static $throw_exception_on_error = false;
   
@@ -53,8 +53,8 @@ class DB
     return $mysql;
   }
   
-  public static function debugMode() {
-    DB::$debug = true;
+  public static function debugMode($handler = true) {
+    DB::$success_handler = $handler;
   }
   
   public static function insertId() { return DB::$insert_id; }
@@ -69,11 +69,6 @@ class DB
     if (! $db->select_db($dbName)) die("unable to set db to $dbName");
     DB::$current_db = $dbName;
     DB::$current_db_limit = $limit;
-    
-    if (DB::$debug) { 
-      if ($limit) echo "Setting DB to $dbName for $limit queries<br>\n";
-      else echo "Setting DB to $dbName for $limit queries<br>\n";
-    }
   }
   
   
@@ -309,9 +304,9 @@ class DB
     
     $db = DB::get();
     
-    if (DB::$debug) $starttime = microtime(true);
+    if (DB::$success_handler) $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
-    if (DB::$debug) $runtime = microtime(true) - $starttime;
+    if (DB::$success_handler) $runtime = microtime(true) - $starttime;
     
     if (!$sql || $error = DB::checkError()) {
       if (function_exists(DB::$error_handler)) {
@@ -325,10 +320,14 @@ class DB
         $e = new MeekroDBException($error, $sql);
         throw $e;
       }
-    } else if (DB::$debug) {
+    } else if (DB::$success_handler) {
       $runtime = sprintf('%f', $runtime * 1000);
-      $sqlShow = "$sql (" . ($is_buffered ? 'MYSQLI_STORE_RESULT' : 'MYSQLI_USE_RESULT') . ")";
-      echo "QUERY: $sqlShow [$runtime ms]<br>\n";
+      $success_handler = function_exists(DB::$success_handler) ? DB::$success_handler : 'meekrodb_debugmode_handler';
+      
+      call_user_func($success_handler, array(
+        'query' => $sql,
+        'runtime' => $runtime
+      )); 
     }
     
     DB::$queryResult = $result;
@@ -537,6 +536,15 @@ function meekrodb_error_handler($params) {
   debug_print_backtrace();
   
   die;
+}
+
+function meekrodb_debugmode_handler($params) {
+  echo "QUERY: " . $params['query'] . " [" . $params['runtime'] . " ms]";
+  if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
+    echo "\n";
+  } else {
+    echo "<br>\n";
+  }
 }
 
 ?>
