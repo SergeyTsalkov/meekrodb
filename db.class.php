@@ -57,10 +57,10 @@ class DB
   
   public static function insertId() { return DB::$insert_id; }
   public static function affectedRows() { return DB::$affected_rows; }
-  public static function count() { return call_user_func_array('DB::numRows', func_get_args()); }
+  public static function count() { $args = func_get_args(); return call_user_func_array('DB::numRows', $args); }
   public static function numRows() { return DB::$num_rows; }
   
-  public static function useDB() { return call_user_func_array('DB::setDB', func_get_args()); }
+  public static function useDB() { $args = func_get_args(); return call_user_func_array('DB::setDB', $args); }
   public static function setDB($dbName, $limit=0) {
     $db = DB::get();
     DB::$old_db = DB::$current_db;
@@ -281,19 +281,20 @@ class DB
       return call_user_func_array('DB::parseQueryParamsNew', $args);
   }
   
-  public static function quickPrepare() { return call_user_func_array('DB::query', func_get_args()); }
+  public static function quickPrepare() { $args = func_get_args(); return call_user_func_array('DB::query', $args); }
   
   public static function query() {
+    $args = func_get_args();
     if (DB::$queryMode == 'buffered' || DB::$queryMode == 'unbuffered') {
-      return DB::prependCall('DB::queryHelper', func_get_args(), DB::$queryMode);
+      return DB::prependCall('DB::queryHelper', $args, DB::$queryMode);
     } else {
-      return call_user_func_array('DB::queryAllRows', func_get_args());
+      return call_user_func_array('DB::queryAllRows', $args);
     }
   }
   
-  public static function queryNull() { return DB::prependCall('DB::queryHelper', func_get_args(), 'null'); }
-  public static function queryBuf() { return DB::prependCall('DB::queryHelper', func_get_args(), 'buffered'); }
-  public static function queryUnbuf() { return DB::prependCall('DB::queryHelper', func_get_args(), 'unbuffered'); }
+  public static function queryNull() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'null'); }
+  public static function queryBuf() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'buffered'); }
+  public static function queryUnbuf() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'unbuffered'); }
   
   public static function queryHelper() {
     $args = func_get_args();
@@ -359,7 +360,7 @@ class DB
     return $result;
   }
   
-  public static function queryOneRow() { return call_user_func_array('DB::queryFirstRow', func_get_args()); }
+  public static function queryOneRow() { $args = func_get_args(); return call_user_func_array('DB::queryFirstRow', $args); }
   public static function queryFirstRow() {
     $args = func_get_args();
     $query = call_user_func_array('DB::queryUnbuf', $args);
@@ -369,7 +370,7 @@ class DB
   }
   
   
-  public static function queryFirstColumn() { return DB::prependCall('DB::queryOneColumn', func_get_args(), null); }
+  public static function queryFirstColumn() { $args = func_get_args(); return DB::prependCall('DB::queryOneColumn', $args, null); }
   public static function queryOneColumn() {
     $args = func_get_args();
     $column = array_shift($args);
@@ -389,7 +390,7 @@ class DB
     return $ret;
   }
   
-  public static function queryFirstField() { return DB::prependCall('DB::queryOneField', func_get_args(), null); }
+  public static function queryFirstField() { $args = func_get_args(); return DB::prependCall('DB::queryOneField', $args, null); }
   public static function queryOneField() {
     $args = func_get_args();
     $column = array_shift($args);

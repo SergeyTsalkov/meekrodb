@@ -1,5 +1,5 @@
 #!/usr/bin/php
-<?
+<?php
 class SimpleTest {
   protected function assert($boolean) {
     if (! $boolean) $this->fail();
@@ -25,7 +25,7 @@ class SimpleTest {
       if ($type == 'dirs' && ! is_dir("$dir/$filename")) continue;
       if ($type == 'symlinks' && ! is_link("$dir/$filename")) continue;
       
-      $A[] = "$dir/$filename";
+      $A[] = $dir . DIRECTORY_SEPARATOR . $filename;
     }
     return $A;
   }
@@ -34,13 +34,12 @@ class SimpleTest {
 
 }
 
-$files = SimpleTest::__listfiles(__DIR__, '/^.*php$/i');
+$files = SimpleTest::__listfiles(dirname(__FILE__), '/^.*php$/i');
 
 $classes_to_test = array();
 foreach ($files as $fullpath) {
   $filename = basename($fullpath);
   if ($fullpath == __FILE__) continue;
-  
   require_once($fullpath);
   $classes_to_test[] = str_replace('.php', '', $filename);
 }
