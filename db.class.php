@@ -33,6 +33,7 @@ class DB
   public static $user = '';
   public static $password = '';
   public static $host = 'localhost';
+  public static $port = null;
   public static $encoding = 'latin1';
   public static $queryMode = 'queryAllRows';
   public static $error_handler = 'meekrodb_error_handler';
@@ -42,9 +43,10 @@ class DB
     static $mysql = null;
     
     if ($mysql == null) {
+      if (! DB::$port) DB::$port = ini_get('mysqli.default_port');
       if (DB::$dbName != '') $dbName = DB::$dbName;
       DB::$current_db = $dbName;
-      $mysql = new mysqli(DB::$host, DB::$user, DB::$password, $dbName);
+      $mysql = new mysqli(DB::$host, DB::$user, DB::$password, $dbName, DB::$port);
       DB::queryNull("SET NAMES %s", DB::$encoding);
     } 
     
