@@ -47,7 +47,7 @@ class DB
       if (DB::$dbName != '') $dbName = DB::$dbName;
       DB::$current_db = $dbName;
       $mysql = new mysqli(DB::$host, DB::$user, DB::$password, $dbName, DB::$port);
-      DB::queryNull("SET NAMES %s", DB::$encoding);
+      $mysql->set_charset(DB::$encoding);
     } 
     
     return $mysql;
