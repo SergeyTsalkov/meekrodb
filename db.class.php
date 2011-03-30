@@ -361,6 +361,26 @@ class DB
     return $result;
   }
   
+  public static function queryAllArrays() {
+    $args = func_get_args();
+    
+    $query = call_user_func_array('DB::queryUnbuf', $args);
+    $result = DB::fetchAllArrays($query);
+    DB::freeResult($query);
+    DB::$num_rows = count($result);
+    
+    return $result;
+  }
+  
+  public static function queryOneList() { $args = func_get_args(); return call_user_func_array('DB::queryFirstList', $args); }
+  public static function queryFirstList() {
+    $args = func_get_args();
+    $query = call_user_func_array('DB::queryUnbuf', $args);
+    $result = DB::fetchArray($query);
+    DB::freeResult($query);
+    return $result;
+  }
+  
   public static function queryOneRow() { $args = func_get_args(); return call_user_func_array('DB::queryFirstRow', $args); }
   public static function queryFirstRow() {
     $args = func_get_args();
@@ -371,7 +391,20 @@ class DB
   }
   
   
-  public static function queryFirstColumn() { $args = func_get_args(); return DB::prependCall('DB::queryOneColumn', $args, null); }
+  public static function queryFirstColumn() { 
+    $args = func_get_args();
+    $results = call_user_func_array('DB::queryAllArrays', $args);
+    $ret = array();
+    
+    if (!count($results) || !count($results[0])) return $ret;
+    
+    foreach ($results as $row) {
+      $ret[] = $row[0];
+    }
+    
+    return $ret;
+  }
+  
   public static function queryOneColumn() {
     $args = func_get_args();
     $column = array_shift($args);
@@ -391,7 +424,13 @@ class DB
     return $ret;
   }
   
-  public static function queryFirstField() { $args = func_get_args(); return DB::prependCall('DB::queryOneField', $args, null); }
+  public static function queryFirstField() { 
+    $args = func_get_args();
+    $row = call_user_func_array('DB::queryFirstList', $args);
+    if ($row == null) return null;    
+    return $row[0];
+  }
+  
   public static function queryOneField() {
     $args = func_get_args();
     $column = array_shift($args);
@@ -431,6 +470,22 @@ class DB
     }
     return $A;
   }
+  
+  public static function fetchArray($result = null) {
+    if ($result === null) $result = DB::$queryResult;
+    if (! ($result instanceof MySQLi_Result)) return null;
+    return $result->fetch_row();
+  }
+  
+  public static function fetchAllArrays($result = null) {
+    $A = array();
+    while ($row = DB::fetchArray($result)) {
+      $A[] = $row;
+    }
+    return $A;
+  }
+  
+  
 }
 
 class WhereClause {
