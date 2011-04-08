@@ -133,7 +133,14 @@ class DB
     $buildquery = "UPDATE " . self::formatTableName($table) . " SET ";
     $keyval = array();
     foreach ($params as $key => $value) {
-      $keyval[] = "`" . $key . "`=" . (is_int($value) ? $value : "'" . DB::escape($value) . "'");
+      if (is_object($value) && ($value instanceof MeekroDBEval)) {
+        $value = $value->text;
+      } else {
+        if (is_array($value)) $value = serialize($value);
+        $value = (is_int($value) ? $value : "'" . DB::escape($value) . "'");
+      }
+      
+      $keyval[] = "`" . $key . "`=" . $value;
     }
     
     $buildquery = "UPDATE " . self::formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
@@ -146,8 +153,12 @@ class DB
     $keys_str = implode(', ', DB::wrapStr(array_keys($data), '`'));
     
     foreach ($data as &$datum) {
-      if (is_array($datum)) $datum = serialize($datum);
-      $datum = "'" . DB::escape($datum) . "'";
+      if (is_object($datum) && ($datum instanceof MeekroDBEval)) { 
+        $datum = $datum->text;
+      } else {
+        if (is_array($datum)) $datum = serialize($datum);
+        $datum = (is_int($datum) ? $datum : "'" . DB::escape($datum) . "'");
+      }
     }
     $values_str = implode(', ', array_values($data));
     
@@ -162,6 +173,10 @@ class DB
   
   public static function replace($table, $data) {
     return DB::insertOrReplace('REPLACE', $table, $data);
+  }
+  
+  public static function sqleval($text) {
+    return new MeekroDBEval($text);
   }
   
   public static function columnList($table) {
@@ -599,6 +614,14 @@ function meekrodb_debugmode_handler($params) {
     echo "\n";
   } else {
     echo "<br>\n";
+  }
+}
+
+class MeekroDBEval {
+  public $text = '';
+  
+  function __construct($text) {
+    $this->text = $text;
   }
 }
 

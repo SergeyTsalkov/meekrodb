@@ -118,6 +118,29 @@ class BasicTest extends SimpleTest {
     $this->assert(count($results) === 2);
   }
   
+  function test_4_1_query() {
+    DB::insert('accounts', array(
+      'username' => 'newguy',
+      'password' => DB::sqleval("REPEAT('blah', 3)"),
+      'age' => 172,
+      'height' => 111.15
+    ));
+    
+    $row = DB::queryOneRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
+    $this->assert($row['username'] === 'newguy');
+    
+    DB::update('accounts', array(
+      'password' => DB::sqleval("REPEAT('blah', 4)"),
+      ), 'username=%s', 'newguy');
+    
+    $row = null;
+    $row = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
+    $this->assert($row['password'] === 'blahblahblahblah');
+    
+    DB::query("DELETE FROM accounts WHERE password=%s", 'blahblahblahblah');
+    $this->assert(DB::affectedRows() === 1);
+  }
+  
   function test_5_error_handler() {
     global $error_callback_worked;
     
