@@ -181,7 +181,9 @@ class DB
     call_user_func_array('DB::queryNull', $args);
   }
   
-  public static function sqleval($text) {
+  public static function sqleval() {
+    $args = func_get_args();
+    $text = call_user_func_array('DB::parseQueryParams', $args);
     return new MeekroDBEval($text);
   }
   

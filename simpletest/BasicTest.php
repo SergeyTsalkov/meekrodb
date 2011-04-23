@@ -135,16 +135,17 @@ class BasicTest extends SimpleTest {
   function test_4_1_query() {
     DB::insert('accounts', array(
       'username' => 'newguy',
-      'password' => DB::sqleval("REPEAT('blah', 3)"),
-      'age' => 172,
+      'password' => DB::sqleval("REPEAT('blah', %i)", '3'),
+      'age' => DB::sqleval('171+1'),
       'height' => 111.15
     ));
     
     $row = DB::queryOneRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
     $this->assert($row['username'] === 'newguy');
+    $this->assert($row['age'] === '172');
     
     DB::update('accounts', array(
-      'password' => DB::sqleval("REPEAT('blah', 4)"),
+      'password' => DB::sqleval("REPEAT('blah', %i)", 4),
       ), 'username=%s', 'newguy');
     
     $row = null;
