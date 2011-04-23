@@ -172,6 +172,15 @@ class DB
     return DB::insertOrReplace('REPLACE', $table, $data);
   }
   
+  public static function delete() {
+    $args = func_get_args();
+    $table = self::formatTableName(array_shift($args));
+    $where = array_shift($args);
+    $buildquery = "DELETE FROM $table WHERE $where";
+    array_unshift($args, $buildquery);
+    call_user_func_array('DB::queryNull', $args);
+  }
+  
   public static function sqleval($text) {
     return new MeekroDBEval($text);
   }

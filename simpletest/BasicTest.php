@@ -155,6 +155,24 @@ class BasicTest extends SimpleTest {
     $this->assert(DB::affectedRows() === 1);
   }
   
+  function test_4_2_delete() {
+    DB::insert('accounts', array(
+      'username' => 'gonesoon',
+      'password' => 'something',
+      'age' => 61,
+      'height' => 199.194
+    ));
+    
+    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s AND height=%d", 'gonesoon', 199.194);
+    $this->assert(intval($ct) === 1);
+    
+    DB::delete('accounts', 'username=%s AND age=%i AND height=%d', 'gonesoon', '61', '199.194');
+    $this->assert(DB::affectedRows() === 1);
+    
+    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s AND height=%d", 'gonesoon', '199.194');
+    $this->assert(intval($ct) === 0);
+  }
+  
   function test_5_error_handler() {
     global $error_callback_worked;
     
