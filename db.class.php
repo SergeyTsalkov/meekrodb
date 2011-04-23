@@ -35,7 +35,7 @@ class DB
   public static $encoding = 'latin1';
   public static $queryMode = 'queryAllRows';
   public static $success_handler = false;
-  public static $error_handler = 'meekrodb_error_handler';
+  public static $error_handler = true;
   public static $throw_exception_on_error = false;
   
   public static function get() {
@@ -145,31 +145,57 @@ class DB
     call_user_func_array('DB::queryNull', $args);
   }
   
-  public static function insertOrReplace($which, $table, $data) {
-    $data = unserialize(serialize($data)); // break references within array
-    $keys_str = implode(', ', DB::wrapStr(array_keys($data), '`'));
+  public static function insertOrReplace($which, $table, $datas, $many) {
+    $datas = unserialize(serialize($datas)); // break references within array
+    $keys = null;
+    if (! $many) $datas = array($datas);
     
-    foreach ($data as &$datum) {
-      if (is_object($datum) && ($datum instanceof MeekroDBEval)) { 
-        $datum = $datum->text;
-      } else {
-        if (is_array($datum)) $datum = serialize($datum);
-        $datum = (is_int($datum) ? $datum : "'" . DB::escape($datum) . "'");
+    foreach ($datas as $data) {
+      if (! $keys) {
+        $keys = array_keys($data);
+        if ($many) sort($keys);
       }
+      
+      $insert_values = array();
+      
+      foreach ($keys as $key) {
+        if ($many && !isset($data[$key])) die("insert/replace many: each assoc array must have the same keys!");
+        $datum = $data[$key];
+        
+        if (is_object($datum) && ($datum instanceof MeekroDBEval)) { 
+          $datum = $datum->text;
+        } else {
+          if (is_array($datum)) $datum = serialize($datum);
+          $datum = (is_int($datum) ? $datum : "'" . DB::escape($datum) . "'");
+        }
+        $insert_values[] = $datum;
+      }
+      
+      
+      $values[] = '(' . implode(', ', $insert_values) . ')';
     }
-    $values_str = implode(', ', array_values($data));
     
     $table = self::formatTableName($table);
+    $keys_str = implode(', ', DB::wrapStr($keys, '`'));
+    $values_str = implode(',', $values);
     
-    DB::queryNull("$which INTO $table ($keys_str) VALUES ($values_str)");
+    DB::queryNull("$which INTO $table ($keys_str) VALUES $values_str");
   }
   
   public static function insert($table, $data) {
-    return DB::insertOrReplace('INSERT', $table, $data);
+    return DB::insertOrReplace('INSERT', $table, $data, false);
+  }
+  
+  public static function insertMany($table, $data) {
+    return DB::insertOrReplace('INSERT', $table, $data, true);
   }
   
   public static function replace($table, $data) {
-    return DB::insertOrReplace('REPLACE', $table, $data);
+    return DB::insertOrReplace('REPLACE', $table, $data, false);
+  }
+  
+  public static function replaceMany($table, $data) {
+    return DB::insertOrReplace('REPLACE', $table, $data, true);
   }
   
   public static function delete() {
@@ -326,8 +352,10 @@ class DB
     if (DB::$success_handler) $runtime = microtime(true) - $starttime;
     
     if (!$sql || $error = DB::checkError()) {
-      if (function_exists(DB::$error_handler)) {
-        call_user_func(DB::$error_handler, array(
+      if (DB::$error_handler) {
+        $error_handler = is_callable(DB::$error_handler) ? DB::$error_handler : 'meekrodb_error_handler';
+        
+        call_user_func($error_handler, array(
           'query' => $sql,
           'error' => $error
         ));
@@ -339,7 +367,7 @@ class DB
       }
     } else if (DB::$success_handler) {
       $runtime = sprintf('%f', $runtime * 1000);
-      $success_handler = function_exists(DB::$success_handler) ? DB::$success_handler : 'meekrodb_debugmode_handler';
+      $success_handler = is_callable(DB::$success_handler) ? DB::$success_handler : 'meekrodb_debugmode_handler';
       
       call_user_func($success_handler, array(
         'query' => $sql,

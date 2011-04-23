@@ -174,12 +174,66 @@ class BasicTest extends SimpleTest {
     $this->assert(intval($ct) === 0);
   }
   
+  function test_4_3_insertmany() {
+    $ins[] = array(
+      'username' => '1ofmany',
+      'password' => 'something',
+      'age' => 23,
+      'height' => 190.194
+    );
+    $ins[] = array(
+      'password' => 'somethingelse',
+      'username' => '2ofmany',
+      'age' => 25,
+      'height' => 190.194
+    );
+    
+    DB::insertMany('accounts', $ins);
+    $this->assert(DB::affectedRows() === 2);
+    
+    $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY age ASC", 190.194);
+    $this->assert(count($rows) === 2);
+    $this->assert($rows[0]['username'] === '1ofmany');
+    $this->assert($rows[0]['age'] === '23');
+    $this->assert($rows[1]['age'] === '25');
+    $this->assert($rows[1]['password'] === 'somethingelse');
+    $this->assert($rows[1]['username'] === '2ofmany');
+    
+  }
+  
   function test_5_error_handler() {
-    global $error_callback_worked;
+    global $error_callback_worked, $static_error_callback_worked, $nonstatic_error_callback_worked, 
+      $anonymous_error_callback_worked;
     
     DB::$error_handler = 'new_error_callback';
     DB::query("SELET * FROM accounts");
     $this->assert($error_callback_worked === 1);
+    
+    DB::$error_handler = array('BasicTest', 'static_error_callback');
+    DB::query("SELET * FROM accounts");
+    $this->assert($static_error_callback_worked === 1);
+    
+    DB::$error_handler = array($this, 'nonstatic_error_callback');
+    DB::query("SELET * FROM accounts");
+    $this->assert($nonstatic_error_callback_worked === 1);
+    
+    DB::$error_handler = function($params) {
+      global $anonymous_error_callback_worked;
+      if (substr_count($params['error'], 'You have an error in your SQL syntax')) $anonymous_error_callback_worked = 1;
+    };
+    DB::query("SELET * FROM accounts");
+    $this->assert($anonymous_error_callback_worked === 1);
+    
+  }
+  
+  public static function static_error_callback($params) {
+    global $static_error_callback_worked;
+    if (substr_count($params['error'], 'You have an error in your SQL syntax')) $static_error_callback_worked = 1;
+  }
+  
+  public function nonstatic_error_callback($params) {
+    global $nonstatic_error_callback_worked;
+    if (substr_count($params['error'], 'You have an error in your SQL syntax')) $nonstatic_error_callback_worked = 1;
   }
   
   function test_6_exception_catch() {

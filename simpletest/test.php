@@ -48,7 +48,7 @@ foreach ($classes_to_test as $class) {
   $object = new $class();
   
   foreach (get_class_methods($object) as $method) {
-    if (substr($method, 0, 2) == '__') continue;
+    if (substr($method, 0, 4) != 'test') continue;
     echo "Running $class::$method..\n";
     $object->$method();
   }
