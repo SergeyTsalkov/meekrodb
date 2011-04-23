@@ -116,6 +116,20 @@ class BasicTest extends SimpleTest {
     
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     $this->assert(count($results) === 2);
+    
+    $columnlist = DB::columnList('accounts');
+    $this->assert(count($columnlist) === 5);
+    $this->assert($columnlist[0] === 'id');
+    $this->assert($columnlist[4] === 'height');
+    
+    $tablelist = DB::tableList();
+    $this->assert(count($tablelist) === 1);
+    $this->assert($tablelist[0] === 'accounts');
+    
+    $tablelist = null;
+    $tablelist = DB::tableList('libdb_test');
+    $this->assert(count($tablelist) === 1);
+    $this->assert($tablelist[0] === 'accounts');
   }
   
   function test_4_1_query() {

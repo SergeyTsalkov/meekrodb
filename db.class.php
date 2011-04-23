@@ -27,8 +27,7 @@ class DB
   public static $queryResultType = null;
   public static $old_db = null;
   public static $current_db = null;
-  public static $current_db_limit = 0;
-  public static $dbName = null;
+  public static $dbName = '';
   public static $user = '';
   public static $password = '';
   public static $host = 'localhost';
@@ -39,16 +38,15 @@ class DB
   public static $error_handler = 'meekrodb_error_handler';
   public static $throw_exception_on_error = false;
   
-  public static function get($dbName = '') {
+  public static function get() {
     static $mysql = null;
     
     if ($mysql == null) {
       if (! DB::$port) DB::$port = ini_get('mysqli.default_port');
-      if (DB::$dbName != '') $dbName = DB::$dbName;
-      DB::$current_db = $dbName;
-      $mysql = new mysqli(DB::$host, DB::$user, DB::$password, $dbName, DB::$port);
+      DB::$current_db = DB::$dbName;
+      $mysql = new mysqli(DB::$host, DB::$user, DB::$password, DB::$dbName, DB::$port);
       $mysql->set_charset(DB::$encoding);
-    } 
+    }
     
     return $mysql;
   }
@@ -63,12 +61,11 @@ class DB
   public static function numRows() { return DB::$num_rows; }
   
   public static function useDB() { $args = func_get_args(); return call_user_func_array('DB::setDB', $args); }
-  public static function setDB($dbName, $limit=0) {
+  public static function setDB($dbName) {
     $db = DB::get();
     DB::$old_db = DB::$current_db;
     if (! $db->select_db($dbName)) die("unable to set db to $dbName");
     DB::$current_db = $dbName;
-    DB::$current_db_limit = $limit;
   }
   
   
@@ -85,7 +82,7 @@ class DB
   }
   
   public static function escape($str) {
-    $db = DB::get(DB::$dbName);
+    $db = DB::get();
     return $db->real_escape_string($str);
   }
   
@@ -185,15 +182,9 @@ class DB
   
   public static function tableList($db = null) {
     if ($db) DB::useDB($db);
-    $db = DB::$current_db;
-    return DB::queryOneColumn('Tables_in_' . $db, "SHOW TABLES");
-  }
-  
-  private static function checkUseDB() {
-    if (DB::$current_db_limit > 0) { 
-      DB::$current_db_limit -= 1;
-      if (DB::$current_db_limit == 0) DB::useDB(DB::$old_db);
-    }
+    $result = DB::queryFirstColumn('SHOW TABLES');
+    if ($db && DB::$old_db) DB::useDB(DB::$old_db);
+    return $result;
   }
   
   public static function parseQueryParamsOld() {
@@ -352,9 +343,6 @@ class DB
     
     if ($is_buffered) DB::$num_rows = $result->num_rows;
     else DB::$num_rows = null;
-    
-    //TODO: fix DB switch back 
-    //DB::checkUseDB();
     
     if ($is_null) {
       DB::freeResult($result);
