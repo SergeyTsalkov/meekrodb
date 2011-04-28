@@ -37,6 +37,7 @@ class DB
   public static $success_handler = false;
   public static $error_handler = true;
   public static $throw_exception_on_error = false;
+  public static $param_char = '%';
   
   public static function get() {
     static $mysql = null;
@@ -244,26 +245,25 @@ class DB
     return $sql;
   }
   
-  /*
-    %s = string
-    %i = integer
-    %d = decimal / double
-    %b = backtick
-    %l = literal
-    
-    %ls = list of strings
-    %li = list of integers
-    %ld = list of doubles
-    %ll = list of literals
-    %lb = list of backticks
-  */
-  
   public static function parseQueryParamsNew() {
     $args = func_get_args();
     $sql = array_shift($args);
     $posList = array();
     $pos_adj = 0;
-    $types = array('%ll', '%ls', '%l', '%li', '%ld', '%lb', '%s', '%i', '%d', '%b', '%ss');
+    $param_char_length = strlen(DB::$param_char);
+    $types = array(
+      DB::$param_char . 'll', // list of literals
+      DB::$param_char . 'ls', // list of strings
+      DB::$param_char . 'l',  // literal
+      DB::$param_char . 'li', // list of integers
+      DB::$param_char . 'ld', // list of decimals
+      DB::$param_char . 'lb', // list of backticks
+      DB::$param_char . 's',  // string
+      DB::$param_char . 'i',  // integer
+      DB::$param_char . 'd',  // double / decimal
+      DB::$param_char . 'b',  // backtick
+      DB::$param_char . 'ss'  // search string (like string, surrounded with %'s)
+    );
     
     foreach ($types as $type) {
       $lastPos = 0;
@@ -278,26 +278,25 @@ class DB
     
     foreach ($posList as $pos => $type) {
       $arg = array_shift($args);
+      $type = substr($type, $param_char_length);
+      $length_type = strlen($type) + $param_char_length;
       
-      if (in_array($type, array('%s', '%i', '%d', '%b', '%l'))) {
+      if (in_array($type, array('s', 'i', 'd', 'b', 'l'))) {
         $array_type = false;
         $arg = array($arg);
-        $length_type = strlen($type);
-        $type = '%l' . substr($type, 1);
-      } else if ($type == '%ss') {
+        $type = 'l' . $type;
+      } else if ($type == 'ss') {
         $result = "'%" . DB::escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
-        $length_type = strlen($type);
       } else {
         $array_type = true;
-        $length_type = strlen($type);
         if (! is_array($arg)) die("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
       }
       
-      if ($type == '%ls') $result = DB::wrapStr($arg, "'", true);
-      else if ($type == '%li') $result = array_map('intval', $arg);
-      else if ($type == '%ld') $result = array_map('floatval', $arg);
-      else if ($type == '%lb') $result = array_map('DB::formatTableName', $arg);
-      else if ($type == '%ll') $result = $arg;
+      if ($type == 'ls') $result = DB::wrapStr($arg, "'", true);
+      else if ($type == 'li') $result = array_map('intval', $arg);
+      else if ($type == 'ld') $result = array_map('floatval', $arg);
+      else if ($type == 'lb') $result = array_map('DB::formatTableName', $arg);
+      else if ($type == 'll') $result = $arg;
       else if (! $result) die("Badly formatted SQL query: $sql");
       
       if (is_array($result)) {

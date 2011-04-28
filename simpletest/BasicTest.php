@@ -86,9 +86,11 @@ class BasicTest extends SimpleTest {
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
     
-    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN %li AND height IN %ld AND username IN %ls", 
+    DB::$param_char = '###';
+    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
       array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
     $this->assert($bart['username'] === 'Bart');
+    DB::$param_char = '%';
     
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
