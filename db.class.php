@@ -270,12 +270,9 @@ class DB
       while (($pos = strpos($sql, $type, $lastPos)) !== false) {
         $lastPos = $pos + 1;
         if (isset($posList[$pos]) && strlen($posList[$pos]) > strlen($type)) continue;
-        if (substr($sql, $pos - 1, 1) == '%') continue;
         $posList[$pos] = $type;
       }
     }
-    
-    $sql = str_replace('%%', '%', $sql);
     
     ksort($posList);
     

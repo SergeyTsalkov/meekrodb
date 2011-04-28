@@ -23,11 +23,6 @@ class BasicTest extends SimpleTest {
     DB::useDB('libdb_test');
   }
   
-  function test_0_5_date_format() {
-    $month = DB::queryFirstField("SELECT DATE_FORMAT(NOW(), '%%b')", 4);
-    $this->assert($month === date('M'));
-  }
-  
   
   function test_1_create_table() {
     DB::query("CREATE TABLE `accounts` (
