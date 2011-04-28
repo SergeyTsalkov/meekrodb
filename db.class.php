@@ -22,7 +22,6 @@ class DB
   public static $insert_id = 0;
   public static $num_rows = 0;
   public static $affected_rows = 0;
-  public static $stmt = null;
   public static $queryResult = null;
   public static $queryResultType = null;
   public static $old_db = null;
