@@ -190,7 +190,7 @@ class BasicTest extends SimpleTest {
       'height' => 190.194
     );
     
-    DB::insertMany('accounts', $ins);
+    DB::insert('accounts', $ins);
     $this->assert(DB::affectedRows() === 2);
     
     $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY age ASC", 190.194);

@@ -145,10 +145,16 @@ class DB
     call_user_func_array('DB::queryNull', $args);
   }
   
-  public static function insertOrReplace($which, $table, $datas, $many) {
+  public static function insertOrReplace($which, $table, $datas) {
     $datas = unserialize(serialize($datas)); // break references within array
     $keys = null;
-    if (! $many) $datas = array($datas);
+    
+    if (isset($datas[0]) && is_array($datas[0])) {
+      $many = true;
+    } else {
+      $datas = array($datas);
+      $many = false;
+    }
     
     foreach ($datas as $data) {
       if (! $keys) {
@@ -165,7 +171,6 @@ class DB
         if (is_object($datum) && ($datum instanceof MeekroDBEval)) { 
           $datum = $datum->text;
         } else {
-          if (is_array($datum)) $datum = serialize($datum);
           $datum = (is_int($datum) ? $datum : "'" . DB::escape($datum) . "'");
         }
         $insert_values[] = $datum;
@@ -183,19 +188,11 @@ class DB
   }
   
   public static function insert($table, $data) {
-    return DB::insertOrReplace('INSERT', $table, $data, false);
-  }
-  
-  public static function insertMany($table, $data) {
-    return DB::insertOrReplace('INSERT', $table, $data, true);
+    return DB::insertOrReplace('INSERT', $table, $data);
   }
   
   public static function replace($table, $data) {
-    return DB::insertOrReplace('REPLACE', $table, $data, false);
-  }
-  
-  public static function replaceMany($table, $data) {
-    return DB::insertOrReplace('REPLACE', $table, $data, true);
+    return DB::insertOrReplace('REPLACE', $table, $data);
   }
   
   public static function delete() {
