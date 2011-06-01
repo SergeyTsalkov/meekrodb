@@ -30,7 +30,8 @@ class BasicTest extends SimpleTest {
     `username` VARCHAR( 255 ) NOT NULL ,
     `password` VARCHAR( 255 ) NOT NULL ,
     `age` INT NOT NULL DEFAULT '10',
-    `height` DOUBLE NOT NULL DEFAULT '10.0'
+    `height` DOUBLE NOT NULL DEFAULT '10.0',
+    `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi'
     ) ENGINE = InnoDB");
   }
   
@@ -78,13 +79,17 @@ class BasicTest extends SimpleTest {
       'username' => 'Charlie\'s Friend',
       'password' => 'goodbye',
       'age' => 30,
-      'height' => 155.23
+      'height' => 155.23,
+      'favorite_word' => null,
     ));
     
     $this->assert(DB::insertId() === 3);
     
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
+    
+    $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
+    $this->assert($password === 'goodbye');
     
     DB::$param_char = '###';
     $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
@@ -120,7 +125,7 @@ class BasicTest extends SimpleTest {
     $this->assert(count($results) === 2);
     
     $columnlist = DB::columnList('accounts');
-    $this->assert(count($columnlist) === 5);
+    $this->assert(count($columnlist) === 6);
     $this->assert($columnlist[0] === 'id');
     $this->assert($columnlist[4] === 'height');
     
@@ -148,11 +153,13 @@ class BasicTest extends SimpleTest {
     
     DB::update('accounts', array(
       'password' => DB::sqleval("REPEAT('blah', %i)", 4),
+      'favorite_word' => null,
       ), 'username=%s', 'newguy');
     
     $row = null;
     $row = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
     $this->assert($row['password'] === 'blahblahblahblah');
+    $this->assert($row['favorite_word'] === null);
     
     DB::query("DELETE FROM accounts WHERE password=%s", 'blahblahblahblah');
     $this->assert(DB::affectedRows() === 1);

@@ -133,8 +133,12 @@ class DB
       if (is_object($value) && ($value instanceof MeekroDBEval)) {
         $value = $value->text;
       } else {
-        if (is_array($value)) $value = serialize($value);
-        $value = (is_int($value) ? $value : "'" . DB::escape($value) . "'");
+        if (is_array($value) || is_object($value)) $value = serialize($value);
+        
+        if (is_string($value)) $value = "'" . DB::escape($value) . "'";
+        else if (is_null($value)) $value = 'NULL';
+        else if (is_bool($value)) $value = ($value ? 1 : 0);
+        
       }
       
       $keyval[] = "`" . $key . "`=" . $value;
@@ -171,7 +175,11 @@ class DB
         if (is_object($datum) && ($datum instanceof MeekroDBEval)) { 
           $datum = $datum->text;
         } else {
-          $datum = (is_int($datum) ? $datum : "'" . DB::escape($datum) . "'");
+          if (is_array($datum) || is_object($datum)) $datum = serialize($datum);
+          
+          if (is_string($datum)) $datum = "'" . DB::escape($datum) . "'";
+          else if (is_null($datum)) $datum = 'NULL';
+          else if (is_bool($datum)) $datum = ($datum ? 1 : 0);
         }
         $insert_values[] = $datum;
       }
