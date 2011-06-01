@@ -19,6 +19,7 @@
 
 class DB
 {
+  public static $internal_mysql = null;
   public static $insert_id = 0;
   public static $num_rows = 0;
   public static $affected_rows = 0;
@@ -39,13 +40,14 @@ class DB
   public static $param_char = '%';
   
   public static function get() {
-    static $mysql = null;
+    $mysql = DB::$internal_mysql;
     
     if ($mysql == null) {
       if (! DB::$port) DB::$port = ini_get('mysqli.default_port');
       DB::$current_db = DB::$dbName;
       $mysql = new mysqli(DB::$host, DB::$user, DB::$password, DB::$dbName, DB::$port);
       $mysql->set_charset(DB::$encoding);
+      DB::$internal_mysql = $mysql;
     }
     
     return $mysql;
