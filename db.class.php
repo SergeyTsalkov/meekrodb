@@ -88,6 +88,20 @@ class DB
     return $db->real_escape_string($str);
   }
   
+  public static function sanitize($value) {
+    if (is_object($value) && ($value instanceof MeekroDBEval)) {
+      $value = $value->text;
+    } else {
+      if (is_array($value) || is_object($value)) $value = serialize($value);
+      
+      if (is_string($value)) $value = "'" . DB::escape($value) . "'";
+      else if (is_null($value)) $value = 'NULL';
+      else if (is_bool($value)) $value = ($value ? 1 : 0);
+    }
+    
+    return $value;
+  }
+  
   private static function formatTableName($table) {
     $table = str_replace('`', '', $table);
     if (strpos($table, '.')) {
@@ -132,16 +146,7 @@ class DB
     $buildquery = "UPDATE " . self::formatTableName($table) . " SET ";
     $keyval = array();
     foreach ($params as $key => $value) {
-      if (is_object($value) && ($value instanceof MeekroDBEval)) {
-        $value = $value->text;
-      } else {
-        if (is_array($value) || is_object($value)) $value = serialize($value);
-        
-        if (is_string($value)) $value = "'" . DB::escape($value) . "'";
-        else if (is_null($value)) $value = 'NULL';
-        else if (is_bool($value)) $value = ($value ? 1 : 0);
-        
-      }
+      $value = DB::sanitize($value);
       
       $keyval[] = "`" . $key . "`=" . $value;
     }
@@ -173,16 +178,7 @@ class DB
       foreach ($keys as $key) {
         if ($many && !isset($data[$key])) die("insert/replace many: each assoc array must have the same keys!");
         $datum = $data[$key];
-        
-        if (is_object($datum) && ($datum instanceof MeekroDBEval)) { 
-          $datum = $datum->text;
-        } else {
-          if (is_array($datum) || is_object($datum)) $datum = serialize($datum);
-          
-          if (is_string($datum)) $datum = "'" . DB::escape($datum) . "'";
-          else if (is_null($datum)) $datum = 'NULL';
-          else if (is_bool($datum)) $datum = ($datum ? 1 : 0);
-        }
+        $datum = DB::sanitize($datum);
         $insert_values[] = $datum;
       }
       
