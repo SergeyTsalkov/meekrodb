@@ -15,12 +15,14 @@ class BasicTest extends SimpleTest {
   function __construct() {
     error_reporting(E_ALL);
     require_once '../db.class.php';
-    DB::$user = 'libdb_user';
-    DB::$password = 'sdf235sklj';
-    DB::$dbName = 'libdb_test';
-    DB::query("DROP DATABASE libdb_test");
-    DB::query("CREATE DATABASE libdb_test");
-    DB::useDB('libdb_test');
+    DB::$user = 'meekrodb_test_us';
+    DB::$password = 'akdfo59fg';
+    DB::$dbName = 'meekrodb_test';
+    DB::$host = 'mysql.meekro.com';
+    
+    foreach (DB::tableList() as $table) {
+      DB::query("DROP TABLE $table");
+    }
   }
   
   
@@ -74,8 +76,8 @@ class BasicTest extends SimpleTest {
       'age' => 15,
       'height' => 10.371
     ));
-    
-    DB::insert('`libdb_test`.`accounts`', array(
+    $dbname = DB::$dbName;
+    DB::insert("`$dbname`.`accounts`", array(
       'username' => 'Charlie\'s Friend',
       'password' => 'goodbye',
       'age' => 30,
@@ -134,7 +136,7 @@ class BasicTest extends SimpleTest {
     $this->assert($tablelist[0] === 'accounts');
     
     $tablelist = null;
-    $tablelist = DB::tableList('libdb_test');
+    $tablelist = DB::tableList(DB::$dbName);
     $this->assert(count($tablelist) === 1);
     $this->assert($tablelist[0] === 'accounts');
   }
@@ -246,6 +248,7 @@ class BasicTest extends SimpleTest {
   }
   
   function test_6_exception_catch() {
+    $dbname = DB::$dbName;
     DB::$error_handler = '';
     DB::$throw_exception_on_error = true;
     try {
@@ -258,7 +261,7 @@ class BasicTest extends SimpleTest {
     $this->assert($exception_was_caught === 1);
     
     try {
-      DB::insert('`libdb_test`.`accounts`', array(
+      DB::insert("`$dbname`.`accounts`", array(
         'id' => 2,
         'username' => 'Another Dude\'s \'Mom"',
         'password' => 'asdfsdse',

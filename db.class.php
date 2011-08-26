@@ -34,10 +34,14 @@ class DB
   public static $port = null;
   public static $encoding = 'latin1';
   public static $queryMode = 'queryAllRows';
+  public static $param_char = '%';
+  
   public static $success_handler = false;
   public static $error_handler = true;
   public static $throw_exception_on_error = false;
-  public static $param_char = '%';
+  public static $nonsql_error_handler = null;
+  public static $throw_exception_on_nonsql_error = false;
+  
   
   public static function get() {
     $mysql = DB::$internal_mysql;
@@ -46,11 +50,30 @@ class DB
       if (! DB::$port) DB::$port = ini_get('mysqli.default_port');
       DB::$current_db = DB::$dbName;
       $mysql = new mysqli(DB::$host, DB::$user, DB::$password, DB::$dbName, DB::$port);
+      
+      if ($mysql->connect_error) {
+        DB::nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
+      }
+      
       $mysql->set_charset(DB::$encoding);
       DB::$internal_mysql = $mysql;
     }
     
     return $mysql;
+  }
+  
+  protected static function nonSQLError($message) {
+    if (DB::$throw_exception_on_nonsql_error) {
+      $e = new MeekroDBException($message);
+      throw $e;
+    }
+    
+    $error_handler = is_callable(DB::$nonsql_error_handler) ? DB::$nonsql_error_handler : 'meekrodb_error_handler';
+        
+    call_user_func($error_handler, array(
+      'type' => 'nonsql',
+      'error' => $message
+    ));
   }
   
   public static function debugMode($handler = true) {
@@ -66,7 +89,7 @@ class DB
   public static function setDB($dbName) {
     $db = DB::get();
     DB::$old_db = DB::$current_db;
-    if (! $db->select_db($dbName)) die("unable to set db to $dbName");
+    if (! $db->select_db($dbName)) DB::nonSQLError("Unable to set database to $dbName");
     DB::$current_db = $dbName;
   }
   
@@ -176,7 +199,7 @@ class DB
       $insert_values = array();
       
       foreach ($keys as $key) {
-        if ($many && !isset($data[$key])) die("insert/replace many: each assoc array must have the same keys!");
+        if ($many && !isset($data[$key])) DB::nonSQLError('insert/replace many: each assoc array must have the same keys!'); 
         $datum = $data[$key];
         $datum = DB::sanitize($datum);
         $insert_values[] = $datum;
@@ -236,11 +259,11 @@ class DB
     foreach ($args as $arg) {
       $type = array_shift($types);
       $pos = strpos($sql, '?');
-      if ($pos === false) die("Badly formatted SQL query: $sql");
+      if ($pos === false) DB::nonSQLError("Badly formatted SQL query: $sql");  
       
       if ($type == 's') $replacement = "'" . DB::escape($arg) . "'";
       else if ($type == 'i') $replacement = intval($arg);
-      else die("Badly formatted SQL query: $sql");
+      else DB::nonSQLError("Badly formatted SQL query: $sql");
       
       $sql = substr_replace($sql, $replacement, $pos, 1);
     }
@@ -291,7 +314,7 @@ class DB
         $result = "'%" . DB::escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
       } else {
         $array_type = true;
-        if (! is_array($arg)) die("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
+        if (! is_array($arg)) DB::nonSQLError("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
       }
       
       if ($type == 'ls') $result = DB::wrapStr($arg, "'", true);
@@ -299,7 +322,7 @@ class DB
       else if ($type == 'ld') $result = array_map('floatval', $arg);
       else if ($type == 'lb') $result = array_map('DB::formatTableName', $arg);
       else if ($type == 'll') $result = $arg;
-      else if (! $result) die("Badly formatted SQL query: $sql");
+      else if (! $result) DB::nonSQLError("Badly formatted SQL query: $sql");
       
       if (is_array($result)) {
         if (! $array_type) $result = $result[0];
@@ -340,7 +363,9 @@ class DB
   public static function queryHelper() {
     $args = func_get_args();
     $type = array_shift($args);
-    if ($type != 'buffered' && $type != 'unbuffered' && $type != 'null') die("Error -- first argument to queryHelper must be buffered or unbuffered!");
+    if ($type != 'buffered' && $type != 'unbuffered' && $type != 'null') {
+      DB::nonSQLError('Error -- first argument to queryHelper must be buffered or unbuffered!');
+    }
     $is_buffered = ($type == 'buffered');
     $is_null = ($type == 'null');
     
@@ -357,6 +382,7 @@ class DB
         $error_handler = is_callable(DB::$error_handler) ? DB::$error_handler : 'meekrodb_error_handler';
         
         call_user_func($error_handler, array(
+          'type' => 'sql',
           'query' => $sql,
           'error' => $error
         ));
@@ -621,8 +647,8 @@ class MeekroDBException extends Exception {
 }
 
 function meekrodb_error_handler($params) {
-  $out[] = "QUERY: " . $params['query'];
-  $out[] = "ERROR: " . $params['error'];
+  if (isset($params['query'])) $out[] = "QUERY: " . $params['query'];
+  if (isset($params['error'])) $out[] = "ERROR: " . $params['error'];
   $out[] = "";
   
   if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
