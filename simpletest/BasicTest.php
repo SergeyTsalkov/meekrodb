@@ -16,9 +16,12 @@ class BasicTest extends SimpleTest {
     error_reporting(E_ALL);
     require_once '../db.class.php';
     DB::$user = 'meekrodb_test_us';
-    DB::$password = 'akdfo59fg';
-    DB::$dbName = 'meekrodb_test';
-    DB::$host = 'mysql.meekro.com';
+    
+    include 'test_setup.php'; //test config values go here
+    DB::$password = $set_password;
+    DB::$dbName = $set_db;
+    DB::$host = $set_host;
+    
     
     foreach (DB::tableList() as $table) {
       DB::query("DROP TABLE $table");
@@ -284,6 +287,28 @@ class BasicTest extends SimpleTest {
     $this->assert($debug_callback_worked === 1);
     
     DB::debugMode(false);
+  }
+  
+  function test_8_insert_blobs() {
+    DB::query("CREATE TABLE `storedata` (
+      `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+      `picture` BLOB
+    ) ENGINE = InnoDB");
+    
+    
+    $smile = file_get_contents('smile1.jpg');
+    DB::insert('storedata', array(
+      'picture' => $smile,
+    ));
+    DB::query("INSERT INTO storedata (picture) VALUES (%s)", $smile);
+    DB::query("INSERT INTO storedata (picture) VALUES (?)", 's', $smile);
+    
+    $getsmile = DB::queryFirstField("SELECT picture FROM storedata WHERE id=1");
+    $getsmile2 = DB::queryFirstField("SELECT picture FROM storedata WHERE id=2");
+    $getsmile3 = DB::queryFirstField("SELECT picture FROM storedata WHERE id=3");
+    $this->assert($smile === $getsmile);
+    $this->assert($smile === $getsmile2);
+    $this->assert($smile === $getsmile3);
   }
 
 }

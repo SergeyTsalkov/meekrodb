@@ -40,6 +40,7 @@ $classes_to_test = array();
 foreach ($files as $fullpath) {
   $filename = basename($fullpath);
   if ($fullpath == __FILE__) continue;
+  if ($filename == 'test_setup.php') continue;
   require_once($fullpath);
   $classes_to_test[] = str_replace('.php', '', $filename);
 }
