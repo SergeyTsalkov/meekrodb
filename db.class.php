@@ -357,6 +357,7 @@ class DB
   }
   
   public static function queryNull() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'null'); }
+  public static function queryRaw() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'buffered'); }
   public static function queryBuf() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'buffered'); }
   public static function queryUnbuf() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'unbuffered'); }
   

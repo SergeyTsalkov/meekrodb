@@ -97,6 +97,12 @@ class BasicTest extends SimpleTest {
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
+    
+    $mysqli_result = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
+    $this->assert($mysqli_result instanceof MySQLi_Result);
+    $row = $mysqli_result->fetch_assoc();
+    $this->assert($row['password'] === 'goodbye');
+    $this->assert($mysqli_result->fetch_assoc() === null);
   }
   
   function test_4_query() {
