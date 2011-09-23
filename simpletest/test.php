@@ -11,38 +11,32 @@ class SimpleTest {
     die;
   }
   
-  public static function __listfiles($dir, $regex, $type='files', $rec = false) {
-    $A = array();
-    
-    if (! $dir_handler = @opendir($dir)) return $A;
-    
-    while (false !== ($filename = @readdir($dir_handler))) {
-      if ($filename == '.' || $filename == '..') continue;
-      if ($rec && is_dir("$dir/$filename")) $A = array_merge($A, File::listfiles("$dir/$filename", $regex, $type, true));
-      
-      if (! preg_match($regex, $filename)) continue;
-      if ($type == 'files' && ! is_file("$dir/$filename")) continue;
-      if ($type == 'dirs' && ! is_dir("$dir/$filename")) continue;
-      if ($type == 'symlinks' && ! is_link("$dir/$filename")) continue;
-      
-      $A[] = $dir . DIRECTORY_SEPARATOR . $filename;
-    }
-    return $A;
-  }
-
-  
 
 }
 
-$files = SimpleTest::__listfiles(dirname(__FILE__), '/^.*php$/i');
+if (phpversion() >= '5.3') $is_php_53 = true;
+else $is_php_53 = false;
 
-$classes_to_test = array();
-foreach ($files as $fullpath) {
-  $filename = basename($fullpath);
-  if ($fullpath == __FILE__) continue;
-  if ($filename == 'test_setup.php') continue;
-  require_once($fullpath);
-  $classes_to_test[] = str_replace('.php', '', $filename);
+error_reporting(E_ALL);
+require_once '../db.class.php';
+DB::$user = 'meekrodb_test_us';
+
+include 'test_setup.php'; //test config values go here
+DB::$password = $set_password;
+DB::$dbName = $set_db;
+DB::$host = $set_host;
+
+require_once 'BasicTest.php';
+require_once 'ErrorTest.php';
+
+$classes_to_test = array(
+  'BasicTest',
+  'ErrorTest',
+);
+
+if ($is_php_53) {
+  require_once 'ErrorTest_53.php';
+  $classes_to_test[] = 'ErrorTest_53';
 }
 
 foreach ($classes_to_test as $class) {
