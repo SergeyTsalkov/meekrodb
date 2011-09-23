@@ -179,7 +179,7 @@ class DB
     call_user_func_array('DB::queryNull', $args);
   }
   
-  public static function insertOrReplace($which, $table, $datas) {
+  public static function insertOrReplace($which, $table, $datas, $options=array()) {
     $datas = unserialize(serialize($datas)); // break references within array
     $keys = null;
     
@@ -213,16 +213,16 @@ class DB
     $keys_str = implode(', ', DB::wrapStr($keys, '`'));
     $values_str = implode(',', $values);
     
-    DB::queryNull("$which INTO $table ($keys_str) VALUES $values_str");
+    if (isset($options['ignore']) && $options['ignore'] && strtolower($which) == 'insert') { 
+      DB::queryNull("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
+    } else { 
+      DB::queryNull("$which INTO $table ($keys_str) VALUES $values_str");
+    }
   }
   
-  public static function insert($table, $data) {
-    return DB::insertOrReplace('INSERT', $table, $data);
-  }
-  
-  public static function replace($table, $data) {
-    return DB::insertOrReplace('REPLACE', $table, $data);
-  }
+  public static function insert($table, $data) { return DB::insertOrReplace('INSERT', $table, $data); }
+  public static function insertIgnore($table, $data) { return DB::insertOrReplace('INSERT', $table, $data, array('ignore' => true)); }
+  public static function replace($table, $data) { return DB::insertOrReplace('REPLACE', $table, $data); }
   
   public static function delete() {
     $args = func_get_args();

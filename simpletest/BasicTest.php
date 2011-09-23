@@ -222,6 +222,16 @@ class BasicTest extends SimpleTest {
     $this->assert($smile === $getsmile2);
     $this->assert($smile === $getsmile3);
   }
+  
+  function test_6_insert_ignore() {
+    DB::insertIgnore('accounts', array(
+      'id' => 1, //duplicate primary key
+      'username' => 'gonesoon',
+      'password' => 'something',
+      'age' => 61,
+      'height' => 199.194
+    ));
+  }
 
 }
 
