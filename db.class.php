@@ -62,7 +62,7 @@ class DB
     return $mysql;
   }
   
-  protected static function nonSQLError($message) {
+  public static function nonSQLError($message) {
     if (DB::$throw_exception_on_nonsql_error) {
       $e = new MeekroDBException($message);
       throw $e;
@@ -564,7 +564,9 @@ class WhereClause {
   public $clauses = array();
   
   function __construct($type) {
-    $this->type = strtolower($type);
+    $type = strtolower($type);
+    if ($type != 'or' && $type != 'and') DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
+    $this->type = $type;
   }
   
   function add() {
@@ -598,11 +600,8 @@ class WhereClause {
     return count($this->clauses);
   }
   
-  function text($minimal = false) {
-    if (count($this->clauses) == 0) {
-      if ($minimal) return '(1)';
-      else return '';
-    }
+  function text() {
+    if (count($this->clauses) == 0) return '(1)';
     
     $A = array();
     foreach ($this->clauses as $clause) {
