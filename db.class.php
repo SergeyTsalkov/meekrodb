@@ -614,7 +614,13 @@ class WhereClause {
   
   function negateLast() {
     $i = count($this->clauses) - 1;
-    $this->clauses[$i] = 'NOT (' . $this->clauses[$i] . ')';
+    if (!isset($this->clauses[$i])) return;
+    
+    if ($this->clauses[$i] instanceof WhereClause) {
+      $this->clauses[$i]->negate();
+    } else {
+      $this->clauses[$i] = 'NOT (' . $this->clauses[$i] . ')';
+    }
   }
   
   function negate() {
