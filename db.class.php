@@ -215,6 +215,11 @@ class DB
     
     if (isset($options['ignore']) && $options['ignore'] && strtolower($which) == 'insert') { 
       DB::queryNull("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
+      
+    } else if (isset($options['update']) && $options['update'] && strtolower($which) == 'insert') {
+      $updatestr = call_user_func_array('DB::parseQueryParams', $options['update']);
+      DB::queryNull("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE $updatestr");
+      
     } else { 
       DB::queryNull("$which INTO $table ($keys_str) VALUES $values_str");
     }
@@ -223,6 +228,13 @@ class DB
   public static function insert($table, $data) { return DB::insertOrReplace('INSERT', $table, $data); }
   public static function insertIgnore($table, $data) { return DB::insertOrReplace('INSERT', $table, $data, array('ignore' => true)); }
   public static function replace($table, $data) { return DB::insertOrReplace('REPLACE', $table, $data); }
+  
+  public static function insertUpdate() {
+    $args = func_get_args();
+    $table = array_shift($args);
+    $data = array_shift($args);
+    return DB::insertOrReplace('INSERT', $table, $data, array('update' => $args)); 
+  }
   
   public static function delete() {
     $args = func_get_args();

@@ -232,6 +232,25 @@ class BasicTest extends SimpleTest {
       'height' => 199.194
     ));
   }
+  
+  function test_7_insert_update() {
+    DB::insertUpdate('accounts', array(
+      'id' => 2, //duplicate primary key
+      'username' => 'gonesoon',
+      'password' => 'something',
+      'age' => 61,
+      'height' => 199.194
+    ), 'age = age + %i', 1);
+    
+    $this->assert(DB::affectedRows() === 2); // a quirk of MySQL, even though only 1 row was updated
+    
+    $result = DB::query("SELECT * FROM accounts WHERE age = %i", 16);
+    $this->assert(count($result) === 1);
+    $this->assert($result[0]['height'] === '10.371');
+    
+    DB::query("UPDATE accounts SET age=age-1 WHERE age=%i", 16);
+    $this->assert(DB::affectedRows() === 1);
+  }
 
 }
 
