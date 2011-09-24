@@ -170,7 +170,6 @@ class DB
     $keyval = array();
     foreach ($params as $key => $value) {
       $value = DB::sanitize($value);
-      
       $keyval[] = "`" . $key . "`=" . $value;
     }
     
@@ -217,8 +216,7 @@ class DB
       DB::queryNull("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
       
     } else if (isset($options['update']) && $options['update'] && strtolower($which) == 'insert') {
-      $updatestr = call_user_func_array('DB::parseQueryParams', $options['update']);
-      DB::queryNull("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE $updatestr");
+      DB::queryNull("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
       
     } else { 
       DB::queryNull("$which INTO $table ($keys_str) VALUES $values_str");
@@ -233,7 +231,28 @@ class DB
     $args = func_get_args();
     $table = array_shift($args);
     $data = array_shift($args);
-    return DB::insertOrReplace('INSERT', $table, $data, array('update' => $args)); 
+    
+    if (! isset($args[0])) { // update will have all the data of the insert
+      if (isset($data[0]) && is_array($data[0])) { //multiple insert rows specified -- failing!
+        DB::nonSQLError("Badly formatted insertUpdate() query -- you didn't specify the update component!");
+      }
+      
+      $args[0] = $data;
+    }
+    
+    if (is_array($args[0])) {
+      $keyval = array();
+      foreach ($args[0] as $key => $value) {
+        $value = DB::sanitize($value);
+        $keyval[] = "`" . $key . "`=" . $value;
+      }
+      $updatestr = implode(', ', $keyval);
+      
+    } else {
+      $updatestr = call_user_func_array('DB::parseQueryParams', $args);
+    }
+    
+    return DB::insertOrReplace('INSERT', $table, $data, array('update' => $updatestr)); 
   }
   
   public static function delete() {
