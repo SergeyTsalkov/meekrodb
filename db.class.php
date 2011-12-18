@@ -304,6 +304,7 @@ class DB
   public static function parseQueryParamsNew() {
     $args = func_get_args();
     $sql = array_shift($args);
+    $args_all = $args;
     $posList = array();
     $pos_adj = 0;
     $param_char_length = strlen(DB::$param_char);
@@ -333,9 +334,19 @@ class DB
     ksort($posList);
     
     foreach ($posList as $pos => $type) {
-      $arg = array_shift($args);
       $type = substr($type, $param_char_length);
       $length_type = strlen($type) + $param_char_length;
+      
+      if ($arg_number_length = strspn($sql, '0123456789', $pos + $pos_adj + $length_type)) {
+        $arg_number = substr($sql, $pos + $pos_adj + $length_type, $arg_number_length);
+        if (! isset($args_all[$arg_number])) DB::nonSQLError("Non existent argument reference (arg $arg_number): $sql");
+        
+        $arg = $args_all[$arg_number];
+        
+      } else {
+        $arg_number = 0;
+        $arg = array_shift($args);
+      }
       
       if (in_array($type, array('s', 'i', 'd', 'b', 'l'))) {
         $array_type = false;
@@ -360,8 +371,8 @@ class DB
         else $result = '(' . implode(',', $result) . ')';
       }
       
-      $sql = substr_replace($sql, $result, $pos + $pos_adj, $length_type);
-      $pos_adj += strlen($result) - $length_type;
+      $sql = substr_replace($sql, $result, $pos + $pos_adj, $length_type + $arg_number_length);
+      $pos_adj += strlen($result) - ($length_type + $arg_number_length);
     }
     return $sql;
   }
