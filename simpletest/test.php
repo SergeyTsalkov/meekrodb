@@ -17,7 +17,7 @@ class SimpleTest {
 if (phpversion() >= '5.3') $is_php_53 = true;
 else $is_php_53 = false;
 
-error_reporting(E_ALL);
+error_reporting(E_ALL | E_STRICT);
 require_once '../db.class.php';
 DB::$user = 'meekrodb_test_us';
 
