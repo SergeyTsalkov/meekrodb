@@ -27,12 +27,14 @@ DB::$dbName = $set_db;
 DB::$host = $set_host;
 
 require_once 'BasicTest.php';
+require_once 'ObjectTest.php';
 require_once 'WhereClauseTest.php';
 require_once 'ErrorTest.php';
 
 $classes_to_test = array(
   'BasicTest',
   'WhereClauseTest',
+  'ObjectTest',
   'ErrorTest',
 );
 

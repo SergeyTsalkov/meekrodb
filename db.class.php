@@ -17,58 +17,159 @@
 */
 
 
-class DB
-{
-  public static $internal_mysql = null;
-  public static $insert_id = 0;
-  public static $num_rows = 0;
-  public static $affected_rows = 0;
-  public static $queryResult = null;
-  public static $queryResultType = null;
-  public static $old_db = null;
-  public static $current_db = null;
+class DB {
+  // initial connection
   public static $dbName = '';
   public static $user = '';
   public static $password = '';
   public static $host = 'localhost';
   public static $port = null;
   public static $encoding = 'latin1';
+  
+  // configure workings
   public static $queryMode = 'queryAllRows';
   public static $param_char = '%';
-  
   public static $success_handler = false;
   public static $error_handler = true;
   public static $throw_exception_on_error = false;
   public static $nonsql_error_handler = null;
   public static $throw_exception_on_nonsql_error = false;
   
+  // internal
+  protected static $mdb = null;
   
-  public static function get() {
-    $mysql = DB::$internal_mysql;
+  public static function getMDB() {
+    $mdb = DB::$mdb;
+    
+    if ($mdb === null) {
+      $mdb = DB::$mdb = new MeekroDB();
+    }
+    
+    if ($mdb->queryMode !== DB::$queryMode) $mdb->queryMode = DB::$queryMode;
+    if ($mdb->param_char !== DB::$param_char) $mdb->param_char = DB::$param_char;
+    if ($mdb->success_handler !== DB::$success_handler) $mdb->success_handler = DB::$success_handler;
+    if ($mdb->error_handler !== DB::$error_handler) $mdb->error_handler = DB::$error_handler;
+    if ($mdb->throw_exception_on_error !== DB::$throw_exception_on_error) $mdb->throw_exception_on_error = DB::$throw_exception_on_error;
+    if ($mdb->nonsql_error_handler !== DB::$nonsql_error_handler) $mdb->nonsql_error_handler = DB::$nonsql_error_handler;
+    if ($mdb->throw_exception_on_nonsql_error !== DB::$throw_exception_on_nonsql_error) $mdb->throw_exception_on_nonsql_error = DB::$throw_exception_on_nonsql_error;
+    
+    return $mdb;
+  }
+  
+  public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
+  public static function quickPrepare() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'quickPrepare'), $args); }
+  public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
+  public static function queryOneRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneRow'), $args); }
+  public static function queryFirstList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstList'), $args); }
+  public static function queryOneList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneList'), $args); }
+  public static function queryFirstColumn() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstColumn'), $args); }
+  public static function queryOneColumn() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneColumn'), $args); }
+  public static function queryFirstField() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstField'), $args); }
+  public static function queryOneField() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneField'), $args); }
+  public static function queryRaw() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryRaw'), $args); }
+  public static function queryNull() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryNull'), $args); }
+  public static function queryBuf() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryBuf'), $args); }
+  public static function queryUnbuf() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryUnbuf'), $args); }
+  
+  public static function insert() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insert'), $args); }
+  public static function insertIgnore() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertIgnore'), $args); }
+  public static function insertUpdate() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertUpdate'), $args); }
+  public static function replace() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'replace'), $args); }
+  public static function update() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'update'), $args); }
+  public static function delete() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'delete'), $args); }
+  
+  public static function insertId() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertId'), $args); }
+  public static function count() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'count'), $args); }
+  public static function affectedRows() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'affectedRows'), $args); }
+  
+  public static function useDB() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'useDB'), $args); }
+  public static function startTransaction() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'startTransaction'), $args); }
+  public static function commit() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'commit'), $args); }
+  public static function rollback() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'rollback'), $args); }
+  public static function tableList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'tableList'), $args); }
+  public static function columnList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'columnList'), $args); }
+  
+  public static function sqlEval() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'sqlEval'), $args); }
+  public static function nonSQLError() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'nonSQLError'), $args); }
+  
+  public static function debugMode($handler = true) { 
+    DB::$success_handler = $handler;
+  }
+  
+}
+
+
+class MeekroDB {
+  // initial connection
+  public $dbName = '';
+  public $user = '';
+  public $password = '';
+  public $host = 'localhost';
+  public $port = null;
+  public $encoding = 'latin1';
+  
+  // configure workings
+  public $queryMode = 'queryAllRows';
+  public $param_char = '%';
+  public $success_handler = false;
+  public $error_handler = true;
+  public $throw_exception_on_error = false;
+  public $nonsql_error_handler = null;
+  public $throw_exception_on_nonsql_error = false;
+  
+  // internal
+  public $internal_mysql = null;
+  public $insert_id = 0;
+  public $num_rows = 0;
+  public $affected_rows = 0;
+  public $queryResult = null;
+  public $queryResultType = null;
+  public $old_db = null;
+  public $current_db = null;
+  
+  
+  public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null) {
+    if ($host === null) $host = DB::$host;
+    if ($user === null) $user = DB::$user;
+    if ($password === null) $password = DB::$password;
+    if ($dbName === null) $dbName = DB::$dbName;
+    if ($port === null) $port = DB::$port;
+    if ($encoding === null) $encoding = DB::$encoding;
+    
+    $this->host = $host;
+    $this->user = $user;
+    $this->password = $password;
+    $this->dbName = $dbName;
+    $this->port = $port;
+    $this->encoding = $encoding;
+  }
+  
+  public function get() {
+    $mysql = $this->internal_mysql;
     
     if ($mysql == null) {
-      if (! DB::$port) DB::$port = ini_get('mysqli.default_port');
-      DB::$current_db = DB::$dbName;
-      $mysql = new mysqli(DB::$host, DB::$user, DB::$password, DB::$dbName, DB::$port);
+      if (! $this->port) $this->port = ini_get('mysqli.default_port');
+      $this->current_db = $this->dbName;
+      $mysql = new mysqli($this->host, $this->user, $this->password, $this->dbName, $this->port);
       
       if ($mysql->connect_error) {
-        DB::nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
+        $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
       }
       
-      $mysql->set_charset(DB::$encoding);
-      DB::$internal_mysql = $mysql;
+      $mysql->set_charset($this->encoding);
+      $this->internal_mysql = $mysql;
     }
     
     return $mysql;
   }
   
-  public static function nonSQLError($message) {
-    if (DB::$throw_exception_on_nonsql_error) {
+  public function nonSQLError($message) {
+    if ($this->throw_exception_on_nonsql_error) {
       $e = new MeekroDBException($message);
       throw $e;
     }
     
-    $error_handler = is_callable(DB::$nonsql_error_handler) ? DB::$nonsql_error_handler : 'meekrodb_error_handler';
+    $error_handler = is_callable($this->nonsql_error_handler) ? $this->nonsql_error_handler : 'meekrodb_error_handler';
         
     call_user_func($error_handler, array(
       'type' => 'nonsql',
@@ -76,48 +177,48 @@ class DB
     ));
   }
   
-  public static function debugMode($handler = true) {
-    DB::$success_handler = $handler;
+  public function debugMode($handler = true) {
+    $this->success_handler = $handler;
   }
   
-  public static function insertId() { return DB::$insert_id; }
-  public static function affectedRows() { return DB::$affected_rows; }
-  public static function count() { $args = func_get_args(); return call_user_func_array('DB::numRows', $args); }
-  public static function numRows() { return DB::$num_rows; }
+  public function insertId() { return $this->insert_id; }
+  public function affectedRows() { return $this->affected_rows; }
+  public function count() { $args = func_get_args(); return call_user_func_array(array($this, 'numRows'), $args); }
+  public function numRows() { return $this->num_rows; }
   
-  public static function useDB() { $args = func_get_args(); return call_user_func_array('DB::setDB', $args); }
-  public static function setDB($dbName) {
-    $db = DB::get();
-    DB::$old_db = DB::$current_db;
-    if (! $db->select_db($dbName)) DB::nonSQLError("Unable to set database to $dbName");
-    DB::$current_db = $dbName;
+  public function useDB() { $args = func_get_args(); return call_user_func_array(array($this, 'setDB'), $args); }
+  public function setDB($dbName) {
+    $db = $this->get();
+    $this->old_db = $this->current_db;
+    if (! $db->select_db($dbName)) $this->nonSQLError("Unable to set database to $dbName");
+    $this->current_db = $dbName;
   }
   
   
-  public static function startTransaction() {
-    DB::queryNull('START TRANSACTION');
+  public function startTransaction() {
+    $this->queryNull('START TRANSACTION');
   }
   
-  public static function commit() {
-    DB::queryNull('COMMIT');
+  public function commit() {
+    $this->queryNull('COMMIT');
   }
   
-  public static function rollback() {
-    DB::queryNull('ROLLBACK');
+  public function rollback() {
+    $this->queryNull('ROLLBACK');
   }
   
-  public static function escape($str) {
-    $db = DB::get();
+  public function escape($str) {
+    $db = $this->get();
     return $db->real_escape_string($str);
   }
   
-  public static function sanitize($value) {
+  public function sanitize($value) {
     if (is_object($value) && ($value instanceof MeekroDBEval)) {
       $value = $value->text;
     } else {
       if (is_array($value) || is_object($value)) $value = serialize($value);
       
-      if (is_string($value)) $value = "'" . DB::escape($value) . "'";
+      if (is_string($value)) $value = "'" . $this->escape($value) . "'";
       else if (is_null($value)) $value = 'NULL';
       else if (is_bool($value)) $value = ($value ? 1 : 0);
     }
@@ -125,7 +226,7 @@ class DB
     return $value;
   }
   
-  private static function formatTableName($table) {
+  protected function formatTableName($table) {
     $table = str_replace('`', '', $table);
     if (strpos($table, '.')) {
       list($table_db, $table_table) = explode('.', $table, 2);
@@ -137,31 +238,31 @@ class DB
     return $table;
   }
   
-  private static function prependCall($function, $args, $prepend) {
+  protected function prependCall($function, $args, $prepend) {
     array_unshift($args, $prepend);
     return call_user_func_array($function, $args);
   }
   
-  private static function wrapStr($strOrArray, $wrapChar, $escape = false) {
+  protected function wrapStr($strOrArray, $wrapChar, $escape = false) {
     if (! is_array($strOrArray)) {
-      if ($escape) return $wrapChar . DB::escape($strOrArray) . $wrapChar;
+      if ($escape) return $wrapChar . $this->escape($strOrArray) . $wrapChar;
       else return $wrapChar . $strOrArray . $wrapChar;
     } else {
       $R = array();
       foreach ($strOrArray as $element) {
-        $R[] = DB::wrapStr($element, $wrapChar, $escape);
+        $R[] = $this->wrapStr($element, $wrapChar, $escape);
       }
       return $R;
     }
       
   }
   
-  public static function freeResult($result) {
+  public function freeResult($result) {
     if (! ($result instanceof MySQLi_Result)) return;
     return $result->free();
   }
   
-  public static function update() {
+  public function update() {
     $args = func_get_args();
     $table = array_shift($args);
     $params = array_shift($args);
@@ -169,16 +270,16 @@ class DB
     $buildquery = "UPDATE " . self::formatTableName($table) . " SET ";
     $keyval = array();
     foreach ($params as $key => $value) {
-      $value = DB::sanitize($value);
+      $value = $this->sanitize($value);
       $keyval[] = "`" . $key . "`=" . $value;
     }
     
     $buildquery = "UPDATE " . self::formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
     array_unshift($args, $buildquery);
-    call_user_func_array('DB::queryNull', $args);
+    call_user_func_array(array($this, 'queryNull'), $args);
   }
   
-  public static function insertOrReplace($which, $table, $datas, $options=array()) {
+  public function insertOrReplace($which, $table, $datas, $options=array()) {
     $datas = unserialize(serialize($datas)); // break references within array
     $keys = null;
     
@@ -198,9 +299,9 @@ class DB
       $insert_values = array();
       
       foreach ($keys as $key) {
-        if ($many && !isset($data[$key])) DB::nonSQLError('insert/replace many: each assoc array must have the same keys!'); 
+        if ($many && !isset($data[$key])) $this->nonSQLError('insert/replace many: each assoc array must have the same keys!'); 
         $datum = $data[$key];
-        $datum = DB::sanitize($datum);
+        $datum = $this->sanitize($datum);
         $insert_values[] = $datum;
       }
       
@@ -209,32 +310,32 @@ class DB
     }
     
     $table = self::formatTableName($table);
-    $keys_str = implode(', ', DB::wrapStr($keys, '`'));
+    $keys_str = implode(', ', $this->wrapStr($keys, '`'));
     $values_str = implode(',', $values);
     
     if (isset($options['ignore']) && $options['ignore'] && strtolower($which) == 'insert') { 
-      DB::queryNull("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
+      $this->queryNull("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
       
     } else if (isset($options['update']) && $options['update'] && strtolower($which) == 'insert') {
-      DB::queryNull("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
+      $this->queryNull("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
       
     } else { 
-      DB::queryNull("$which INTO $table ($keys_str) VALUES $values_str");
+      $this->queryNull("$which INTO $table ($keys_str) VALUES $values_str");
     }
   }
   
-  public static function insert($table, $data) { return DB::insertOrReplace('INSERT', $table, $data); }
-  public static function insertIgnore($table, $data) { return DB::insertOrReplace('INSERT', $table, $data, array('ignore' => true)); }
-  public static function replace($table, $data) { return DB::insertOrReplace('REPLACE', $table, $data); }
+  public function insert($table, $data) { return $this->insertOrReplace('INSERT', $table, $data); }
+  public function insertIgnore($table, $data) { return $this->insertOrReplace('INSERT', $table, $data, array('ignore' => true)); }
+  public function replace($table, $data) { return $this->insertOrReplace('REPLACE', $table, $data); }
   
-  public static function insertUpdate() {
+  public function insertUpdate() {
     $args = func_get_args();
     $table = array_shift($args);
     $data = array_shift($args);
     
     if (! isset($args[0])) { // update will have all the data of the insert
       if (isset($data[0]) && is_array($data[0])) { //multiple insert rows specified -- failing!
-        DB::nonSQLError("Badly formatted insertUpdate() query -- you didn't specify the update component!");
+        $this->nonSQLError("Badly formatted insertUpdate() query -- you didn't specify the update component!");
       }
       
       $args[0] = $data;
@@ -243,45 +344,45 @@ class DB
     if (is_array($args[0])) {
       $keyval = array();
       foreach ($args[0] as $key => $value) {
-        $value = DB::sanitize($value);
+        $value = $this->sanitize($value);
         $keyval[] = "`" . $key . "`=" . $value;
       }
       $updatestr = implode(', ', $keyval);
       
     } else {
-      $updatestr = call_user_func_array('DB::parseQueryParams', $args);
+      $updatestr = call_user_func_array(array($this, 'parseQueryParams'), $args);
     }
     
-    return DB::insertOrReplace('INSERT', $table, $data, array('update' => $updatestr)); 
+    return $this->insertOrReplace('INSERT', $table, $data, array('update' => $updatestr)); 
   }
   
-  public static function delete() {
+  public function delete() {
     $args = func_get_args();
     $table = self::formatTableName(array_shift($args));
     $where = array_shift($args);
     $buildquery = "DELETE FROM $table WHERE $where";
     array_unshift($args, $buildquery);
-    call_user_func_array('DB::queryNull', $args);
+    call_user_func_array(array($this, 'queryNull'), $args);
   }
   
-  public static function sqleval() {
+  public function sqleval() {
     $args = func_get_args();
-    $text = call_user_func_array('DB::parseQueryParams', $args);
+    $text = call_user_func_array(array($this, 'parseQueryParams'), $args);
     return new MeekroDBEval($text);
   }
   
-  public static function columnList($table) {
-    return DB::queryOneColumn('Field', "SHOW COLUMNS FROM $table");
+  public function columnList($table) {
+    return $this->queryOneColumn('Field', "SHOW COLUMNS FROM $table");
   }
   
-  public static function tableList($db = null) {
-    if ($db) DB::useDB($db);
-    $result = DB::queryFirstColumn('SHOW TABLES');
-    if ($db && DB::$old_db) DB::useDB(DB::$old_db);
+  public function tableList($db = null) {
+    if ($db) $this->useDB($db);
+    $result = $this->queryFirstColumn('SHOW TABLES');
+    if ($db && $this->old_db) $this->useDB($this->old_db);
     return $result;
   }
   
-  public static function parseQueryParamsOld() {
+  public function parseQueryParamsOld() {
     $args = func_get_args();
     $sql = array_shift($args);
     $types = array_shift($args);
@@ -290,36 +391,36 @@ class DB
     foreach ($args as $arg) {
       $type = array_shift($types);
       $pos = strpos($sql, '?');
-      if ($pos === false) DB::nonSQLError("Badly formatted SQL query: $sql");  
+      if ($pos === false) $this->nonSQLError("Badly formatted SQL query: $sql");  
       
-      if ($type == 's') $replacement = "'" . DB::escape($arg) . "'";
+      if ($type == 's') $replacement = "'" . $this->escape($arg) . "'";
       else if ($type == 'i') $replacement = intval($arg);
-      else DB::nonSQLError("Badly formatted SQL query: $sql");
+      else $this->nonSQLError("Badly formatted SQL query: $sql");
       
       $sql = substr_replace($sql, $replacement, $pos, 1);
     }
     return $sql;
   }
   
-  public static function parseQueryParamsNew() {
+  public function parseQueryParamsNew() {
     $args = func_get_args();
     $sql = array_shift($args);
     $args_all = $args;
     $posList = array();
     $pos_adj = 0;
-    $param_char_length = strlen(DB::$param_char);
+    $param_char_length = strlen($this->param_char);
     $types = array(
-      DB::$param_char . 'll', // list of literals
-      DB::$param_char . 'ls', // list of strings
-      DB::$param_char . 'l',  // literal
-      DB::$param_char . 'li', // list of integers
-      DB::$param_char . 'ld', // list of decimals
-      DB::$param_char . 'lb', // list of backticks
-      DB::$param_char . 's',  // string
-      DB::$param_char . 'i',  // integer
-      DB::$param_char . 'd',  // double / decimal
-      DB::$param_char . 'b',  // backtick
-      DB::$param_char . 'ss'  // search string (like string, surrounded with %'s)
+      $this->param_char . 'll', // list of literals
+      $this->param_char . 'ls', // list of strings
+      $this->param_char . 'l',  // literal
+      $this->param_char . 'li', // list of integers
+      $this->param_char . 'ld', // list of decimals
+      $this->param_char . 'lb', // list of backticks
+      $this->param_char . 's',  // string
+      $this->param_char . 'i',  // integer
+      $this->param_char . 'd',  // double / decimal
+      $this->param_char . 'b',  // backtick
+      $this->param_char . 'ss'  // search string (like string, surrounded with %'s)
     );
     
     foreach ($types as $type) {
@@ -339,7 +440,7 @@ class DB
       
       if ($arg_number_length = strspn($sql, '0123456789', $pos + $pos_adj + $length_type)) {
         $arg_number = substr($sql, $pos + $pos_adj + $length_type, $arg_number_length);
-        if (! isset($args_all[$arg_number])) DB::nonSQLError("Non existent argument reference (arg $arg_number): $sql");
+        if (! isset($args_all[$arg_number])) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
         
         $arg = $args_all[$arg_number];
         
@@ -353,18 +454,18 @@ class DB
         $arg = array($arg);
         $type = 'l' . $type;
       } else if ($type == 'ss') {
-        $result = "'%" . DB::escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
+        $result = "'%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
       } else {
         $array_type = true;
-        if (! is_array($arg)) DB::nonSQLError("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
+        if (! is_array($arg)) $this->nonSQLError("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
       }
       
-      if ($type == 'ls') $result = DB::wrapStr($arg, "'", true);
+      if ($type == 'ls') $result = $this->wrapStr($arg, "'", true);
       else if ($type == 'li') $result = array_map('intval', $arg);
       else if ($type == 'ld') $result = array_map('floatval', $arg);
-      else if ($type == 'lb') $result = array_map('DB::formatTableName', $arg);
+      else if ($type == 'lb') $result = array_map('$this->formatTableName', $arg);
       else if ($type == 'll') $result = $arg;
-      else if (! $result) DB::nonSQLError("Badly formatted SQL query: $sql");
+      else if (! $result) $this->nonSQLError("Badly formatted SQL query: $sql");
       
       if (is_array($result)) {
         if (! $array_type) $result = $result[0];
@@ -377,52 +478,52 @@ class DB
     return $sql;
   }
   
-  public static function parseQueryParams() {
+  public function parseQueryParams() {
     $args = func_get_args();
     if (count($args) < 2) return $args[0];
     
     if (is_string($args[1]) && preg_match('/^[is]+$/', $args[1]) && substr_count($args[0], '?') > 0)
-      return call_user_func_array('DB::parseQueryParamsOld', $args);
+      return call_user_func_array(array($this, 'parseQueryParamsOld'), $args);
     else
-      return call_user_func_array('DB::parseQueryParamsNew', $args);
+      return call_user_func_array(array($this, 'parseQueryParamsNew'), $args);
   }
   
-  public static function quickPrepare() { $args = func_get_args(); return call_user_func_array('DB::query', $args); }
+  public function quickPrepare() { $args = func_get_args(); return call_user_func_array(array($this, 'query'), $args); }
   
-  public static function query() {
+  public function query() {
     $args = func_get_args();
-    if (DB::$queryMode == 'buffered' || DB::$queryMode == 'unbuffered') {
-      return DB::prependCall('DB::queryHelper', $args, DB::$queryMode);
+    if ($this->queryMode == 'buffered' || $this->queryMode == 'unbuffered') {
+      return $this->prependCall(array($this, 'queryHelper'), $args, $this->queryMode);
     } else {
-      return call_user_func_array('DB::queryAllRows', $args);
+      return call_user_func_array(array($this, 'queryAllRows'), $args);
     }
   }
   
-  public static function queryNull() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'null'); }
-  public static function queryRaw() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'buffered'); }
-  public static function queryBuf() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'buffered'); }
-  public static function queryUnbuf() { $args = func_get_args(); return DB::prependCall('DB::queryHelper', $args, 'unbuffered'); }
+  public function queryNull() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'null'); }
+  public function queryRaw() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'buffered'); }
+  public function queryBuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'buffered'); }
+  public function queryUnbuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'unbuffered'); }
   
-  public static function queryHelper() {
+  protected function queryHelper() {
     $args = func_get_args();
     $type = array_shift($args);
     if ($type != 'buffered' && $type != 'unbuffered' && $type != 'null') {
-      DB::nonSQLError('Error -- first argument to queryHelper must be buffered or unbuffered!');
+      $this->nonSQLError('Error -- first argument to queryHelper must be buffered or unbuffered!');
     }
     $is_buffered = ($type == 'buffered');
     $is_null = ($type == 'null');
     
-    $sql = call_user_func_array('DB::parseQueryParams', $args);
+    $sql = call_user_func_array(array($this, 'parseQueryParams'), $args);
     
-    $db = DB::get();
+    $db = $this->get();
     
-    if (DB::$success_handler) $starttime = microtime(true);
+    if ($this->success_handler) $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
-    if (DB::$success_handler) $runtime = microtime(true) - $starttime;
+    if ($this->success_handler) $runtime = microtime(true) - $starttime;
     
-    if (!$sql || $error = DB::checkError()) {
-      if (DB::$error_handler) {
-        $error_handler = is_callable(DB::$error_handler) ? DB::$error_handler : 'meekrodb_error_handler';
+    if (!$sql || $error = $this->checkError()) {
+      if ($this->error_handler) {
+        $error_handler = is_callable($this->error_handler) ? $this->error_handler : 'meekrodb_error_handler';
         
         call_user_func($error_handler, array(
           'type' => 'sql',
@@ -431,13 +532,13 @@ class DB
         ));
       }
       
-      if (DB::$throw_exception_on_error) {
+      if ($this->throw_exception_on_error) {
         $e = new MeekroDBException($error, $sql);
         throw $e;
       }
-    } else if (DB::$success_handler) {
+    } else if ($this->success_handler) {
       $runtime = sprintf('%f', $runtime * 1000);
-      $success_handler = is_callable(DB::$success_handler) ? DB::$success_handler : 'meekrodb_debugmode_handler';
+      $success_handler = is_callable($this->success_handler) ? $this->success_handler : 'meekrodb_debugmode_handler';
       
       call_user_func($success_handler, array(
         'query' => $sql,
@@ -445,67 +546,67 @@ class DB
       )); 
     }
     
-    DB::$queryResult = $result;
-    DB::$queryResultType = $type;
-    DB::$insert_id = $db->insert_id;
-    DB::$affected_rows = $db->affected_rows;
+    $this->queryResult = $result;
+    $this->queryResultType = $type;
+    $this->insert_id = $db->insert_id;
+    $this->affected_rows = $db->affected_rows;
     
-    if ($is_buffered) DB::$num_rows = $result->num_rows;
-    else DB::$num_rows = null;
+    if ($is_buffered) $this->num_rows = $result->num_rows;
+    else $this->num_rows = null;
     
     if ($is_null) {
-      DB::freeResult($result);
-      DB::$queryResult = DB::$queryResultType = null;
+      $this->freeResult($result);
+      $this->queryResult = $this->queryResultType = null;
       return null;
     }
     
     return $result;
   }
   
-  public static function queryAllRows() {
+  public function queryAllRows() {
     $args = func_get_args();
     
-    $query = call_user_func_array('DB::queryUnbuf', $args);
-    $result = DB::fetchAllRows($query);
-    DB::freeResult($query);
-    DB::$num_rows = count($result);
-    
-    return $result;
-  }
-  
-  public static function queryAllArrays() {
-    $args = func_get_args();
-    
-    $query = call_user_func_array('DB::queryUnbuf', $args);
-    $result = DB::fetchAllArrays($query);
-    DB::freeResult($query);
-    DB::$num_rows = count($result);
+    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = $this->fetchAllRows($query);
+    $this->freeResult($query);
+    $this->num_rows = count($result);
     
     return $result;
   }
   
-  public static function queryOneList() { $args = func_get_args(); return call_user_func_array('DB::queryFirstList', $args); }
-  public static function queryFirstList() {
+  public function queryAllArrays() {
     $args = func_get_args();
-    $query = call_user_func_array('DB::queryUnbuf', $args);
-    $result = DB::fetchArray($query);
-    DB::freeResult($query);
+    
+    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = $this->fetchAllArrays($query);
+    $this->freeResult($query);
+    $this->num_rows = count($result);
+    
     return $result;
   }
   
-  public static function queryOneRow() { $args = func_get_args(); return call_user_func_array('DB::queryFirstRow', $args); }
-  public static function queryFirstRow() {
+  public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
+  public function queryFirstList() {
     $args = func_get_args();
-    $query = call_user_func_array('DB::queryUnbuf', $args);
-    $result = DB::fetchRow($query);
-    DB::freeResult($query);
+    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = $this->fetchArray($query);
+    $this->freeResult($query);
+    return $result;
+  }
+  
+  public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
+  public function queryFirstRow() {
+    $args = func_get_args();
+    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = $this->fetchRow($query);
+    $this->freeResult($query);
     return $result;
   }
   
   
-  public static function queryFirstColumn() { 
+  public function queryFirstColumn() { 
     $args = func_get_args();
-    $results = call_user_func_array('DB::queryAllArrays', $args);
+    $results = call_user_func_array(array($this, 'queryAllArrays'), $args);
     $ret = array();
     
     if (!count($results) || !count($results[0])) return $ret;
@@ -517,10 +618,10 @@ class DB
     return $ret;
   }
   
-  public static function queryOneColumn() {
+  public function queryOneColumn() {
     $args = func_get_args();
     $column = array_shift($args);
-    $results = call_user_func_array('DB::queryAllRows', $args);
+    $results = call_user_func_array(array($this, 'queryAllRows'), $args);
     $ret = array();
     
     if (!count($results) || !count($results[0])) return $ret;
@@ -536,18 +637,18 @@ class DB
     return $ret;
   }
   
-  public static function queryFirstField() { 
+  public function queryFirstField() { 
     $args = func_get_args();
-    $row = call_user_func_array('DB::queryFirstList', $args);
+    $row = call_user_func_array(array($this, 'queryFirstList'), $args);
     if ($row == null) return null;    
     return $row[0];
   }
   
-  public static function queryOneField() {
+  public function queryOneField() {
     $args = func_get_args();
     $column = array_shift($args);
     
-    $row = call_user_func_array('DB::queryOneRow', $args);
+    $row = call_user_func_array(array($this, 'queryOneRow'), $args);
     if ($row == null) { 
       return null;
     } else if ($column === null) {
@@ -558,8 +659,8 @@ class DB
     return $row[$column];
   }
   
-  private static function checkError() {
-    $db = DB::get();
+  protected function checkError() {
+    $db = $this->get();
     if ($db->error) {
       $error = $db->error;
       $db->rollback();
@@ -569,29 +670,29 @@ class DB
     return false;
   }
   
-  public static function fetchRow($result = null) {
-    if ($result === null) $result = DB::$queryResult;
+  public function fetchRow($result = null) {
+    if ($result === null) $result = $this->queryResult;
     if (! ($result instanceof MySQLi_Result)) return null;
     return $result->fetch_assoc();
   }
   
-  public static function fetchAllRows($result = null) {
+  public function fetchAllRows($result = null) {
     $A = array();
-    while ($row = DB::fetchRow($result)) {
+    while ($row = $this->fetchRow($result)) {
       $A[] = $row;
     }
     return $A;
   }
   
-  public static function fetchArray($result = null) {
-    if ($result === null) $result = DB::$queryResult;
+  public function fetchArray($result = null) {
+    if ($result === null) $result = $this->queryResult;
     if (! ($result instanceof MySQLi_Result)) return null;
     return $result->fetch_row();
   }
   
-  public static function fetchAllArrays($result = null) {
+  public function fetchAllArrays($result = null) {
     $A = array();
-    while ($row = DB::fetchArray($result)) {
+    while ($row = $this->fetchArray($result)) {
       $A[] = $row;
     }
     return $A;
@@ -604,11 +705,16 @@ class WhereClause {
   public $type = 'and'; //AND or OR
   public $negate = false;
   public $clauses = array();
+  public $mdb = null;
   
-  function __construct($type) {
+  function __construct($type, $mdb=null) {
     $type = strtolower($type);
     if ($type != 'or' && $type != 'and') DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
     $this->type = $type;
+    
+    if ($mdb === null) $this->mdb = DB::getMDB();
+    else if ($mdb instanceof MeekroDB) $this->mdb = $mdb;
+    else DB::nonSQLError('the second argument to new WhereClause() must be an instance of class MeekroDB');
   }
   
   function add() {
@@ -617,7 +723,7 @@ class WhereClause {
       $this->clauses[] = $args[0];
       return $args[0];
     } else {
-      $r = call_user_func_array('DB::parseQueryParams', $args);
+      $r = call_user_func_array(array($this->mdb, 'parseQueryParams'), $args);
       $this->clauses[] = $r;
       return $r;
     }
