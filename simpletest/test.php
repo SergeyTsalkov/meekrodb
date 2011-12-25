@@ -14,6 +14,12 @@ class SimpleTest {
 
 }
 
+function microtime_float()
+{
+    list($usec, $sec) = explode(" ", microtime());
+    return ((float)$usec + (float)$sec);
+}
+
 if (phpversion() >= '5.3') $is_php_53 = true;
 else $is_php_53 = false;
 
@@ -43,6 +49,7 @@ if ($is_php_53) {
   $classes_to_test[] = 'ErrorTest_53';
 }
 
+$time_start = microtime_float();
 foreach ($classes_to_test as $class) {
   $object = new $class();
   
@@ -52,7 +59,10 @@ foreach ($classes_to_test as $class) {
     $object->$method();
   }
 }
+$time_end = microtime_float();
+$time = round($time_end - $time_start, 2);
 
+echo "Completed in $time seconds\n";
 
 
 ?>
