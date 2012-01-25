@@ -542,7 +542,8 @@ class MeekroDB {
       
       call_user_func($success_handler, array(
         'query' => $sql,
-        'runtime' => $runtime
+        'runtime' => $runtime,
+        'affected' => $db->affected_rows
       )); 
     }
     
