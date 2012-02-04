@@ -304,6 +304,18 @@ class BasicTest extends SimpleTest {
     DB::query("UPDATE accounts SET age=15, username='Bart' WHERE age=%i", 74);
     $this->assert(DB::affectedRows() === 1);
   }
+  
+  function test_8_lb() {
+    $data = array(
+      'username' => 'vookoo',
+      'password' => 'dookoo',
+    );
+    
+    DB::query("INSERT into accounts %lb VALUES %ls", array_keys($data), array_values($data));
+    $result = DB::query("SELECT * FROM accounts WHERE username=%s", 'vookoo');
+    $this->assert(count($result) === 1);
+    $this->assert($result[0]['password'] === 'dookoo');
+  }
 
 }
 

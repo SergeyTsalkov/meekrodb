@@ -463,7 +463,7 @@ class MeekroDB {
       if ($type == 'ls') $result = $this->wrapStr($arg, "'", true);
       else if ($type == 'li') $result = array_map('intval', $arg);
       else if ($type == 'ld') $result = array_map('floatval', $arg);
-      else if ($type == 'lb') $result = array_map('$this->formatTableName', $arg);
+      else if ($type == 'lb') $result = array_map(array($this, 'formatTableName'), $arg);
       else if ($type == 'll') $result = $arg;
       else if (! $result) $this->nonSQLError("Badly formatted SQL query: $sql");
       
