@@ -29,6 +29,7 @@ class DB {
   // configure workings
   public static $queryMode = 'queryAllRows';
   public static $param_char = '%';
+  public static $ping = false;
   public static $success_handler = false;
   public static $error_handler = true;
   public static $throw_exception_on_error = false;
@@ -47,6 +48,7 @@ class DB {
     
     if ($mdb->queryMode !== DB::$queryMode) $mdb->queryMode = DB::$queryMode;
     if ($mdb->param_char !== DB::$param_char) $mdb->param_char = DB::$param_char;
+    if ($mdb->ping !== DB::$ping) $mdb->ping = DB::$ping;
     if ($mdb->success_handler !== DB::$success_handler) $mdb->success_handler = DB::$success_handler;
     if ($mdb->error_handler !== DB::$error_handler) $mdb->error_handler = DB::$error_handler;
     if ($mdb->throw_exception_on_error !== DB::$throw_exception_on_error) $mdb->throw_exception_on_error = DB::$throw_exception_on_error;
@@ -111,6 +113,7 @@ class MeekroDB {
   // configure workings
   public $queryMode = 'queryAllRows';
   public $param_char = '%';
+  public $ping = false;
   public $success_handler = false;
   public $error_handler = true;
   public $throw_exception_on_error = false;
@@ -155,7 +158,11 @@ class MeekroDB {
       if ($mysql->connect_error) {
         $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
       }
-      
+
+      if ($this->ping === true) {
+        $mysql->ping();  
+      }
+
       $mysql->set_charset($this->encoding);
       $this->internal_mysql = $mysql;
     }
