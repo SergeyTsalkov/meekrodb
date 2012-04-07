@@ -159,12 +159,12 @@ class MeekroDB {
         $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
       }
 
-      if ($this->ping === true) {
-        $mysql->ping();  
-      }
-
       $mysql->set_charset($this->encoding);
       $this->internal_mysql = $mysql;
+    }
+
+    if ($this->ping === true) {
+      $mysql->ping();  
     }
     
     return $mysql;
