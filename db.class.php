@@ -812,8 +812,6 @@ function meekrodb_error_handler($params) {
     echo implode("<br>\n", $out);
   }
   
-  debug_print_backtrace();
-  
   die;
 }
 
