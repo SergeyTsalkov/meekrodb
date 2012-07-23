@@ -150,7 +150,7 @@ class BasicTest extends SimpleTest {
     $this->assert($row['password'] === 'blahblahblahblah');
     $this->assert($row['favorite_word'] === null);
     
-    $row = DB::query("SELECT * FROM accounts WHERE password=%s_mypass AND username=%s_myuser", 
+    $row = DB::query("SELECT * FROM accounts WHERE password=%s_mypass AND (password=%s_mypass) AND username=%s_myuser", 
       array('myuser' => 'newguy', 'mypass' => 'blahblahblahblah')
     );
     $this->assert(count($row) === 1);

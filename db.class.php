@@ -453,14 +453,11 @@ class MeekroDB {
         $arg = $args_all[$arg_number];
         
       } else if (substr($sql, $new_pos_back, $named_seperator_length) == $this->named_param_seperator) {
-        $next_space = strpos($sql, ' ', $new_pos_back + $named_seperator_length);
-        if ($next_space < $new_pos_back + $named_seperator_length) $next_space = strlen($sql);
+        $arg_number_length = strspn($sql, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_', 
+          $new_pos_back + $named_seperator_length) + $named_seperator_length;
         
-        $arg_number = substr($sql, $new_pos_back + $named_seperator_length, $next_space - $new_pos_back - 1); 
-        $arg_number_length = strlen($arg_number) + $named_seperator_length;
-        
+        $arg_number = substr($sql, $new_pos_back + $named_seperator_length, $arg_number_length - $named_seperator_length);
         if (count($args_all) != 1) $this->nonSQLError("If you use named parameters, the second argument must be an array of parameters");
-        
         if (! isset($args_all[0][$arg_number])) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
         
         $arg = $args_all[0][$arg_number];
