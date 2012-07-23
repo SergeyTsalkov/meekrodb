@@ -29,6 +29,7 @@ class DB {
   // configure workings
   public static $queryMode = 'queryAllRows';
   public static $param_char = '%';
+  public static $named_param_seperator = '_';
   public static $success_handler = false;
   public static $error_handler = true;
   public static $throw_exception_on_error = false;
@@ -47,6 +48,7 @@ class DB {
     
     if ($mdb->queryMode !== DB::$queryMode) $mdb->queryMode = DB::$queryMode;
     if ($mdb->param_char !== DB::$param_char) $mdb->param_char = DB::$param_char;
+    if ($mdb->named_param_seperator !== DB::$named_param_seperator) $mdb->named_param_seperator = DB::$named_param_seperator;
     if ($mdb->success_handler !== DB::$success_handler) $mdb->success_handler = DB::$success_handler;
     if ($mdb->error_handler !== DB::$error_handler) $mdb->error_handler = DB::$error_handler;
     if ($mdb->throw_exception_on_error !== DB::$throw_exception_on_error) $mdb->throw_exception_on_error = DB::$throw_exception_on_error;
@@ -111,6 +113,7 @@ class MeekroDB {
   // configure workings
   public $queryMode = 'queryAllRows';
   public $param_char = '%';
+  public $named_param_seperator = '_';
   public $success_handler = false;
   public $error_handler = true;
   public $throw_exception_on_error = false;
@@ -409,6 +412,8 @@ class MeekroDB {
     $posList = array();
     $pos_adj = 0;
     $param_char_length = strlen($this->param_char);
+    $named_seperator_length = strlen($this->named_param_seperator);
+    
     $types = array(
       $this->param_char . 'll', // list of literals
       $this->param_char . 'ls', // list of strings
@@ -438,11 +443,27 @@ class MeekroDB {
       $type = substr($type, $param_char_length);
       $length_type = strlen($type) + $param_char_length;
       
-      if ($arg_number_length = strspn($sql, '0123456789', $pos + $pos_adj + $length_type)) {
-        $arg_number = substr($sql, $pos + $pos_adj + $length_type, $arg_number_length);
+      $new_pos = $pos + $pos_adj;
+      $new_pos_back = $new_pos + $length_type;
+      
+      if ($arg_number_length = strspn($sql, '0123456789', $new_pos_back)) {
+        $arg_number = substr($sql, $new_pos_back, $arg_number_length);
         if (! isset($args_all[$arg_number])) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
         
         $arg = $args_all[$arg_number];
+        
+      } else if (substr($sql, $new_pos_back, $named_seperator_length) == $this->named_param_seperator) {
+        $next_space = strpos($sql, ' ', $new_pos_back + $named_seperator_length);
+        if ($next_space < $new_pos_back + $named_seperator_length) $next_space = strlen($sql);
+        
+        $arg_number = substr($sql, $new_pos_back + $named_seperator_length, $next_space - $new_pos_back - 1); 
+        $arg_number_length = strlen($arg_number) + $named_seperator_length;
+        
+        if (count($args_all) != 1) $this->nonSQLError("If you use named parameters, the second argument must be an array of parameters");
+        
+        if (! isset($args_all[0][$arg_number])) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
+        
+        $arg = $args_all[0][$arg_number];
         
       } else {
         $arg_number = 0;
@@ -472,7 +493,7 @@ class MeekroDB {
         else $result = '(' . implode(',', $result) . ')';
       }
       
-      $sql = substr_replace($sql, $result, $pos + $pos_adj, $length_type + $arg_number_length);
+      $sql = substr_replace($sql, $result, $new_pos, $length_type + $arg_number_length);
       $pos_adj += strlen($result) - ($length_type + $arg_number_length);
     }
     return $sql;
