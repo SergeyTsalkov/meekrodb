@@ -41,7 +41,7 @@ class WhereClauseTest extends SimpleTest {
     $subclause->add('username!=%s', 'Bart');
     $where->negateLast();
     
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where->text());
+    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['age'] === '15');
   }
@@ -53,7 +53,7 @@ class WhereClauseTest extends SimpleTest {
     $subclause->add('username!=%s', 'Bart');
     $subclause->negate();
     
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where->text());
+    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['age'] === '15');
   }

@@ -789,6 +789,8 @@ class WhereClause {
     if ($this->negate) $A = '(NOT ' . $A . ')';
     return $A;
   }
+  
+  function __toString() { return $this->text(); }
 }
 
 class DBTransaction {
