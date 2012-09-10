@@ -47,6 +47,8 @@ $classes_to_test = array(
 if ($is_php_53) {
   require_once 'ErrorTest_53.php';
   $classes_to_test[] = 'ErrorTest_53';
+} else {
+  echo "PHP 5.3 not detected, skipping 5.3 tests..\n";
 }
 
 $time_start = microtime_float();
