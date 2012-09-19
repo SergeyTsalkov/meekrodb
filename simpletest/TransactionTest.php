@@ -5,16 +5,22 @@ class TransactionTest extends SimpleTest {
     
     DB::query("UPDATE accounts SET age=%i WHERE username=%s", 600, 'Abe');
     
-    DB::startTransaction();
+    $depth = DB::startTransaction();
+    $this->assert($depth === 1);
+    
     DB::query("UPDATE accounts SET age=%i WHERE username=%s", 700, 'Abe');
-    DB::startTransaction();
+    $depth = DB::startTransaction();
+    $this->assert($depth === 1);
+    
     DB::query("UPDATE accounts SET age=%i WHERE username=%s", 800, 'Abe');
-    DB::rollback();
+    $depth = DB::rollback();
+    $this->assert($depth === 0);
     
     $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
     $this->assert($age == 700);
     
-    DB::rollback();
+    $depth = DB::rollback();
+    $this->assert($depth === 0);
     
     $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
     $this->assert($age == 700);

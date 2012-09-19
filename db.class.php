@@ -215,14 +215,16 @@ class MeekroDB {
     
     if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
       $this->queryNull('START TRANSACTION');
+      $this->nested_transactions_count = 1;
     } else {
       $this->queryNull("SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->nested_transactions_count++;
     }
     
-    if ($this->nested_transactions) return ++$this->nested_transactions_count;
+    return $this->nested_transactions_count;
   }
   
-  public function commit() {
+  public function commit($all=false) {
     if ($this->nested_transactions && $this->serverVersion() < '5.5') {
       return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
     }
@@ -230,7 +232,8 @@ class MeekroDB {
     if ($this->nested_transactions && $this->nested_transactions_count > 0)
       $this->nested_transactions_count--;
     
-    if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
+    if (!$this->nested_transactions || $all || $this->nested_transactions_count == 0) {
+      $this->nested_transactions_count = 0;
       $this->queryNull('COMMIT');
     } else {
       $this->queryNull("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
@@ -239,7 +242,7 @@ class MeekroDB {
     return $this->nested_transactions_count;
   }
   
-  public function rollback() {
+  public function rollback($all=false) {
     if ($this->nested_transactions && $this->serverVersion() < '5.5') {
       return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
     }
@@ -247,7 +250,8 @@ class MeekroDB {
     if ($this->nested_transactions && $this->nested_transactions_count > 0)
       $this->nested_transactions_count--;
     
-    if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
+    if (!$this->nested_transactions || $all || $this->nested_transactions_count == 0) {
+      $this->nested_transactions_count = 0;
       $this->queryNull('ROLLBACK');
     } else {
       $this->queryNull("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");

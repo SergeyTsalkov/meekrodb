@@ -59,5 +59,26 @@ class TransactionTest_55 extends SimpleTest {
     DB::$nested_transactions = false;
   }
   
+  function test_3_transaction_rollback_all() {
+    DB::$nested_transactions = true;
+    
+    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 200, 'Abe');
+    
+    $depth = DB::startTransaction();
+    $this->assert($depth === 1);
+    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 300, 'Abe');
+    $depth = DB::startTransaction();
+    $this->assert($depth === 2);
+    
+    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 400, 'Abe');
+    $depth = DB::rollback(true);
+    $this->assert($depth === 0);
+    
+    $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
+    $this->assert($age == 200);
+    
+    DB::$nested_transactions = false;
+  }
+  
 }
 ?>
