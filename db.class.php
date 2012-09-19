@@ -355,7 +355,7 @@ class MeekroDB {
       $insert_values = array();
       
       foreach ($keys as $key) {
-        if ($many && !isset($data[$key])) $this->nonSQLError('insert/replace many: each assoc array must have the same keys!'); 
+        if ($many && !array_key_exists($key, $data)) $this->nonSQLError('insert/replace many: each assoc array must have the same keys!'); 
         $datum = $data[$key];
         $datum = $this->sanitize($datum);
         $insert_values[] = $datum;

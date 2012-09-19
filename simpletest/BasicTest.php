@@ -11,7 +11,7 @@ class BasicTest extends SimpleTest {
     DB::query("CREATE TABLE `accounts` (
     `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
     `username` VARCHAR( 255 ) NOT NULL ,
-    `password` VARCHAR( 255 ) NOT NULL ,
+    `password` VARCHAR( 255 ) NULL ,
     `age` INT NOT NULL DEFAULT '10',
     `height` DOUBLE NOT NULL DEFAULT '10.0',
     `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi'
@@ -195,9 +195,15 @@ class BasicTest extends SimpleTest {
       'age' => 25,
       'height' => 190.194
     );
+    $ins[] = array(
+      'password' => NULL,
+      'username' => '3ofmany',
+      'age' => 15,
+      'height' => 111.951
+    ); 
     
     DB::insert('accounts', $ins);
-    $this->assert(DB::affectedRows() === 2);
+    $this->assert(DB::affectedRows() === 3);
     
     $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY age ASC", 190.194);
     $this->assert(count($rows) === 2);
@@ -207,6 +213,9 @@ class BasicTest extends SimpleTest {
     $this->assert($rows[1]['password'] === 'somethingelse');
     $this->assert($rows[1]['username'] === '2ofmany');
     
+    $nullrow = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", '3ofmany');
+    $this->assert($nullrow['password'] === NULL);
+    $this->assert($nullrow['age'] === '15');
   }
   
   
