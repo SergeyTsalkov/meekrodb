@@ -867,6 +867,45 @@ class MeekroDBException extends Exception {
   public function getQuery() { return $this->query; }
 }
 
+class DBHelper {
+  /*
+    verticalSlice
+    1. For an array of assoc rays, return an array of values for a particular key
+    2. if $keyfield is given, same as above but use that hash key as the key in new array
+  */
+  
+  public static function verticalSlice($array, $field, $keyfield = null) {
+    $R = array();
+    foreach ($array as $obj) {
+      if ($keyfield) $R[$obj[$keyfield]] = $obj[$field];
+      else $R[] = $obj[$field];
+    }
+    return $R;
+  }
+  
+  /*
+    reIndex
+    For an array of assoc rays, return a new array of assoc rays using a certain field for keys
+  */
+  
+  public static function reIndex() {
+    $fields = func_get_args();
+    $array = array_shift($fields);
+    
+    $R = array();
+    foreach ($array as $obj) {
+      $target =& $R;
+      
+      foreach ($fields as $field) {
+        $nextkey = $obj[$field];
+        $target =& $target[$nextkey];
+      }
+      $target = $obj;
+    }
+    return $R;
+  }
+}
+
 function meekrodb_error_handler($params) {
   if (isset($params['query'])) $out[] = "QUERY: " . $params['query'];
   if (isset($params['error'])) $out[] = "ERROR: " . $params['error'];
