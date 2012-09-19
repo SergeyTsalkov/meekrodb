@@ -13,6 +13,7 @@ class TransactionTest_55 extends SimpleTest {
         
         $depth = DB::startTransaction();
           $this->assert($depth === 3);
+          $this->assert(DB::transactionDepth() === 3);
           DB::query("UPDATE accounts SET age=%i WHERE username=%s", 500, 'Abe');
         $depth = DB::commit();
         

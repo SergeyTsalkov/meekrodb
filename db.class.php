@@ -98,6 +98,8 @@ class DB {
   public static function nonSQLError() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'nonSQLError'), $args); }
   
   public static function serverVersion() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'serverVersion'), $args); }
+  public static function transactionDepth() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'transactionDepth'), $args); }
+  
   
   public static function debugMode($handler = true) { 
     DB::$success_handler = $handler;
@@ -194,6 +196,7 @@ class MeekroDB {
   }
   
   public function serverVersion() { return $this->server_info; }
+  public function transactionDepth() { return $this->nested_transactions_count; }
   public function insertId() { return $this->insert_id; }
   public function affectedRows() { return $this->affected_rows; }
   public function count() { $args = func_get_args(); return call_user_func_array(array($this, 'numRows'), $args); }
