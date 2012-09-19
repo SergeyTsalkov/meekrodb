@@ -35,6 +35,7 @@ class DB {
   public static $throw_exception_on_error = false;
   public static $nonsql_error_handler = null;
   public static $throw_exception_on_nonsql_error = false;
+  public static $nested_transactions = false;
   
   // internal
   protected static $mdb = null;
@@ -54,10 +55,12 @@ class DB {
     if ($mdb->throw_exception_on_error !== DB::$throw_exception_on_error) $mdb->throw_exception_on_error = DB::$throw_exception_on_error;
     if ($mdb->nonsql_error_handler !== DB::$nonsql_error_handler) $mdb->nonsql_error_handler = DB::$nonsql_error_handler;
     if ($mdb->throw_exception_on_nonsql_error !== DB::$throw_exception_on_nonsql_error) $mdb->throw_exception_on_nonsql_error = DB::$throw_exception_on_nonsql_error;
+    if ($mdb->nested_transactions !== DB::$nested_transactions) $mdb->nested_transactions = DB::$nested_transactions;
     
     return $mdb;
   }
   
+  public static function get() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'get'), $args); }
   public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
   public static function quickPrepare() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'quickPrepare'), $args); }
   public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
@@ -94,6 +97,8 @@ class DB {
   public static function sqlEval() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'sqlEval'), $args); }
   public static function nonSQLError() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'nonSQLError'), $args); }
   
+  public static function serverVersion() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'serverVersion'), $args); }
+  
   public static function debugMode($handler = true) { 
     DB::$success_handler = $handler;
   }
@@ -119,9 +124,11 @@ class MeekroDB {
   public $throw_exception_on_error = false;
   public $nonsql_error_handler = null;
   public $throw_exception_on_nonsql_error = false;
+  public $nested_transactions = false;
   
   // internal
   public $internal_mysql = null;
+  public $server_info = null;
   public $insert_id = 0;
   public $num_rows = 0;
   public $affected_rows = 0;
@@ -129,6 +136,7 @@ class MeekroDB {
   public $queryResultType = null;
   public $old_db = null;
   public $current_db = null;
+  public $nested_transactions_count = 0;
   
   
   public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null) {
@@ -161,6 +169,7 @@ class MeekroDB {
       
       $mysql->set_charset($this->encoding);
       $this->internal_mysql = $mysql;
+      $this->server_info = $mysql->server_info;
     }
     
     return $mysql;
@@ -184,6 +193,7 @@ class MeekroDB {
     $this->success_handler = $handler;
   }
   
+  public function serverVersion() { return $this->server_info; }
   public function insertId() { return $this->insert_id; }
   public function affectedRows() { return $this->affected_rows; }
   public function count() { $args = func_get_args(); return call_user_func_array(array($this, 'numRows'), $args); }
@@ -199,15 +209,51 @@ class MeekroDB {
   
   
   public function startTransaction() {
-    $this->queryNull('START TRANSACTION');
+    if ($this->nested_transactions && $this->serverVersion() < '5.5') {
+      return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
+    }
+    
+    if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
+      $this->queryNull('START TRANSACTION');
+    } else {
+      $this->queryNull("SAVEPOINT LEVEL{$this->nested_transactions_count}");
+    }
+    
+    if ($this->nested_transactions) return ++$this->nested_transactions_count;
   }
   
   public function commit() {
-    $this->queryNull('COMMIT');
+    if ($this->nested_transactions && $this->serverVersion() < '5.5') {
+      return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
+    }
+    
+    if ($this->nested_transactions && $this->nested_transactions_count > 0)
+      $this->nested_transactions_count--;
+    
+    if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
+      $this->queryNull('COMMIT');
+    } else {
+      $this->queryNull("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
+    }
+    
+    return $this->nested_transactions_count;
   }
   
   public function rollback() {
-    $this->queryNull('ROLLBACK');
+    if ($this->nested_transactions && $this->serverVersion() < '5.5') {
+      return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
+    }
+    
+    if ($this->nested_transactions && $this->nested_transactions_count > 0)
+      $this->nested_transactions_count--;
+    
+    if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
+      $this->queryNull('ROLLBACK');
+    } else {
+      $this->queryNull("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
+    }
+    
+    return $this->nested_transactions_count;
   }
   
   public function escape($str) {

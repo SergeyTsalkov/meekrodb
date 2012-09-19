@@ -25,23 +25,25 @@ else $is_php_53 = false;
 
 error_reporting(E_ALL | E_STRICT);
 require_once '../db.class.php';
-DB::$user = 'meekrodb_test_us';
-
 include 'test_setup.php'; //test config values go here
+DB::$user = $set_db_user;
 DB::$password = $set_password;
 DB::$dbName = $set_db;
 DB::$host = $set_host;
+DB::get(); //connect to mysql
 
 require_once 'BasicTest.php';
 require_once 'ObjectTest.php';
 require_once 'WhereClauseTest.php';
 require_once 'ErrorTest.php';
+require_once 'TransactionTest.php';
 
 $classes_to_test = array(
   'BasicTest',
   'WhereClauseTest',
   'ObjectTest',
   'ErrorTest',
+  'TransactionTest',
 );
 
 if ($is_php_53) {
@@ -49,6 +51,14 @@ if ($is_php_53) {
   $classes_to_test[] = 'ErrorTest_53';
 } else {
   echo "PHP 5.3 not detected, skipping 5.3 tests..\n";
+}
+
+$mysql_version = DB::serverVersion();
+if ($mysql_version >= '5.5') {
+  require_once 'TransactionTest_55.php';
+  $classes_to_test[] = 'TransactionTest_55';
+} else {
+  echo "MySQL 5.5 not available (version is $mysql_version) -- skipping MySQL 5.5 tests\n";
 }
 
 $time_start = microtime_float();
