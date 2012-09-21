@@ -37,6 +37,7 @@ require_once 'ObjectTest.php';
 require_once 'WhereClauseTest.php';
 require_once 'ErrorTest.php';
 require_once 'TransactionTest.php';
+require_once 'HelperTest.php';
 
 $classes_to_test = array(
   'BasicTest',
@@ -44,6 +45,7 @@ $classes_to_test = array(
   'ObjectTest',
   'ErrorTest',
   'TransactionTest',
+  'HelperTest',
 );
 
 if ($is_php_53) {

@@ -15,7 +15,7 @@ class ObjectTest extends SimpleTest {
     $this->mdb->query("CREATE TABLE `accounts` (
     `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
     `username` VARCHAR( 255 ) NOT NULL ,
-    `password` VARCHAR( 255 ) NOT NULL ,
+    `password` VARCHAR( 255 ) NULL ,
     `age` INT NOT NULL DEFAULT '10',
     `height` DOUBLE NOT NULL DEFAULT '10.0',
     `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi'
