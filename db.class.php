@@ -27,7 +27,6 @@ class DB {
   public static $encoding = 'latin1';
   
   // configure workings
-  public static $queryMode = 'queryAllRows';
   public static $param_char = '%';
   public static $named_param_seperator = '_';
   public static $success_handler = false;
@@ -46,8 +45,7 @@ class DB {
     if ($mdb === null) {
       $mdb = DB::$mdb = new MeekroDB();
     }
-    
-    if ($mdb->queryMode !== DB::$queryMode) $mdb->queryMode = DB::$queryMode;
+
     if ($mdb->param_char !== DB::$param_char) $mdb->param_char = DB::$param_char;
     if ($mdb->named_param_seperator !== DB::$named_param_seperator) $mdb->named_param_seperator = DB::$named_param_seperator;
     if ($mdb->success_handler !== DB::$success_handler) $mdb->success_handler = DB::$success_handler;
@@ -62,7 +60,6 @@ class DB {
   
   public static function get() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'get'), $args); }
   public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
-  public static function quickPrepare() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'quickPrepare'), $args); }
   public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
   public static function queryOneRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneRow'), $args); }
   public static function queryFirstList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstList'), $args); }
@@ -118,7 +115,6 @@ class MeekroDB {
   public $encoding = 'latin1';
   
   // configure workings
-  public $queryMode = 'queryAllRows';
   public $param_char = '%';
   public $named_param_seperator = '_';
   public $success_handler = false;
@@ -311,10 +307,6 @@ class MeekroDB {
       
   }
   
-  public function freeResult(MySQLi_Result $result) {
-    return $result->free();
-  }
-  
   public function update() {
     $args = func_get_args();
     $table = array_shift($args);
@@ -435,28 +427,10 @@ class MeekroDB {
     return $result;
   }
   
-  public function parseQueryParamsOld() {
+  public function parseQueryParams() {
     $args = func_get_args();
-    $sql = array_shift($args);
-    $types = array_shift($args);
-    $types = str_split($types);
-    
-    foreach ($args as $arg) {
-      $type = array_shift($types);
-      $pos = strpos($sql, '?');
-      if ($pos === false) $this->nonSQLError("Badly formatted SQL query: $sql");  
-      
-      if ($type == 's') $replacement = "'" . $this->escape($arg) . "'";
-      else if ($type == 'i') $replacement = intval($arg);
-      else $this->nonSQLError("Badly formatted SQL query: $sql");
-      
-      $sql = substr_replace($sql, $replacement, $pos, 1);
-    }
-    return $sql;
-  }
-  
-  public function parseQueryParamsNew() {
-    $args = func_get_args();
+    if (count($args) < 2) return $args[0];
+
     $sql = array_shift($args);
     $args_all = $args;
     $posList = array();
@@ -547,26 +521,10 @@ class MeekroDB {
     }
     return $sql;
   }
-  
-  public function parseQueryParams() {
-    $args = func_get_args();
-    if (count($args) < 2) return $args[0];
-    
-    if (is_string($args[1]) && preg_match('/^[is]+$/', $args[1]) && substr_count($args[0], '?') > 0)
-      return call_user_func_array(array($this, 'parseQueryParamsOld'), $args);
-    else
-      return call_user_func_array(array($this, 'parseQueryParamsNew'), $args);
-  }
-  
-  public function quickPrepare() { $args = func_get_args(); return call_user_func_array(array($this, 'query'), $args); }
-  
+
   public function query() {
     $args = func_get_args();
-    if ($this->queryMode == 'buffered' || $this->queryMode == 'unbuffered') {
-      return $this->prependCall(array($this, 'queryHelper'), $args, $this->queryMode);
-    } else {
-      return call_user_func_array(array($this, 'queryAllRows'), $args);
-    }
+    return call_user_func_array(array($this, 'queryAllRows'), $args);
   }
   
   public function queryNull() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'null'); }

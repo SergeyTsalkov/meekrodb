@@ -232,14 +232,11 @@ class BasicTest extends SimpleTest {
       'picture' => $smile,
     ));
     DB::query("INSERT INTO storedata (picture) VALUES (%s)", $smile);
-    DB::query("INSERT INTO storedata (picture) VALUES (?)", 's', $smile);
     
     $getsmile = DB::queryFirstField("SELECT picture FROM storedata WHERE id=1");
     $getsmile2 = DB::queryFirstField("SELECT picture FROM storedata WHERE id=2");
-    $getsmile3 = DB::queryFirstField("SELECT picture FROM storedata WHERE id=3");
     $this->assert($smile === $getsmile);
     $this->assert($smile === $getsmile2);
-    $this->assert($smile === $getsmile3);
   }
   
   function test_6_insert_ignore() {

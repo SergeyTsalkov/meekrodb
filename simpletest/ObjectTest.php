@@ -220,14 +220,11 @@ class ObjectTest extends SimpleTest {
       'picture' => $smile,
     ));
     $this->mdb->query("INSERT INTO storedata (picture) VALUES (%s)", $smile);
-    $this->mdb->query("INSERT INTO storedata (picture) VALUES (?)", 's', $smile);
     
     $getsmile = $this->mdb->queryFirstField("SELECT picture FROM storedata WHERE id=1");
     $getsmile2 = $this->mdb->queryFirstField("SELECT picture FROM storedata WHERE id=2");
-    $getsmile3 = $this->mdb->queryFirstField("SELECT picture FROM storedata WHERE id=3");
     $this->assert($smile === $getsmile);
     $this->assert($smile === $getsmile2);
-    $this->assert($smile === $getsmile3);
   }
   
   function test_6_insert_ignore() {
