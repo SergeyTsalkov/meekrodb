@@ -134,8 +134,6 @@ class MeekroDB {
   public $insert_id = 0;
   public $num_rows = 0;
   public $affected_rows = 0;
-  public $queryResult = null;
-  public $queryResultType = null;
   public $old_db = null;
   public $current_db = null;
   public $nested_transactions_count = 0;
@@ -313,8 +311,7 @@ class MeekroDB {
       
   }
   
-  public function freeResult($result) {
-    if (! ($result instanceof MySQLi_Result)) return;
+  public function freeResult(MySQLi_Result $result) {
     return $result->free();
   }
   
@@ -593,7 +590,9 @@ class MeekroDB {
     if ($this->success_handler) $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
     if ($this->success_handler) $runtime = microtime(true) - $starttime;
-    
+    else $runtime = 0;
+
+    $error = '';
     if (!$sql || $error = $this->checkError()) {
       if ($this->error_handler) {
         $error_handler = is_callable($this->error_handler) ? $this->error_handler : 'meekrodb_error_handler';
@@ -619,9 +618,7 @@ class MeekroDB {
         'affected' => $db->affected_rows
       )); 
     }
-    
-    $this->queryResult = $result;
-    $this->queryResultType = $type;
+
     $this->insert_id = $db->insert_id;
     $this->affected_rows = $db->affected_rows;
     
@@ -629,8 +626,7 @@ class MeekroDB {
     else $this->num_rows = null;
     
     if ($is_null) {
-      $this->freeResult($result);
-      $this->queryResult = $this->queryResultType = null;
+      if ($result instanceof MySQLi_Result) $result->free();
       return null;
     }
     
@@ -639,42 +635,69 @@ class MeekroDB {
   
   public function queryAllRows() {
     $args = func_get_args();
-    
-    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
-    $result = $this->fetchAllRows($query);
-    $this->freeResult($query);
-    $this->num_rows = count($result);
-    
-    return $result;
+
+    $rowlist = array();
+    $this->num_rows = 0;
+
+    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    if ($result instanceof MySQLi_Result) {
+      while ($row = $result->fetch_assoc()) {
+        $rowlist[] = $row;
+        $this->num_rows++;
+      }
+
+      $result->free();
+    }
+
+    return $rowlist;
   }
   
   public function queryAllArrays() {
     $args = func_get_args();
-    
-    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
-    $result = $this->fetchAllArrays($query);
-    $this->freeResult($query);
-    $this->num_rows = count($result);
-    
-    return $result;
+
+    $rows = array();
+    $this->num_rows = 0;
+
+    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    if ($result instanceof MySQLi_Result) {
+      while ($row = $result->fetch_row()) {
+        $rows[] = $row;
+        $this->num_rows++;
+      }
+
+      $result->free();
+    }
+
+    return $rows;
   }
   
   public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
   public function queryFirstList() {
     $args = func_get_args();
-    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
-    $result = $this->fetchArray($query);
-    $this->freeResult($query);
-    return $result;
+    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    if ($result instanceof MySQLi_Result) {
+      $row = $result->fetch_row();
+      $result->free();
+    } else {
+      $row = null;
+    }
+
+    return $row;
   }
   
   public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
   public function queryFirstRow() {
     $args = func_get_args();
-    $query = call_user_func_array(array($this, 'queryUnbuf'), $args);
-    $result = $this->fetchRow($query);
-    $this->freeResult($query);
-    return $result;
+    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+
+    if ($result instanceof MySQLi_Result) {
+      $row = $result->fetch_assoc();
+      $result->free();
+    } else {
+      $row = null;
+    }
+
+    return $row;
   }
   
   
@@ -743,36 +766,7 @@ class MeekroDB {
     
     return false;
   }
-  
-  public function fetchRow($result = null) {
-    if ($result === null) $result = $this->queryResult;
-    if (! ($result instanceof MySQLi_Result)) return null;
-    return $result->fetch_assoc();
-  }
-  
-  public function fetchAllRows($result = null) {
-    $A = array();
-    while ($row = $this->fetchRow($result)) {
-      $A[] = $row;
-    }
-    return $A;
-  }
-  
-  public function fetchArray($result = null) {
-    if ($result === null) $result = $this->queryResult;
-    if (! ($result instanceof MySQLi_Result)) return null;
-    return $result->fetch_row();
-  }
-  
-  public function fetchAllArrays($result = null) {
-    $A = array();
-    while ($row = $this->fetchArray($result)) {
-      $A[] = $row;
-    }
-    return $A;
-  }
-  
-  
+
 }
 
 class WhereClause {
