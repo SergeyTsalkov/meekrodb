@@ -541,8 +541,10 @@ class MeekroDB {
       if (is_array($result)) {
         if (! $array_type) $result = $result[0];
         else $result = '(' . implode(',', $result) . ')';
+
+        if (is_array($result)) $this->nonSQLError("Badly formatted SQL query: $sql -- you passed an array but I didn't expect one!");
       }
-      
+
       $sql = substr_replace($sql, $result, $new_pos, $length_type + $arg_number_length);
       $pos_adj += strlen($result) - ($length_type + $arg_number_length);
     }
