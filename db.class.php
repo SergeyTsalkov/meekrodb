@@ -312,14 +312,14 @@ class MeekroDB {
     $table = array_shift($args);
     $params = array_shift($args);
     $where = array_shift($args);
-    $buildquery = "UPDATE " . self::formatTableName($table) . " SET ";
+    $buildquery = "UPDATE " . $this->formatTableName($table) . " SET ";
     $keyval = array();
     foreach ($params as $key => $value) {
       $value = $this->sanitize($value);
       $keyval[] = "`" . $key . "`=" . $value;
     }
     
-    $buildquery = "UPDATE " . self::formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
+    $buildquery = "UPDATE " . $this->formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
     array_unshift($args, $buildquery);
     call_user_func_array(array($this, 'queryNull'), $args);
   }
@@ -354,7 +354,7 @@ class MeekroDB {
       $values[] = '(' . implode(', ', $insert_values) . ')';
     }
     
-    $table = self::formatTableName($table);
+    $table = $this->formatTableName($table);
     $keys_str = implode(', ', $this->wrapStr($keys, '`'));
     $values_str = implode(',', $values);
     
@@ -403,7 +403,7 @@ class MeekroDB {
   
   public function delete() {
     $args = func_get_args();
-    $table = self::formatTableName(array_shift($args));
+    $table = $this->formatTableName(array_shift($args));
     $where = array_shift($args);
     $buildquery = "DELETE FROM $table WHERE $where";
     array_unshift($args, $buildquery);
@@ -579,32 +579,46 @@ class MeekroDB {
 
     $this->insert_id = $db->insert_id;
     $this->affected_rows = $db->affected_rows;
-    
-    if ($is_buffered) $this->num_rows = $result->num_rows;
+
+    // mysqli_result->num_rows won't initially show correct results for unbuffered data
+    if ($is_buffered && ($result instanceof MySQLi_Result)) $this->num_rows = $result->num_rows;
     else $this->num_rows = null;
-    
+
     if ($is_null) {
-      if ($result instanceof MySQLi_Result) $result->free();
+      if ($result instanceof MySQLi_Result) $this->freeResult($result);
       return null;
     }
     
     return $result;
   }
-  
+
+  protected function freeResult($result = null) {
+    if ($result instanceof MySQLi_Result) {
+      $result->free();
+    }
+
+    $db = $this->get();
+    while ($db->more_results()) {
+      $db->next_result();
+      if ($result = $db->use_result()) $result->free();
+    }
+
+  }
+
   public function queryAllRows() {
     $args = func_get_args();
 
     $rowlist = array();
     $this->num_rows = 0;
 
-    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = call_user_func_array(array($this, 'queryBuf'), $args);
     if ($result instanceof MySQLi_Result) {
       while ($row = $result->fetch_assoc()) {
         $rowlist[] = $row;
         $this->num_rows++;
       }
 
-      $result->free();
+      $this->freeResult($result);
     }
 
     return $rowlist;
@@ -616,14 +630,14 @@ class MeekroDB {
     $rows = array();
     $this->num_rows = 0;
 
-    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = call_user_func_array(array($this, 'queryBuf'), $args);
     if ($result instanceof MySQLi_Result) {
       while ($row = $result->fetch_row()) {
         $rows[] = $row;
         $this->num_rows++;
       }
 
-      $result->free();
+      $this->freeResult($result);
     }
 
     return $rows;
@@ -632,10 +646,10 @@ class MeekroDB {
   public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
   public function queryFirstList() {
     $args = func_get_args();
-    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = call_user_func_array(array($this, 'queryBuf'), $args);
     if ($result instanceof MySQLi_Result) {
       $row = $result->fetch_row();
-      $result->free();
+      $this->freeResult($result);
     } else {
       $row = null;
     }
@@ -646,11 +660,11 @@ class MeekroDB {
   public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
   public function queryFirstRow() {
     $args = func_get_args();
-    $result = call_user_func_array(array($this, 'queryUnbuf'), $args);
+    $result = call_user_func_array(array($this, 'queryBuf'), $args);
 
     if ($result instanceof MySQLi_Result) {
       $row = $result->fetch_assoc();
-      $result->free();
+      $this->freeResult($result);
     } else {
       $row = null;
     }

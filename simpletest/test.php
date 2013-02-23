@@ -1,7 +1,7 @@
 #!/usr/bin/php
 <?php
 class SimpleTest {
-  protected function assert($boolean) {
+  public function assert($boolean) {
     if (! $boolean) $this->fail();
   }
 
@@ -33,6 +33,7 @@ DB::$host = $set_host;
 DB::get(); //connect to mysql
 
 require_once 'BasicTest.php';
+require_once 'CallTest.php';
 require_once 'ObjectTest.php';
 require_once 'WhereClauseTest.php';
 require_once 'ErrorTest.php';
@@ -41,6 +42,7 @@ require_once 'HelperTest.php';
 
 $classes_to_test = array(
   'BasicTest',
+  'CallTest',
   'WhereClauseTest',
   'ObjectTest',
   'ErrorTest',
