@@ -65,12 +65,21 @@ class BasicTest extends SimpleTest {
       'height' => 155.23,
       'favorite_word' => null,
     ));
-    
+
     $this->assert(DB::insertId() === 3);
-    
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
-    
+
+    DB::insert('`accounts`', array(
+      'username' => 'Deer',
+      'password' => '',
+      'age' => 15,
+      'height' => 10.371
+    ));
+
+    $username = DB::queryFirstField("SELECT username FROM accounts WHERE password=%s0", null);
+    $this->assert($username === 'Deer');
+
     $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
     $this->assert($password === 'goodbye');
     
@@ -111,7 +120,7 @@ class BasicTest extends SimpleTest {
     $this->assert($results[0]['age'] == 30 && $results[0]['password'] == 'goodbye');
     
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
-    $this->assert(count($results) === 2);
+    $this->assert(count($results) === 3);
     
     $columnlist = DB::columnList('accounts');
     $this->assert(count($columnlist) === 6);
