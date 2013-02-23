@@ -62,6 +62,7 @@ class DB {
   public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
   public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
   public static function queryOneRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneRow'), $args); }
+  public static function queryAllLists() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryAllLists'), $args); }
   public static function queryFirstList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstList'), $args); }
   public static function queryOneList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneList'), $args); }
   public static function queryFirstColumn() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstColumn'), $args); }
@@ -69,9 +70,7 @@ class DB {
   public static function queryFirstField() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstField'), $args); }
   public static function queryOneField() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneField'), $args); }
   public static function queryRaw() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryRaw'), $args); }
-  public static function queryNull() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryNull'), $args); }
-  public static function queryBuf() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryBuf'), $args); }
-  public static function queryUnbuf() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryUnbuf'), $args); }
+  public static function queryRawUnbuf() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryRawUnbuf'), $args); }
   
   public static function insert() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insert'), $args); }
   public static function insertIgnore() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertIgnore'), $args); }
@@ -130,7 +129,6 @@ class MeekroDB {
   public $insert_id = 0;
   public $num_rows = 0;
   public $affected_rows = 0;
-  public $old_db = null;
   public $current_db = null;
   public $nested_transactions_count = 0;
   
@@ -199,7 +197,6 @@ class MeekroDB {
   public function useDB() { $args = func_get_args(); return call_user_func_array(array($this, 'setDB'), $args); }
   public function setDB($dbName) {
     $db = $this->get();
-    $this->old_db = $this->current_db;
     if (! $db->select_db($dbName)) $this->nonSQLError("Unable to set database to $dbName");
     $this->current_db = $dbName;
   }
@@ -211,10 +208,10 @@ class MeekroDB {
     }
     
     if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
-      $this->queryNull('START TRANSACTION');
+      $this->query('START TRANSACTION');
       $this->nested_transactions_count = 1;
     } else {
-      $this->queryNull("SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->query("SAVEPOINT LEVEL{$this->nested_transactions_count}");
       $this->nested_transactions_count++;
     }
     
@@ -231,9 +228,9 @@ class MeekroDB {
     
     if (!$this->nested_transactions || $all || $this->nested_transactions_count == 0) {
       $this->nested_transactions_count = 0;
-      $this->queryNull('COMMIT');
+      $this->query('COMMIT');
     } else {
-      $this->queryNull("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->query("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
     }
     
     return $this->nested_transactions_count;
@@ -249,9 +246,9 @@ class MeekroDB {
     
     if (!$this->nested_transactions || $all || $this->nested_transactions_count == 0) {
       $this->nested_transactions_count = 0;
-      $this->queryNull('ROLLBACK');
+      $this->query('ROLLBACK');
     } else {
-      $this->queryNull("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->query("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
     }
     
     return $this->nested_transactions_count;
@@ -321,7 +318,7 @@ class MeekroDB {
     
     $buildquery = "UPDATE " . $this->formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
     array_unshift($args, $buildquery);
-    call_user_func_array(array($this, 'queryNull'), $args);
+    call_user_func_array(array($this, 'query'), $args);
   }
   
   public function insertOrReplace($which, $table, $datas, $options=array()) {
@@ -359,13 +356,13 @@ class MeekroDB {
     $values_str = implode(',', $values);
     
     if (isset($options['ignore']) && $options['ignore'] && strtolower($which) == 'insert') { 
-      $this->queryNull("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
+      $this->query("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
       
     } else if (isset($options['update']) && $options['update'] && strtolower($which) == 'insert') {
-      $this->queryNull("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
+      $this->query("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
       
     } else { 
-      $this->queryNull("$which INTO $table ($keys_str) VALUES $values_str");
+      $this->query("$which INTO $table ($keys_str) VALUES $values_str");
     }
   }
   
@@ -407,7 +404,7 @@ class MeekroDB {
     $where = array_shift($args);
     $buildquery = "DELETE FROM $table WHERE $where";
     array_unshift($args, $buildquery);
-    call_user_func_array(array($this, 'queryNull'), $args);
+    call_user_func_array(array($this, 'query'), $args);
   }
   
   public function sqleval() {
@@ -421,9 +418,13 @@ class MeekroDB {
   }
   
   public function tableList($db = null) {
-    if ($db) $this->useDB($db);
+    if ($db) {
+      $olddb = $this->current_db;
+      $this->useDB($db);
+    }
+
     $result = $this->queryFirstColumn('SHOW TABLES');
-    if ($db && $this->old_db) $this->useDB($this->old_db);
+    if (isset($olddb)) $this->useDB($olddb);
     return $result;
   }
   
@@ -522,25 +523,37 @@ class MeekroDB {
     return $sql;
   }
 
-  public function query() {
-    $args = func_get_args();
-    return call_user_func_array(array($this, 'queryAllRows'), $args);
-  }
-  
-  public function queryNull() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'null'); }
-  public function queryRaw() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'buffered'); }
-  public function queryBuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'buffered'); }
-  public function queryUnbuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'unbuffered'); }
+
+  public function query() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'assoc'); }
+  public function queryAllLists() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'list'); }
+
+  public function queryRaw() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'raw_buf'); }
+  public function queryRawUnbuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'raw_unbuf'); }
   
   protected function queryHelper() {
     $args = func_get_args();
     $type = array_shift($args);
-    if ($type != 'buffered' && $type != 'unbuffered' && $type != 'null') {
-      $this->nonSQLError('Error -- first argument to queryHelper must be buffered or unbuffered!');
+
+    $is_buffered = true;
+    $row_type = 'assoc'; // assoc, list, raw
+
+    switch ($type) {
+      case 'assoc':
+        break;
+      case 'list':
+        $row_type = 'list';
+        break;
+      case 'raw_buf':
+        $row_type = 'raw';
+        break;
+      case 'raw_unbuf':
+        $is_buffered = false;
+        $row_type = 'raw';
+        break;
+      default:
+        $this->nonSQLError('Error -- invalid argument to queryHelper!');
     }
-    $is_buffered = ($type == 'buffered');
-    $is_null = ($type == 'null');
-    
+
     $sql = call_user_func_array(array($this, 'parseQueryParams'), $args);
     
     $db = $this->get();
@@ -549,6 +562,8 @@ class MeekroDB {
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
     if ($this->success_handler) $runtime = microtime(true) - $starttime;
     else $runtime = 0;
+
+    // ----- BEGIN ERROR HANDLING
 
     $error = '';
     if (!$sql || $error = $this->checkError()) {
@@ -577,6 +592,8 @@ class MeekroDB {
       )); 
     }
 
+    // ----- END ERROR HANDLING
+
     $this->insert_id = $db->insert_id;
     $this->affected_rows = $db->affected_rows;
 
@@ -584,12 +601,17 @@ class MeekroDB {
     if ($is_buffered && ($result instanceof MySQLi_Result)) $this->num_rows = $result->num_rows;
     else $this->num_rows = null;
 
-    if ($is_null) {
-      if ($result instanceof MySQLi_Result) $this->freeResult($result);
-      return null;
+    if ($row_type == 'raw') return $result;
+
+    $return = array();
+    if (!($result instanceof MySQLi_Result)) return $return;
+
+    while ($row = ($row_type == 'assoc' ? $result->fetch_assoc() : $result->fetch_row())) {
+      $return[] = $row;
     }
-    
-    return $result;
+
+    $this->freeResult($result);
+    return $return;
   }
 
   protected function freeResult($result = null) {
@@ -605,77 +627,25 @@ class MeekroDB {
 
   }
 
-  public function queryAllRows() {
-    $args = func_get_args();
-
-    $rowlist = array();
-    $this->num_rows = 0;
-
-    $result = call_user_func_array(array($this, 'queryBuf'), $args);
-    if ($result instanceof MySQLi_Result) {
-      while ($row = $result->fetch_assoc()) {
-        $rowlist[] = $row;
-        $this->num_rows++;
-      }
-
-      $this->freeResult($result);
-    }
-
-    return $rowlist;
-  }
-  
-  public function queryAllArrays() {
-    $args = func_get_args();
-
-    $rows = array();
-    $this->num_rows = 0;
-
-    $result = call_user_func_array(array($this, 'queryBuf'), $args);
-    if ($result instanceof MySQLi_Result) {
-      while ($row = $result->fetch_row()) {
-        $rows[] = $row;
-        $this->num_rows++;
-      }
-
-      $this->freeResult($result);
-    }
-
-    return $rows;
-  }
-  
-  public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
-  public function queryFirstList() {
-    $args = func_get_args();
-    $result = call_user_func_array(array($this, 'queryBuf'), $args);
-    if ($result instanceof MySQLi_Result) {
-      $row = $result->fetch_row();
-      $this->freeResult($result);
-    } else {
-      $row = null;
-    }
-
-    return $row;
-  }
-  
   public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
   public function queryFirstRow() {
     $args = func_get_args();
-    $result = call_user_func_array(array($this, 'queryBuf'), $args);
-
-    if ($result instanceof MySQLi_Result) {
-      $row = $result->fetch_assoc();
-      $this->freeResult($result);
-    } else {
-      $row = null;
-    }
-
-    return $row;
+    $result = call_user_func_array(array($this, 'query'), $args);
+    if (! $result) return null;
+    return reset($result);
   }
-  
+
+  public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
+  public function queryFirstList() {
+    $args = func_get_args();
+    $result = call_user_func_array(array($this, 'queryAllLists'), $args);
+    if (! $result) return null;
+    return reset($result);
+  }
   
   public function queryFirstColumn() { 
     $args = func_get_args();
-    $results = call_user_func_array(array($this, 'queryAllArrays'), $args);
+    $results = call_user_func_array(array($this, 'queryAllLists'), $args);
     $ret = array();
     
     if (!count($results) || !count($results[0])) return $ret;
@@ -690,7 +660,7 @@ class MeekroDB {
   public function queryOneColumn() {
     $args = func_get_args();
     $column = array_shift($args);
-    $results = call_user_func_array(array($this, 'queryAllRows'), $args);
+    $results = call_user_func_array(array($this, 'query'), $args);
     $ret = array();
     
     if (!count($results) || !count($results[0])) return $ret;
