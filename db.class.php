@@ -63,6 +63,7 @@ class DB {
   public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
   public static function queryOneRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneRow'), $args); }
   public static function queryAllLists() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryAllLists'), $args); }
+  public static function queryFullColumns() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFullColumns'), $args); }
   public static function queryFirstList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstList'), $args); }
   public static function queryOneList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneList'), $args); }
   public static function queryFirstColumn() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstColumn'), $args); }
@@ -526,6 +527,7 @@ class MeekroDB {
 
   public function query() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'assoc'); }
   public function queryAllLists() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'list'); }
+  public function queryFullColumns() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'full'); }
 
   public function queryRaw() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'raw_buf'); }
   public function queryRawUnbuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'raw_unbuf'); }
@@ -536,12 +538,17 @@ class MeekroDB {
 
     $is_buffered = true;
     $row_type = 'assoc'; // assoc, list, raw
+    $full_names = false;
 
     switch ($type) {
       case 'assoc':
         break;
       case 'list':
         $row_type = 'list';
+        break;
+      case 'full':
+        $row_type = 'list';
+        $full_names = true;
         break;
       case 'raw_buf':
         $row_type = 'raw';
@@ -606,7 +613,15 @@ class MeekroDB {
     $return = array();
     if (!($result instanceof MySQLi_Result)) return $return;
 
+    if ($full_names) {
+      $infos = array();
+      foreach ($result->fetch_fields() as $info) {
+        $infos[] = $info->table . '.' . $info->name;
+      }
+    }
+
     while ($row = ($row_type == 'assoc' ? $result->fetch_assoc() : $result->fetch_row())) {
+      if ($full_names) $row = array_combine($infos, $row);
       $return[] = $row;
     }
 

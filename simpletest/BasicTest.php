@@ -10,11 +10,17 @@ class BasicTest extends SimpleTest {
   function test_1_create_table() {
     DB::query("CREATE TABLE `accounts` (
     `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+    `profile_id` INT NOT NULL,
     `username` VARCHAR( 255 ) NOT NULL ,
     `password` VARCHAR( 255 ) NULL ,
     `age` INT NOT NULL DEFAULT '10',
     `height` DOUBLE NOT NULL DEFAULT '10.0',
     `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi'
+    ) ENGINE = InnoDB");
+
+    DB::query("CREATE TABLE `profile` (
+    `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+    `signature` VARCHAR( 255 ) NULL DEFAULT 'donewriting'
     ) ENGINE = InnoDB");
   }
   
@@ -123,17 +129,17 @@ class BasicTest extends SimpleTest {
     $this->assert(count($results) === 3);
     
     $columnlist = DB::columnList('accounts');
-    $this->assert(count($columnlist) === 6);
+    $this->assert(count($columnlist) === 7);
     $this->assert($columnlist[0] === 'id');
-    $this->assert($columnlist[4] === 'height');
+    $this->assert($columnlist[5] === 'height');
     
     $tablelist = DB::tableList();
-    $this->assert(count($tablelist) === 1);
+    $this->assert(count($tablelist) === 2);
     $this->assert($tablelist[0] === 'accounts');
     
     $tablelist = null;
     $tablelist = DB::tableList(DB::$dbName);
-    $this->assert(count($tablelist) === 1);
+    $this->assert(count($tablelist) === 2);
     $this->assert($tablelist[0] === 'accounts');
   }
   
@@ -337,6 +343,22 @@ class BasicTest extends SimpleTest {
     $result = DB::query("SELECT * FROM accounts WHERE username=%s", 'vookoo');
     $this->assert(count($result) === 1);
     $this->assert($result[0]['password'] === 'dookoo');
+  }
+
+  function test_9_fullcolumns() {
+    DB::insert('profile', array(
+      'id' => 1,
+      'signature' => 'u_suck'
+    ));
+    DB::query("UPDATE accounts SET profile_id=1 WHERE id=2");
+
+    $r = DB::queryFullColumns("SELECT accounts.*, profile.* FROM accounts
+      INNER JOIN profile ON accounts.profile_id=profile.id");
+
+    $this->assert(count($r) === 1);
+    $this->assert($r[0]['accounts.id'] === '2');
+    $this->assert($r[0]['profile.id'] === '1');
+    $this->assert($r[0]['profile.signature'] === 'u_suck');
   }
 
 }
