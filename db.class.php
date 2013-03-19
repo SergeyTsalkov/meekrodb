@@ -319,7 +319,7 @@ class MeekroDB {
     
     $buildquery = "UPDATE " . $this->formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
     array_unshift($args, $buildquery);
-    call_user_func_array(array($this, 'query'), $args);
+    return call_user_func_array(array($this, 'query'), $args);
   }
   
   public function insertOrReplace($which, $table, $datas, $options=array()) {
@@ -357,13 +357,13 @@ class MeekroDB {
     $values_str = implode(',', $values);
     
     if (isset($options['ignore']) && $options['ignore'] && strtolower($which) == 'insert') { 
-      $this->query("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
+      return $this->query("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
       
     } else if (isset($options['update']) && $options['update'] && strtolower($which) == 'insert') {
-      $this->query("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
+      return $this->query("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
       
     } else { 
-      $this->query("$which INTO $table ($keys_str) VALUES $values_str");
+      return $this->query("$which INTO $table ($keys_str) VALUES $values_str");
     }
   }
   
@@ -405,7 +405,7 @@ class MeekroDB {
     $where = array_shift($args);
     $buildquery = "DELETE FROM $table WHERE $where";
     array_unshift($args, $buildquery);
-    call_user_func_array(array($this, 'query'), $args);
+    return call_user_func_array(array($this, 'query'), $args);
   }
   
   public function sqleval() {
@@ -608,10 +608,9 @@ class MeekroDB {
     if ($is_buffered && ($result instanceof MySQLi_Result)) $this->num_rows = $result->num_rows;
     else $this->num_rows = null;
 
-    if ($row_type == 'raw') return $result;
+    if ($row_type == 'raw' || !($result instanceof MySQLi_Result)) return $result;
 
     $return = array();
-    if (!($result instanceof MySQLi_Result)) return $return;
 
     if ($full_names) {
       $infos = array();

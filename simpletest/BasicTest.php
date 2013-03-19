@@ -45,11 +45,12 @@ class BasicTest extends SimpleTest {
   }
   
   function test_2_insert_row() {
-    DB::insert('accounts', array(
+    $true = DB::insert('accounts', array(
       'username' => 'Abe',
       'password' => 'hello'
     ));
     
+    $this->assert($true === true);
     $this->assert(DB::affectedRows() === 1);
     
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
@@ -155,13 +156,14 @@ class BasicTest extends SimpleTest {
     $this->assert($row['username'] === 'newguy');
     $this->assert($row['age'] === '172');
     
-    DB::update('accounts', array(
+    $true = DB::update('accounts', array(
       'password' => DB::sqleval("REPEAT('blah', %i)", 4),
       'favorite_word' => null,
       ), 'username=%s', 'newguy');
     
     $row = null;
     $row = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
+    $this->assert($true === true);
     $this->assert($row['password'] === 'blahblahblahblah');
     $this->assert($row['favorite_word'] === null);
     
@@ -172,7 +174,8 @@ class BasicTest extends SimpleTest {
     $this->assert($row[0]['username'] === 'newguy');
     $this->assert($row[0]['age'] === '172');
     
-    DB::query("DELETE FROM accounts WHERE password=%s", 'blahblahblahblah');
+    $true = DB::query("DELETE FROM accounts WHERE password=%s", 'blahblahblahblah');
+    $this->assert($true === true);
     $this->assert(DB::affectedRows() === 1);
   }
   
@@ -265,7 +268,7 @@ class BasicTest extends SimpleTest {
   }
   
   function test_7_insert_update() {
-    DB::insertUpdate('accounts', array(
+    $true = DB::insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
@@ -273,6 +276,7 @@ class BasicTest extends SimpleTest {
       'height' => 199.194
     ), 'age = age + %i', 1);
     
+    $this->assert($true === true);
     $this->assert(DB::affectedRows() === 2); // a quirk of MySQL, even though only 1 row was updated
     
     $result = DB::query("SELECT * FROM accounts WHERE age = %i", 16);
@@ -329,7 +333,8 @@ class BasicTest extends SimpleTest {
     $this->assert($result[0]['username'] === 'Abe');
     $this->assert($result[1]['username'] === 'Charlie\'s Friend');
     
-    DB::query("UPDATE accounts SET age=15, username='Bart' WHERE age=%i", 74);
+    $true = DB::query("UPDATE accounts SET age=15, username='Bart' WHERE age=%i", 74);
+    $this->assert($true === true);
     $this->assert(DB::affectedRows() === 1);
   }
   
@@ -339,14 +344,15 @@ class BasicTest extends SimpleTest {
       'password' => 'dookoo',
     );
     
-    DB::query("INSERT into accounts %lb VALUES %ls", array_keys($data), array_values($data));
+    $true = DB::query("INSERT into accounts %lb VALUES %ls", array_keys($data), array_values($data));
     $result = DB::query("SELECT * FROM accounts WHERE username=%s", 'vookoo');
+    $this->assert($true === true);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['password'] === 'dookoo');
   }
 
   function test_9_fullcolumns() {
-    DB::insert('profile', array(
+    $true = DB::insert('profile', array(
       'id' => 1,
       'signature' => 'u_suck'
     ));
@@ -355,6 +361,7 @@ class BasicTest extends SimpleTest {
     $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 FROM accounts
       INNER JOIN profile ON accounts.profile_id=profile.id");
 
+    $this->assert($true === true);
     $this->assert(count($r) === 1);
     $this->assert($r[0]['accounts.id'] === '2');
     $this->assert($r[0]['profile.id'] === '1');
