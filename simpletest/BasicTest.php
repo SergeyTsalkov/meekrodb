@@ -352,13 +352,14 @@ class BasicTest extends SimpleTest {
     ));
     DB::query("UPDATE accounts SET profile_id=1 WHERE id=2");
 
-    $r = DB::queryFullColumns("SELECT accounts.*, profile.* FROM accounts
+    $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 FROM accounts
       INNER JOIN profile ON accounts.profile_id=profile.id");
 
     $this->assert(count($r) === 1);
     $this->assert($r[0]['accounts.id'] === '2');
     $this->assert($r[0]['profile.id'] === '1');
     $this->assert($r[0]['profile.signature'] === 'u_suck');
+    $this->assert($r[0]['1+1'] === '2');
   }
 
 }

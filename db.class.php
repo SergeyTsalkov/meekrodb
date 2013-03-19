@@ -616,7 +616,8 @@ class MeekroDB {
     if ($full_names) {
       $infos = array();
       foreach ($result->fetch_fields() as $info) {
-        $infos[] = $info->table . '.' . $info->name;
+        if (strlen($info->table)) $infos[] = $info->table . '.' . $info->name;
+        else $infos[] = $info->name;
       }
     }
 
