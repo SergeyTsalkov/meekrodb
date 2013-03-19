@@ -59,6 +59,7 @@ class DB {
   }
   
   public static function get() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'get'), $args); }
+  public static function disconnect() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'disconnect'), $args); }
   public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
   public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
   public static function queryOneRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneRow'), $args); }
@@ -153,7 +154,7 @@ class MeekroDB {
   public function get() {
     $mysql = $this->internal_mysql;
     
-    if ($mysql == null) {
+    if (!($mysql instanceof MySQLi)) {
       if (! $this->port) $this->port = ini_get('mysqli.default_port');
       $this->current_db = $this->dbName;
       $mysql = new mysqli($this->host, $this->user, $this->password, $this->dbName, $this->port);
@@ -168,6 +169,15 @@ class MeekroDB {
     }
     
     return $mysql;
+  }
+  
+  public function disconnect() {
+    $mysqli = $this->internal_mysql;
+    if ($mysqli instanceof MySQLi) {
+      if ($thread_id = $mysqli->thread_id) $mysqli->kill($thread_id); 
+      $mysqli->close();
+    }
+    $this->internal_mysql = null; 
   }
   
   public function nonSQLError($message) {
