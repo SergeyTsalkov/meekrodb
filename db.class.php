@@ -439,14 +439,13 @@ class MeekroDB {
     return $result;
   }
   
-  public function parseQueryParams() {
+  public function preparseQueryParams() {
     $args = func_get_args();
-    if (count($args) < 2) return $args[0];
-
-    $sql = array_shift($args);
+    $sql = trim(strval(array_shift($args)));
     $args_all = $args;
-    $posList = array();
-    $pos_adj = 0;
+    
+    if (count($args_all) == 0) return array($sql);
+      
     $param_char_length = strlen($this->param_char);
     $named_seperator_length = strlen($this->named_param_seperator);
     
@@ -464,6 +463,9 @@ class MeekroDB {
       $this->param_char . 'ss'  // search string (like string, surrounded with %'s)
     );
     
+    // generate list of all MeekroDB variables in our query, and their position
+    // in the form "offset => variable", sorted by offsets
+    $posList = array();
     foreach ($types as $type) {
       $lastPos = 0;
       while (($pos = strpos($sql, $type, $lastPos)) !== false) {
@@ -475,19 +477,25 @@ class MeekroDB {
     
     ksort($posList);
     
+    // for each MeekroDB variable, substitute it with array(type: i, value: 53) or whatever
+    $chunkyQuery = array(); // preparsed query
+    $pos_adj = 0; // how much we've added or removed from the original sql string
     foreach ($posList as $pos => $type) {
-      $type = substr($type, $param_char_length);
-      $length_type = strlen($type) + $param_char_length;
+      $type = substr($type, $param_char_length); // variable, without % in front of it
+      $length_type = strlen($type) + $param_char_length; // length of variable w/o %
       
-      $new_pos = $pos + $pos_adj;
-      $new_pos_back = $new_pos + $length_type;
+      $new_pos = $pos + $pos_adj; // position of start of variable
+      $new_pos_back = $new_pos + $length_type; // position of end of variable
+      $arg_number_length = 0; // length of any named or numbered parameter addition
       
+      // handle numbered parameters
       if ($arg_number_length = strspn($sql, '0123456789', $new_pos_back)) {
         $arg_number = substr($sql, $new_pos_back, $arg_number_length);
         if (! array_key_exists($arg_number, $args_all)) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
         
         $arg = $args_all[$arg_number];
         
+      // handle named parameters
       } else if (substr($sql, $new_pos_back, $named_seperator_length) == $this->named_param_seperator) {
         $arg_number_length = strspn($sql, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_', 
           $new_pos_back + $named_seperator_length) + $named_seperator_length;
@@ -503,35 +511,59 @@ class MeekroDB {
         $arg = array_shift($args);
       }
       
-      if (in_array($type, array('s', 'i', 'd', 'b', 'l'))) {
-        $array_type = false;
-        $arg = array($arg);
-        $type = 'l' . $type;
-      } else if ($type == 'ss') {
-        $result = "'%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
-      } else {
-        $array_type = true;
-        if (! is_array($arg)) $this->nonSQLError("Badly formatted SQL query: $sql -- expecting array, but didn't get one!");
+      if ($new_pos > 0) $chunkyQuery[] = substr($sql, 0, $new_pos);
+      $chunkyQuery[] = array('type' => $type, 'value' => $arg);
+      $sql = substr($sql, $new_pos_back + $arg_number_length);
+      $pos_adj -= $new_pos_back + $arg_number_length;
+    }
+    
+    if (strlen($sql) > 0) $chunkyQuery[] = $sql;
+    
+    return $chunkyQuery;
+  }
+  
+  public function parseQueryParams() {
+    $args = func_get_args();
+    $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
+    
+    $query = '';
+    $array_types = array('ls', 'li', 'ld', 'lb', 'll');
+    
+    foreach ($chunkyQuery as $chunk) {
+      if (is_string($chunk)) {
+        $query .= $chunk;
+        continue;
       }
       
-      if ($type == 'ls') $result = $this->wrapStr($arg, "'", true);
+      $type = $chunk['type'];
+      $arg = $chunk['value'];
+      $result = '';
+      $is_array_type = in_array($type, $array_types, true);
+      
+      if ($is_array_type && !is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
+      else if (!$is_array_type && is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected scalar, got array instead!");
+      
+      if ($type == 's') $result = $this->wrapStr($arg, "'", true);
+      else if ($type == 'i') $result = intval($arg);
+      else if ($type == 'd') $result = doubleval($arg);
+      else if ($type == 'b') $result = $this->formatTableName($arg);
+      else if ($type == 'l') $result = $arg;
+      else if ($type == 'ss') $result = "'%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
+      
+      else if ($type == 'ls') $result = $this->wrapStr($arg, "'", true);
       else if ($type == 'li') $result = array_map('intval', $arg);
-      else if ($type == 'ld') $result = array_map('floatval', $arg);
+      else if ($type == 'ld') $result = array_map('doubleval', $arg);
       else if ($type == 'lb') $result = array_map(array($this, 'formatTableName'), $arg);
       else if ($type == 'll') $result = $arg;
-      else if (! $result) $this->nonSQLError("Badly formatted SQL query: $sql");
       
-      if (is_array($result)) {
-        if (! $array_type) $result = $result[0];
-        else $result = '(' . implode(',', $result) . ')';
-
-        if (is_array($result)) $this->nonSQLError("Badly formatted SQL query: $sql -- you passed an array but I didn't expect one!");
-      }
-
-      $sql = substr_replace($sql, $result, $new_pos, $length_type + $arg_number_length);
-      $pos_adj += strlen($result) - ($length_type + $arg_number_length);
+      else $this->nonSQLError("Badly formatted SQL query: Invalid MeekroDB param $type");
+      
+      if (is_array($result)) $result = '(' . implode(',', $result) . ')';
+      
+      $query .= $result;
     }
-    return $sql;
+      
+    return $query;
   }
 
 
