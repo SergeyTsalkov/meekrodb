@@ -372,7 +372,7 @@ class MeekroDB {
     return $result;
   }
   
-  public function preparseQueryParams() {
+  protected function preparseQueryParams() {
     $args = func_get_args();
     $sql = trim(strval(array_shift($args)));
     $args_all = $args;
@@ -446,7 +446,16 @@ class MeekroDB {
       }
       
       if ($new_pos > 0) $chunkyQuery[] = substr($sql, 0, $new_pos);
-      $chunkyQuery[] = array('type' => $type, 'value' => $arg);
+      
+      if (is_object($arg) && ($arg instanceof WhereClause)) {
+        list($clause_sql, $clause_args) = $arg->textAndArgs();
+        array_unshift($clause_args, $clause_sql); 
+        $preparsed_sql = call_user_func_array(array($this, 'preparseQueryParams'), $clause_args);
+        $chunkyQuery = array_merge($chunkyQuery, $preparsed_sql);  
+      } else {
+        $chunkyQuery[] = array('type' => $type, 'value' => $arg);
+      }
+      
       $sql = substr($sql, $new_pos_back + $arg_number_length);
       $pos_adj -= $new_pos_back + $arg_number_length;
     }
@@ -456,9 +465,9 @@ class MeekroDB {
     return $chunkyQuery;
   }
   
-  public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
+  protected function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
-  public function sanitize($value) {
+  protected function sanitize($value) {
     if (is_object($value) && ($value instanceof MeekroDBEval)) return $value->text;
     else if (is_null($value)) return 'NULL';
     else if (is_bool($value)) return ($value ? 1 : 0);
@@ -482,7 +491,7 @@ class MeekroDB {
     else return $this->escape($value);
   }
   
-  public function parseQueryParams() {
+  protected function parseQueryParams() {
     $args = func_get_args();
     $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
     
@@ -736,27 +745,21 @@ class WhereClause {
   public $type = 'and'; //AND or OR
   public $negate = false;
   public $clauses = array();
-  public $mdb = null;
   
-  function __construct($type, $mdb=null) {
+  function __construct($type) {
     $type = strtolower($type);
-    if ($type != 'or' && $type != 'and') DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
+    if ($type !== 'or' && $type !== 'and') DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
     $this->type = $type;
-    
-    if ($mdb === null) $this->mdb = DB::getMDB();
-    else if ($mdb instanceof MeekroDB) $this->mdb = $mdb;
-    else DB::nonSQLError('the second argument to new WhereClause() must be an instance of class MeekroDB');
   }
   
   function add() {
     $args = func_get_args();
-    if ($args[0] instanceof WhereClause) {
-      $this->clauses[] = $args[0];
-      return $args[0];
+    $sql = array_shift($args);
+    
+    if ($sql instanceof WhereClause) {
+      $this->clauses[] = $sql;
     } else {
-      $r = call_user_func_array(array($this->mdb, 'parseQueryParams'), $args);
-      $this->clauses[] = $r;
-      return $r;
+      $this->clauses[] = array('sql' => $sql, 'args' => $args);
     }
   }
   
@@ -767,7 +770,7 @@ class WhereClause {
     if ($this->clauses[$i] instanceof WhereClause) {
       $this->clauses[$i]->negate();
     } else {
-      $this->clauses[$i] = 'NOT (' . $this->clauses[$i] . ')';
+      $this->clauses[$i]['sql'] = 'NOT (' . $this->clauses[$i]['sql'] . ')';
     }
   }
   
@@ -785,23 +788,36 @@ class WhereClause {
     return count($this->clauses);
   }
   
-  function text() {
-    if (count($this->clauses) == 0) return '(1)';
+  function textAndArgs() {
+    $sql = '';
+    $args = array();
     
-    $A = array();
+    if (count($this->clauses) == 0) return array('(1)', $args);
+    
+    $sql = array();
     foreach ($this->clauses as $clause) {
-      if ($clause instanceof WhereClause) $clause = $clause->text();
-      $A[] = '(' . $clause . ')';
+      if ($clause instanceof WhereClause) { 
+        list($clause_sql, $clause_args) = $clause->textAndArgs();
+      } else {
+        $clause_sql = $clause['sql'];
+        $clause_args = $clause['args'];
+      }
+      
+      $sql[] = "($clause_sql)";
+      $args = array_merge($args, $clause_args);
     }
     
-    $A = array_unique($A);
-    if ($this->type == 'and') $A = implode(' AND ', $A);
-    else $A = implode(' OR ', $A);
+    $sql = array_unique($sql);
+    if ($this->type == 'and') $sql = implode(' AND ', $sql);
+    else $sql = implode(' OR ', $sql);
     
-    if ($this->negate) $A = '(NOT ' . $A . ')';
-    return $A;
+    if ($this->negate) $sql = '(NOT ' . $sql . ')';
+    return array($sql, $args);
   }
   
+  // backwards compatability
+  // we now return full WhereClause object here and evaluate it in preparseQueryParams
+  function text() { return $this; }
   function __toString() { return $this->text(); }
 }
 
