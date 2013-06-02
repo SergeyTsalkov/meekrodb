@@ -265,54 +265,11 @@ class MeekroDB {
     return $this->nested_transactions_count;
   }
   
-  public function escape($str) {
-    $db = $this->get();
-    return $db->real_escape_string($str);
-  }
-  
-  public function sanitize($value) {
-    if (is_object($value) && ($value instanceof MeekroDBEval)) {
-      $value = $value->text;
-    } else {
-      if (is_array($value) || is_object($value)) $value = serialize($value);
-      
-      if (is_string($value)) $value = "'" . $this->escape($value) . "'";
-      else if (is_null($value)) $value = 'NULL';
-      else if (is_bool($value)) $value = ($value ? 1 : 0);
-    }
-    
-    return $value;
-  }
-  
   protected function formatTableName($table) {
-    $table = str_replace('`', '', $table);
-    if (strpos($table, '.')) {
-      list($table_db, $table_table) = explode('.', $table, 2);
-      $table = "`$table_db`.`$table_table`";
-    } else {
-      $table = "`$table`";
-    }
+    $table = trim($table, '`');
     
-    return $table;
-  }
-  
-  protected function prependCall($function, $args, $prepend) {
-    array_unshift($args, $prepend);
-    return call_user_func_array($function, $args);
-  }
-  
-  protected function wrapStr($strOrArray, $wrapChar, $escape = false) {
-    if (! is_array($strOrArray)) {
-      if ($escape) return $wrapChar . $this->escape($strOrArray) . $wrapChar;
-      else return $wrapChar . $strOrArray . $wrapChar;
-    } else {
-      $R = array();
-      foreach ($strOrArray as $element) {
-        $R[] = $this->wrapStr($element, $wrapChar, $escape);
-      }
-      return $R;
-    }
-      
+    if (strpos($table, '.')) return implode('.', array_map(array($this, 'formatTableName'), explode('.', $table)));
+    else return '`' . str_replace('`', '``', $table) . '`'; 
   }
   
   public function update() {
@@ -320,61 +277,46 @@ class MeekroDB {
     $table = array_shift($args);
     $params = array_shift($args);
     $where = array_shift($args);
-    $buildquery = "UPDATE " . $this->formatTableName($table) . " SET ";
-    $keyval = array();
-    foreach ($params as $key => $value) {
-      $value = $this->sanitize($value);
-      $keyval[] = "`" . $key . "`=" . $value;
-    }
     
-    $buildquery = "UPDATE " . $this->formatTableName($table) . " SET " . implode(', ', $keyval) . " WHERE " . $where;
-    array_unshift($args, $buildquery);
+    $query = "UPDATE %b SET %? WHERE " . $where;
+    
+    array_unshift($args, $params);
+    array_unshift($args, $table);
+    array_unshift($args, $query);
     return call_user_func_array(array($this, 'query'), $args);
   }
   
   public function insertOrReplace($which, $table, $datas, $options=array()) {
     $datas = unserialize(serialize($datas)); // break references within array
-    $keys = null;
+    $keys = $values = array();
     
     if (isset($datas[0]) && is_array($datas[0])) {
-      $many = true;
+      foreach ($datas as $datum) {
+        ksort($datum);
+        if (! $keys) $keys = array_keys($datum);
+        $values[] = array_values($datum);  
+      }
+      
     } else {
-      $datas = array($datas);
-      $many = false;
+      $keys = array_keys($datas);
+      $values = array_values($datas);
     }
     
-    foreach ($datas as $data) {
-      if (! $keys) {
-        $keys = array_keys($data);
-        if ($many) sort($keys);
+    if (isset($options['ignore']) && $options['ignore']) $which = 'INSERT IGNORE';
+    
+    if (isset($options['update']) && is_array($options['update']) && $options['update'] && strtolower($which) == 'insert') {
+      if (array_values($options['update']) !== $options['update']) {
+        return $this->query("INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE %?", $table, $keys, $values, $options['update']);
+      } else {
+        $update_str = array_shift($options['update']);
+        $query_param = array("INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE $update_str", $table, $keys, $values);
+        $query_param = array_merge($query_param, $options['update']);
+        return call_user_func_array(array($this, 'query'), $query_param);
       }
       
-      $insert_values = array();
-      
-      foreach ($keys as $key) {
-        if ($many && !array_key_exists($key, $data)) $this->nonSQLError('insert/replace many: each assoc array must have the same keys!'); 
-        $datum = $data[$key];
-        $datum = $this->sanitize($datum);
-        $insert_values[] = $datum;
-      }
-      
-      
-      $values[] = '(' . implode(', ', $insert_values) . ')';
-    }
+    } 
     
-    $table = $this->formatTableName($table);
-    $keys_str = implode(', ', $this->wrapStr($keys, '`'));
-    $values_str = implode(',', $values);
-    
-    if (isset($options['ignore']) && $options['ignore'] && strtolower($which) == 'insert') { 
-      return $this->query("INSERT IGNORE INTO $table ($keys_str) VALUES $values_str");
-      
-    } else if (isset($options['update']) && $options['update'] && strtolower($which) == 'insert') {
-      return $this->query("INSERT INTO $table ($keys_str) VALUES $values_str ON DUPLICATE KEY UPDATE {$options['update']}");
-      
-    } else { 
-      return $this->query("$which INTO $table ($keys_str) VALUES $values_str");
-    }
+    return $this->query("%l INTO %b %lb VALUES %?", $which, $table, $keys, $values);
   }
   
   public function insert($table, $data) { return $this->insertOrReplace('INSERT', $table, $data); }
@@ -394,19 +336,10 @@ class MeekroDB {
       $args[0] = $data;
     }
     
-    if (is_array($args[0])) {
-      $keyval = array();
-      foreach ($args[0] as $key => $value) {
-        $value = $this->sanitize($value);
-        $keyval[] = "`" . $key . "`=" . $value;
-      }
-      $updatestr = implode(', ', $keyval);
-      
-    } else {
-      $updatestr = call_user_func_array(array($this, 'parseQueryParams'), $args);
-    }
+    if (is_array($args[0])) $update = $args[0];
+    else $update = $args;
     
-    return $this->insertOrReplace('INSERT', $table, $data, array('update' => $updatestr)); 
+    return $this->insertOrReplace('INSERT', $table, $data, array('update' => $update)); 
   }
   
   public function delete() {
@@ -460,6 +393,7 @@ class MeekroDB {
       $this->param_char . 'i',  // integer
       $this->param_char . 'd',  // double / decimal
       $this->param_char . 'b',  // backtick
+      $this->param_char . '?',  // infer type
       $this->param_char . 'ss'  // search string (like string, surrounded with %'s)
     );
     
@@ -522,6 +456,32 @@ class MeekroDB {
     return $chunkyQuery;
   }
   
+  public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
+  
+  public function sanitize($value) {
+    if (is_object($value) && ($value instanceof MeekroDBEval)) return $value->text;
+    else if (is_null($value)) return 'NULL';
+    else if (is_bool($value)) return ($value ? 1 : 0);
+    else if (is_int($value)) return $value;
+    else if (is_float($value)) return $value;
+    
+    else if (is_array($value)) {
+      // non-assoc array?
+      if (array_values($value) === $value) {
+        if (is_array($value[0])) return implode(', ', array_map(array($this, 'sanitize'), $value));
+        else return '(' . implode(', ', array_map(array($this, 'sanitize'), $value)) . ')';
+      }
+      
+      $pairs = array();
+      foreach ($value as $k => $v) {
+        $pairs[] = $this->formatTableName($k) . '=' . $this->sanitize($v);
+      }
+      
+      return implode(', ', $pairs);
+    }
+    else return $this->escape($value);
+  }
+  
   public function parseQueryParams() {
     $args = func_get_args();
     $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
@@ -538,23 +498,27 @@ class MeekroDB {
       $type = $chunk['type'];
       $arg = $chunk['value'];
       $result = '';
-      $is_array_type = in_array($type, $array_types, true);
       
-      if ($is_array_type && !is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
-      else if (!$is_array_type && is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected scalar, got array instead!");
+      if ($type != '?') {
+        $is_array_type = in_array($type, $array_types, true);
+        if ($is_array_type && !is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
+        else if (!$is_array_type && is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected scalar, got array instead!");
+      }
       
-      if ($type == 's') $result = $this->wrapStr($arg, "'", true);
+      if ($type == 's') $result = $this->escape($arg);
       else if ($type == 'i') $result = intval($arg);
       else if ($type == 'd') $result = doubleval($arg);
       else if ($type == 'b') $result = $this->formatTableName($arg);
       else if ($type == 'l') $result = $arg;
-      else if ($type == 'ss') $result = "'%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%'";
+      else if ($type == 'ss') $result = "%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%";
       
-      else if ($type == 'ls') $result = $this->wrapStr($arg, "'", true);
+      else if ($type == 'ls') $result = array_map(array($this, 'escape'), $arg);
       else if ($type == 'li') $result = array_map('intval', $arg);
       else if ($type == 'ld') $result = array_map('doubleval', $arg);
       else if ($type == 'lb') $result = array_map(array($this, 'formatTableName'), $arg);
       else if ($type == 'll') $result = $arg;
+      
+      else if ($type == '?') $result = $this->sanitize($arg);
       
       else $this->nonSQLError("Badly formatted SQL query: Invalid MeekroDB param $type");
       
@@ -565,8 +529,8 @@ class MeekroDB {
       
     return $query;
   }
-
-
+  
+  protected function prependCall($function, $args, $prepend) { array_unshift($args, $prepend); return call_user_func_array($function, $args); }
   public function query() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'assoc'); }
   public function queryAllLists() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'list'); }
   public function queryFullColumns() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'full'); }
