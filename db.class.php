@@ -473,8 +473,13 @@ class MeekroDB {
   protected function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
   protected function sanitize($value) {
-    if (is_object($value) && ($value instanceof MeekroDBEval)) return $value->text;
-    else if (is_null($value)) return $this->usenull ? 'NULL' : "''";
+    if (is_object($value)) {
+      if ($value instanceof MeekroDBEval) return $value->text;
+      else if ($value instanceof DateTime) return $this->escape($value->format('Y-m-d H:i:s'));
+      else return '';
+    }
+    
+    if (is_null($value)) return $this->usenull ? 'NULL' : "''";
     else if (is_bool($value)) return ($value ? 1 : 0);
     else if (is_int($value)) return $value;
     else if (is_float($value)) return $value;

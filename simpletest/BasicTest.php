@@ -142,7 +142,9 @@ class BasicTest extends SimpleTest {
   }
   
   function test_4_query() {
-    DB::query("UPDATE %b SET birthday=%t WHERE username=%s", 'accounts', new DateTime('10 September 2000 13:13:13'), 'Charlie\'s Friend');
+    DB::update('accounts', array(
+      'birthday' => new DateTime('10 September 2000 13:13:13')
+    ), 'username=%s', 'Charlie\'s Friend');
     
     $results = DB::query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
     $this->assert(count($results) === 1);
