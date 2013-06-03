@@ -23,6 +23,8 @@ function microtime_float()
 if (phpversion() >= '5.3') $is_php_53 = true;
 else $is_php_53 = false;
 
+ini_set('date.timezone', 'America/Los_Angeles');
+
 error_reporting(E_ALL | E_STRICT);
 require_once '../db.class.php';
 include 'test_setup.php'; //test config values go here

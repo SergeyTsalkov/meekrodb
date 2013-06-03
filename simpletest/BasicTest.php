@@ -15,7 +15,8 @@ class BasicTest extends SimpleTest {
     `password` VARCHAR( 255 ) NULL ,
     `age` INT NOT NULL DEFAULT '10',
     `height` DOUBLE NOT NULL DEFAULT '10.0',
-    `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi'
+    `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
+    `birthday` TIMESTAMP NOT NULL
     ) ENGINE = InnoDB");
 
     DB::query("CREATE TABLE `profile` (
@@ -76,11 +77,11 @@ class BasicTest extends SimpleTest {
       'height' => 155.23,
       'favorite_word' => null,
     ));
-
+    
     $this->assert(DB::insertId() === 3);
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
-
+    
     DB::insert('`accounts`', array(
       'username' => 'Deer',
       'password' => '',
@@ -126,15 +127,18 @@ class BasicTest extends SimpleTest {
   }
   
   function test_4_query() {
-    $results = DB::query("SELECT * FROM accounts WHERE username=%s", 'Charlie\'s Friend');
+    DB::query("UPDATE %b SET birthday=%t WHERE username=%s", 'accounts', new DateTime('10 September 2000 13:13:13'), 'Charlie\'s Friend');
+    
+    $results = DB::query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
     $this->assert(count($results) === 1);
-    $this->assert($results[0]['age'] == 30 && $results[0]['password'] == 'goodbye');
+    $this->assert($results[0]['age'] === '30' && $results[0]['password'] === 'goodbye');
+    $this->assert($results[0]['birthday'] == '2000-09-10 13:13:13');
     
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     $this->assert(count($results) === 3);
     
     $columnlist = DB::columnList('accounts');
-    $this->assert(count($columnlist) === 7);
+    $this->assert(count($columnlist) === 8);
     $this->assert($columnlist[0] === 'id');
     $this->assert($columnlist[5] === 'height');
     

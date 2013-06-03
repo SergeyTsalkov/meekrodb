@@ -389,10 +389,12 @@ class MeekroDB {
       $this->param_char . 'li', // list of integers
       $this->param_char . 'ld', // list of decimals
       $this->param_char . 'lb', // list of backticks
+      $this->param_char . 'lt', // list of timestamps
       $this->param_char . 's',  // string
       $this->param_char . 'i',  // integer
       $this->param_char . 'd',  // double / decimal
       $this->param_char . 'b',  // backtick
+      $this->param_char . 't',  // timestamp
       $this->param_char . '?',  // infer type
       $this->param_char . 'ss'  // search string (like string, surrounded with %'s)
     );
@@ -491,12 +493,17 @@ class MeekroDB {
     else return $this->escape($value);
   }
   
+  protected function parseTS($ts) {
+    if (is_string($ts)) return date('Y-m-d H:i:s', strtotime($ts));
+    else if (is_object($ts) && ($ts instanceof DateTime)) return $ts->format('Y-m-d H:i:s');
+  }
+  
   protected function parseQueryParams() {
     $args = func_get_args();
     $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
     
     $query = '';
-    $array_types = array('ls', 'li', 'ld', 'lb', 'll');
+    $array_types = array('ls', 'li', 'ld', 'lb', 'll', 'lt');
     
     foreach ($chunkyQuery as $chunk) {
       if (is_string($chunk)) {
@@ -520,12 +527,14 @@ class MeekroDB {
       else if ($type == 'b') $result = $this->formatTableName($arg);
       else if ($type == 'l') $result = $arg;
       else if ($type == 'ss') $result = "%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%";
+      else if ($type == 't') $result = $this->escape($this->parseTS($arg)); 
       
       else if ($type == 'ls') $result = array_map(array($this, 'escape'), $arg);
       else if ($type == 'li') $result = array_map('intval', $arg);
       else if ($type == 'ld') $result = array_map('doubleval', $arg);
       else if ($type == 'lb') $result = array_map(array($this, 'formatTableName'), $arg);
       else if ($type == 'll') $result = $arg;
+      else if ($type == 'lt') $result = array_map(array($this, 'escape'), array_map(array($this, 'parseTS'), $arg));
       
       else if ($type == '?') $result = $this->sanitize($arg);
       
