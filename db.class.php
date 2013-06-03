@@ -550,6 +550,7 @@ class MeekroDB {
   protected function queryHelper() {
     $args = func_get_args();
     $type = array_shift($args);
+    $db = $this->get();
 
     $is_buffered = true;
     $row_type = 'assoc'; // assoc, list, raw
@@ -578,29 +579,25 @@ class MeekroDB {
 
     $sql = call_user_func_array(array($this, 'parseQueryParams'), $args);
     
-    $db = $this->get();
-    
     if ($this->success_handler) $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
     if ($this->success_handler) $runtime = microtime(true) - $starttime;
     else $runtime = 0;
 
     // ----- BEGIN ERROR HANDLING
-
-    $error = '';
-    if (!$sql || $error = $this->checkError()) {
+    if (!$sql || $db->error) {
       if ($this->error_handler) {
         $error_handler = is_callable($this->error_handler) ? $this->error_handler : 'meekrodb_error_handler';
         
         call_user_func($error_handler, array(
           'type' => 'sql',
           'query' => $sql,
-          'error' => $error
+          'error' => $db->error
         ));
       }
       
       if ($this->throw_exception_on_error) {
-        $e = new MeekroDBException($error, $sql);
+        $e = new MeekroDBException($db->error, $sql);
         throw $e;
       }
     } else if ($this->success_handler) {
@@ -640,21 +637,14 @@ class MeekroDB {
       $return[] = $row;
     }
 
-    $this->freeResult($result);
-    return $return;
-  }
-
-  protected function freeResult($result = null) {
-    if ($result instanceof MySQLi_Result) {
-      $result->free();
-    }
-
-    $db = $this->get();
+    // free results
+    $result->free();
     while ($db->more_results()) {
       $db->next_result();
       if ($result = $db->use_result()) $result->free();
     }
-
+    
+    return $return;
   }
 
   public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
@@ -727,18 +717,6 @@ class MeekroDB {
     
     return $row[$column];
   }
-  
-  protected function checkError() {
-    $db = $this->get();
-    if ($db->error) {
-      $error = $db->error;
-      $db->rollback();
-      return $error;
-    }
-    
-    return false;
-  }
-
 }
 
 class WhereClause {
