@@ -35,6 +35,7 @@ class DB {
   public static $nonsql_error_handler = null;
   public static $throw_exception_on_nonsql_error = false;
   public static $nested_transactions = false;
+  public static $usenull = true;
   
   // internal
   protected static $mdb = null;
@@ -54,6 +55,7 @@ class DB {
     if ($mdb->nonsql_error_handler !== DB::$nonsql_error_handler) $mdb->nonsql_error_handler = DB::$nonsql_error_handler;
     if ($mdb->throw_exception_on_nonsql_error !== DB::$throw_exception_on_nonsql_error) $mdb->throw_exception_on_nonsql_error = DB::$throw_exception_on_nonsql_error;
     if ($mdb->nested_transactions !== DB::$nested_transactions) $mdb->nested_transactions = DB::$nested_transactions;
+    if ($mdb->usenull !== DB::$usenull) $mdb->usenull = DB::$usenull;
     
     return $mdb;
   }
@@ -124,6 +126,7 @@ class MeekroDB {
   public $nonsql_error_handler = null;
   public $throw_exception_on_nonsql_error = false;
   public $nested_transactions = false;
+  public $usenull = true;
   
   // internal
   public $internal_mysql = null;
@@ -471,7 +474,7 @@ class MeekroDB {
   
   protected function sanitize($value) {
     if (is_object($value) && ($value instanceof MeekroDBEval)) return $value->text;
-    else if (is_null($value)) return 'NULL';
+    else if (is_null($value)) return $this->usenull ? 'NULL' : "''";
     else if (is_bool($value)) return ($value ? 1 : 0);
     else if (is_int($value)) return $value;
     else if (is_float($value)) return $value;

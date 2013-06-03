@@ -95,6 +95,21 @@ class BasicTest extends SimpleTest {
     $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
     $this->assert($password === 'goodbye');
     
+    DB::$usenull = false;
+    DB::insertUpdate('accounts', array(
+      'id' => 3,
+      'favorite_word' => null,
+    ));
+    
+    $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word=%s AND favorite_word=%s", null, '');
+    $this->assert($password === 'goodbye');
+    
+    DB::$usenull = true;
+    DB::insertUpdate('accounts', array(
+      'id' => 3,
+      'favorite_word' => null,
+    ));
+    
     DB::$param_char = '###';
     $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
       array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
