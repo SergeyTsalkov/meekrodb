@@ -12,7 +12,7 @@ Code Examples
 ========
 ### Grab some rows from the database and print out a field from each row.
 
-    $accounts = DB::query("SELECT * FROM login WHERE username=%s AND password=%s", $username, $password);
+    $accounts = DB::query("SELECT * FROM accounts WHERE type = %s AND age > %i", $type, 15);
     foreach ($accounts as $account) {
       echo $account['username'] . "\n";
     }
