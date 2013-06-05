@@ -29,7 +29,7 @@ Code Examples
     
 ### Grab one row or field
 
-  $account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+	$account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
 	$number_accounts = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
 
 ### Use a list in a query
