@@ -506,6 +506,11 @@ class MeekroDB {
     else if (is_object($ts) && ($ts instanceof DateTime)) return $ts->format('Y-m-d H:i:s');
   }
   
+  protected function intval($var) {
+    if (PHP_INT_SIZE == 8) return intval($var);
+    return floor(doubleval($var));
+  }
+  
   protected function parseQueryParams() {
     $args = func_get_args();
     $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
@@ -530,7 +535,7 @@ class MeekroDB {
       }
       
       if ($type == 's') $result = $this->escape($arg);
-      else if ($type == 'i') $result = intval($arg);
+      else if ($type == 'i') $result = $this->intval($arg);
       else if ($type == 'd') $result = doubleval($arg);
       else if ($type == 'b') $result = $this->formatTableName($arg);
       else if ($type == 'l') $result = $arg;
@@ -538,7 +543,7 @@ class MeekroDB {
       else if ($type == 't') $result = $this->escape($this->parseTS($arg)); 
       
       else if ($type == 'ls') $result = array_map(array($this, 'escape'), $arg);
-      else if ($type == 'li') $result = array_map('intval', $arg);
+      else if ($type == 'li') $result = array_map(array($this, 'intval'), $arg);
       else if ($type == 'ld') $result = array_map('doubleval', $arg);
       else if ($type == 'lb') $result = array_map(array($this, 'formatTableName'), $arg);
       else if ($type == 'll') $result = $arg;
