@@ -1,6 +1,16 @@
 {
     "name": "SergeyTsalkov/meekrodb",
     "description": "The Simple PHP/MySQL Library",
+    "homepage": "http://www.meekro.com",
+    "support": {
+        "email": "support@meekro.com"
+    },
+    "keywords": [
+        "mysql",
+        "database",
+        "mysqli",
+        "pdo"
+    ],
     "license": "LGPL-3.0",
     "authors": [
         {
