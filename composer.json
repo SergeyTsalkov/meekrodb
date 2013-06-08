@@ -1,6 +1,7 @@
 {
-    "name": "sergeytsalkov/meekrodb",
+    "name": "SergeyTsalkov/meekrodb",
     "description": "The Simple PHP/MySQL Library",
+    "license": "LGPL-3.0",
     "authors": [
         {
             "name": "Sergey Tsalkov",
