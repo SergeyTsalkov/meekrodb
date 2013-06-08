@@ -1,0 +1,18 @@
+{
+    "name": "SergeyTsalkov/meekrodb",
+    "description": "The Simple PHP/MySQL Library",
+    "authors": [
+        {
+            "name": "Sergey Tsalkov",
+            "email": "stsalkov@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.2.0"
+    },
+    "autoload": {
+        "classmap": [
+            "db.class.php"
+        ]
+    }
+}
