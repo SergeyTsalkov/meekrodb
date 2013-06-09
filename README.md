@@ -8,6 +8,27 @@ MeekroDB is:
 * Google's #1 search result for "php mysql library" for over 2 years, with **thousands of deployments worldwide**.
 * A library with a **perfect security track record**. No bugs relating to security or SQL injection have ever been discovered.
 
+Installation
+========
+When you're ready to get started, see the [Quick Start Guide](http://www.meekro.com/quickstart.php) on our website.
+
+### Manual Setup
+Include the `db.class.php` file into your project and set it up like this:
+
+    require_once 'db.class.php';
+    DB::$user = 'my_database_user';
+    DB::$password = 'my_database_password';
+    DB::$dbName = 'my_database_name';
+
+### Composer
+Add this to your `composer.json`
+
+    {
+      "require": {
+        "sergeytsalkov/meekrodb": "*"
+      }
+    }
+
 Code Examples
 ========
 ### Grab some rows from the database and print out a field from each row.
