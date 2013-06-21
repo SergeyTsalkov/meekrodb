@@ -539,7 +539,7 @@ class MeekroDB {
       else if ($type == 'd') $result = doubleval($arg);
       else if ($type == 'b') $result = $this->formatTableName($arg);
       else if ($type == 'l') $result = $arg;
-      else if ($type == 'ss') $result = "%" . $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg)) . "%";
+      else if ($type == 'ss') $result = $this->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg) . "%");
       else if ($type == 't') $result = $this->escape($this->parseTS($arg)); 
       
       else if ($type == 'ls') $result = array_map(array($this, 'escape'), $arg);
