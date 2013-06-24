@@ -614,12 +614,13 @@ class MeekroDB {
         call_user_func($error_handler, array(
           'type' => 'sql',
           'query' => $sql,
-          'error' => $db->error
+          'error' => $db->error,
+          'code' => $db->errno
         ));
       }
       
       if ($this->throw_exception_on_error) {
-        $e = new MeekroDBException($db->error, $sql);
+        $e = new MeekroDBException($db->error, $sql, $db->errno);
         throw $e;
       }
     } else if ($this->success_handler) {
@@ -840,9 +841,10 @@ class DBTransaction {
 class MeekroDBException extends Exception {
   protected $query = '';
   
-  function __construct($message='', $query='') {
+  function __construct($message='', $query='', $code = 0) {
     parent::__construct($message);
     $this->query = $query;
+	$this->code = $code;
   }
   
   public function getQuery() { return $this->query; }
