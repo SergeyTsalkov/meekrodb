@@ -394,6 +394,15 @@ class BasicTest extends SimpleTest {
     $this->assert($r[0]['1+1'] === '2');
   }
 
+  function test_901_updatewithspecialchar() {
+    $data = 'www.mysite.com/product?s=t-%s-%%3d%%3d%i&RCAID=24322';
+    DB::update('profile', array('signature' => $data), 'id=%i', 1);
+    $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
+    $this->assert($signature === $data);
+  }
+
+
+
 }
 
 
