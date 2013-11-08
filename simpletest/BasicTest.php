@@ -399,6 +399,11 @@ class BasicTest extends SimpleTest {
     DB::update('profile', array('signature' => $data), 'id=%i', 1);
     $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
     $this->assert($signature === $data);
+
+    DB::update('profile',array('signature'=> "%li "),"id = %d",1);
+    $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
+    $this->assert($signature === "%li ");
+
   }
 
 
