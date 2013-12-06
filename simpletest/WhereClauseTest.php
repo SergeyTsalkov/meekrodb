@@ -57,6 +57,15 @@ class WhereClauseTest extends SimpleTest {
     $this->assert(count($result) === 1);
     $this->assert($result[0]['age'] === '15');
   }
+
+  function test_6_or() {
+    $where = new WhereClause('or');
+    $where->add('username=%s', 'Bart');
+    $where->add('username=%s', 'Abe');
+
+    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
+    $this->assert(count($result) === 2);
+  }
   
 
 }

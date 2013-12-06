@@ -790,12 +790,11 @@ class WhereClause {
   }
   
   function textAndArgs() {
-    $sql = '';
+    $sql = array();
     $args = array();
     
     if (count($this->clauses) == 0) return array('(1)', $args);
     
-    $sql = array();
     foreach ($this->clauses as $clause) {
       if ($clause instanceof WhereClause) { 
         list($clause_sql, $clause_args) = $clause->textAndArgs();
@@ -808,7 +807,6 @@ class WhereClause {
       $args = array_merge($args, $clause_args);
     }
     
-    $sql = array_unique($sql);
     if ($this->type == 'and') $sql = implode(' AND ', $sql);
     else $sql = implode(' OR ', $sql);
     
