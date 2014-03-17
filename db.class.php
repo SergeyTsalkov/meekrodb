@@ -25,6 +25,13 @@ class DB {
   public static $host = 'localhost';
   public static $port = null;
   public static $encoding = 'latin1';
+
+  // ssl settings
+  public static $ssl_client_key = '';
+  public static $ssl_client_cert = '';
+  public static $ssl_ca_cert = '';
+  public static $ssl_ca_path = '';
+  public static $ssl_cipher = '';
   
   // configure workings
   public static $param_char = '%';
@@ -116,7 +123,14 @@ class MeekroDB {
   public $host = 'localhost';
   public $port = null;
   public $encoding = 'latin1';
-  
+ 
+  // ssl settings
+  public $ssl_client_key = '';
+  public $ssl_client_cert = '';
+  public $ssl_ca_cert = '';
+  public $ssl_ca_path = '';
+  public $ssl_cipher = '';
+ 
   // configure workings
   public $param_char = '%';
   public $named_param_seperator = '_';
@@ -138,13 +152,19 @@ class MeekroDB {
   public $nested_transactions_count = 0;
   
   
-  public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null) {
+  public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null, $ssl_client_key=null, $ssl_client_cert=null, $ssl_ca_cert=null, $ssl_ca_path=null, $ssl_cipher=null) {
     if ($host === null) $host = DB::$host;
     if ($user === null) $user = DB::$user;
     if ($password === null) $password = DB::$password;
     if ($dbName === null) $dbName = DB::$dbName;
     if ($port === null) $port = DB::$port;
     if ($encoding === null) $encoding = DB::$encoding;
+
+    if ($ssl_client_key === null) $ssl_client_key = DB::$ssl_client_key;
+    if ($ssl_client_cert === null) $ssl_client_cert = DB::$ssl_client_cert;
+    if ($ssl_ca_cert === null) $ssl_ca_cert = DB::$ssl_ca_cert;
+    if ($ssl_ca_path === null) $ssl_ca_path = DB::$ssl_ca_path;
+    if ($ssl_cipher === null) $ssl_cipher = DB::$ssl_cipher;
     
     $this->host = $host;
     $this->user = $user;
@@ -152,6 +172,12 @@ class MeekroDB {
     $this->dbName = $dbName;
     $this->port = $port;
     $this->encoding = $encoding;
+
+    $this->ssl_client_key = $ssl_client_key;
+    $this->ssl_client_cert = $ssl_client_cert;
+    $this->ssl_ca_cert = $ssl_ca_cert;
+    $this->ssl_ca_path = $ssl_ca_path;
+    $this->ssl_cipher = $ssl_cipher;
   }
   
   public function get() {
@@ -160,7 +186,9 @@ class MeekroDB {
     if (!($mysql instanceof MySQLi)) {
       if (! $this->port) $this->port = ini_get('mysqli.default_port');
       $this->current_db = $this->dbName;
-      $mysql = new mysqli($this->host, $this->user, $this->password, $this->dbName, $this->port);
+      $mysql = new mysqli();
+      $mysql->ssl_set($this->ssl_client_key, $this->ssl_client_cert, $this->ssl_ca_cert, $this->ssl_ca_path, $this->ssl_cipher);
+      $mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port);
       
       if ($mysql->connect_error) {
         $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
