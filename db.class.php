@@ -201,7 +201,7 @@ class MeekroDB {
     $this->success_handler = $handler;
   }
   
-  public function serverVersion() { return $this->server_info; }
+  public function serverVersion() { $this->get(); return $this->server_info; }
   public function transactionDepth() { return $this->nested_transactions_count; }
   public function insertId() { return $this->insert_id; }
   public function affectedRows() { return $this->affected_rows; }
