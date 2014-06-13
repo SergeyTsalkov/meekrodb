@@ -1,4 +1,4 @@
-<?
+<?php
 class HelperTest extends SimpleTest {
   function test_1_verticalslice() {
     $all = DB::query("SELECT * FROM accounts ORDER BY id ASC");

@@ -1,4 +1,4 @@
-<?
+<?php
 class ErrorTest_53 extends SimpleTest {
   function test_1_error_handler() {
     global $anonymous_error_callback_worked;

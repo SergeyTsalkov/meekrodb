@@ -1,4 +1,4 @@
-<?
+<?php
 
 function new_error_callback($params) {
   global $error_callback_worked;
