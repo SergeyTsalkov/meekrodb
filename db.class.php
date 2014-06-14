@@ -47,19 +47,21 @@ class DB {
       $mdb = DB::$mdb = new MeekroDB();
     }
 
-    if ($mdb->param_char !== DB::$param_char) $mdb->param_char = DB::$param_char;
-    if ($mdb->named_param_seperator !== DB::$named_param_seperator) $mdb->named_param_seperator = DB::$named_param_seperator;
-    if ($mdb->success_handler !== DB::$success_handler) $mdb->success_handler = DB::$success_handler;
-    if ($mdb->error_handler !== DB::$error_handler) $mdb->error_handler = DB::$error_handler;
-    if ($mdb->throw_exception_on_error !== DB::$throw_exception_on_error) $mdb->throw_exception_on_error = DB::$throw_exception_on_error;
-    if ($mdb->nonsql_error_handler !== DB::$nonsql_error_handler) $mdb->nonsql_error_handler = DB::$nonsql_error_handler;
-    if ($mdb->throw_exception_on_nonsql_error !== DB::$throw_exception_on_nonsql_error) $mdb->throw_exception_on_nonsql_error = DB::$throw_exception_on_nonsql_error;
-    if ($mdb->nested_transactions !== DB::$nested_transactions) $mdb->nested_transactions = DB::$nested_transactions;
-    if ($mdb->usenull !== DB::$usenull) $mdb->usenull = DB::$usenull;
+    static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
+      'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull');
+
+    $db_class_vars = get_class_vars('DB'); // the DB::$$var syntax only works in 5.3+
+
+    foreach ($variables_to_sync as $variable) {
+      if ($mdb->$variable !== $db_class_vars[$variable]) {
+        $mdb->$variable = $db_class_vars[$variable];
+      }
+    }
     
     return $mdb;
   }
   
+  // yes, this is ugly. __callStatic() only works in 5.3+
   public static function get() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'get'), $args); }
   public static function disconnect() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'disconnect'), $args); }
   public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
