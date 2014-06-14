@@ -36,6 +36,7 @@ class DB {
   public static $throw_exception_on_nonsql_error = false;
   public static $nested_transactions = false;
   public static $usenull = true;
+  public static $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   
   // internal
   protected static $mdb = null;
@@ -48,7 +49,7 @@ class DB {
     }
 
     static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
-      'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull');
+      'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl');
 
     $db_class_vars = get_class_vars('DB'); // the DB::$$var syntax only works in 5.3+
 
@@ -129,6 +130,7 @@ class MeekroDB {
   public $throw_exception_on_nonsql_error = false;
   public $nested_transactions = false;
   public $usenull = true;
+  public $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   
   // internal
   public $internal_mysql = null;
@@ -162,7 +164,14 @@ class MeekroDB {
     if (!($mysql instanceof MySQLi)) {
       if (! $this->port) $this->port = ini_get('mysqli.default_port');
       $this->current_db = $this->dbName;
-      $mysql = new mysqli($this->host, $this->user, $this->password, $this->dbName, $this->port);
+      $mysql = new mysqli();
+      $connect_flags = 0;
+      if ($this->ssl['key']) {
+        $mysql->ssl_set($this->ssl['key'], $this->ssl['cert'], $this->ssl['ca_cert'], $this->ssl['ca_path'], $this->ssl['cipher']);
+        $connect_flags |= MYSQLI_CLIENT_SSL;
+      } 
+      $mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port, null, $connect_flags);
+
       
       if ($mysql->connect_error) {
         $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
