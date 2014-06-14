@@ -674,7 +674,7 @@ class MeekroDB {
   public function queryFirstRow() {
     $args = func_get_args();
     $result = call_user_func_array(array($this, 'query'), $args);
-    if (! $result) return null;
+    if (!$result || !is_array($result)) return null;
     return reset($result);
   }
 
@@ -682,7 +682,7 @@ class MeekroDB {
   public function queryFirstList() {
     $args = func_get_args();
     $result = call_user_func_array(array($this, 'queryAllLists'), $args);
-    if (! $result) return null;
+    if (!$result || !is_array($result)) return null;
     return reset($result);
   }
   

@@ -274,7 +274,7 @@ class BasicTest extends SimpleTest {
     DB::insert('storedata', array(
       'picture' => $smile,
     ));
-    DB::query("INSERT INTO storedata (picture) VALUES (%s)", $smile);
+    DB::queryOneRow("INSERT INTO storedata (picture) VALUES (%s)", $smile);
     
     $getsmile = DB::queryFirstField("SELECT picture FROM storedata WHERE id=1");
     $getsmile2 = DB::queryFirstField("SELECT picture FROM storedata WHERE id=2");
