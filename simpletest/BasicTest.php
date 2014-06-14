@@ -114,6 +114,8 @@ class BasicTest extends SimpleTest {
     $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
       array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
     $this->assert($bart['username'] === 'Bart');
+    DB::insert('accounts', array('username' => 'f_u'));
+    DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
     DB::$param_char = '%';
     
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 

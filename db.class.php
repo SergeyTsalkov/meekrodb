@@ -299,7 +299,7 @@ class MeekroDB {
     $params = array_shift($args);
     $where = array_shift($args);
     
-    $query = "UPDATE %b SET %? WHERE " . $where;
+    $query = str_replace('%', $this->param_char, "UPDATE %b SET %? WHERE ") . $where;
     
     array_unshift($args, $params);
     array_unshift($args, $table);
@@ -327,17 +327,23 @@ class MeekroDB {
     
     if (isset($options['update']) && is_array($options['update']) && $options['update'] && strtolower($which) == 'insert') {
       if (array_values($options['update']) !== $options['update']) {
-        return $this->query("INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE %?", $table, $keys, $values, $options['update']);
+        return $this->query(
+          str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE %?"), 
+          $table, $keys, $values, $options['update']);
       } else {
         $update_str = array_shift($options['update']);
-        $query_param = array("INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE $update_str", $table, $keys, $values);
+        $query_param = array(
+          str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE ") . $update_str, 
+          $table, $keys, $values);
         $query_param = array_merge($query_param, $options['update']);
         return call_user_func_array(array($this, 'query'), $query_param);
       }
       
     } 
     
-    return $this->query("%l INTO %b %lb VALUES %?", $which, $table, $keys, $values);
+    return $this->query(
+      str_replace('%', $this->param_char, "%l INTO %b %lb VALUES %?"), 
+      $which, $table, $keys, $values);
   }
   
   public function insert($table, $data) { return $this->insertOrReplace('INSERT', $table, $data); }
