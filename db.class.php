@@ -385,7 +385,7 @@ class MeekroDB {
   }
   
   public function columnList($table) {
-    return $this->queryOneColumn('Field', "SHOW COLUMNS FROM $table");
+    return $this->queryOneColumn('Field', "SHOW COLUMNS FROM %b", $table);
   }
   
   public function tableList($db = null) {

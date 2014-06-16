@@ -6,7 +6,7 @@ class ObjectTest extends SimpleTest {
     $this->mdb = new MeekroDB();
     
     foreach ($this->mdb->tableList() as $table) {
-      $this->mdb->query("DROP TABLE $table");
+      $this->mdb->query("DROP TABLE %b", $table);
     }
   }
   

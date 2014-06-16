@@ -2,7 +2,7 @@
 class BasicTest extends SimpleTest {
   function __construct() {
     foreach (DB::tableList() as $table) {
-      DB::query("DROP TABLE $table");
+      DB::query("DROP TABLE %b", $table);
     }
   }
   
@@ -266,20 +266,24 @@ class BasicTest extends SimpleTest {
   
   
   function test_5_insert_blobs() {
-    DB::query("CREATE TABLE `storedata` (
+    DB::query("CREATE TABLE `store data` (
       `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
       `picture` BLOB
     ) ENGINE = InnoDB");
+
+    $columns = DB::columnList('store data');
+    $this->assert(count($columns) === 2);
+    $this->assert($columns[1] === 'picture');
     
     
     $smile = file_get_contents('smile1.jpg');
-    DB::insert('storedata', array(
+    DB::insert('store data', array(
       'picture' => $smile,
     ));
-    DB::queryOneRow("INSERT INTO storedata (picture) VALUES (%s)", $smile);
+    DB::queryOneRow("INSERT INTO %b (picture) VALUES (%s)", 'store data', $smile);
     
-    $getsmile = DB::queryFirstField("SELECT picture FROM storedata WHERE id=1");
-    $getsmile2 = DB::queryFirstField("SELECT picture FROM storedata WHERE id=2");
+    $getsmile = DB::queryFirstField("SELECT picture FROM %b WHERE id=1", 'store data');
+    $getsmile2 = DB::queryFirstField("SELECT picture FROM %b WHERE id=2", 'store data');
     $this->assert($smile === $getsmile);
     $this->assert($smile === $getsmile2);
   }
