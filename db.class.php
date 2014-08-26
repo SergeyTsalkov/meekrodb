@@ -494,9 +494,9 @@ class MeekroDB {
     return $chunkyQuery;
   }
   
-  protected function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
+  public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
-  protected function sanitize($value) {
+  public function sanitize($value) {
     if (is_object($value)) {
       if ($value instanceof MeekroDBEval) return $value->text;
       else if ($value instanceof DateTime) return $this->escape($value->format('Y-m-d H:i:s'));
@@ -535,7 +535,7 @@ class MeekroDB {
     return floor(doubleval($var));
   }
   
-  protected function parseQueryParams() {
+  public function parseQueryParams() {
     $args = func_get_args();
     $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
     
