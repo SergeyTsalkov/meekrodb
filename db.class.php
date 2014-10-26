@@ -188,7 +188,7 @@ class MeekroDB {
       @$mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port, null, $connect_flags);
       
       if ($mysql->connect_error) {
-        $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
+        return $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
       }
       
       $mysql->set_charset($this->encoding);
@@ -236,7 +236,7 @@ class MeekroDB {
   public function useDB() { $args = func_get_args(); return call_user_func_array(array($this, 'setDB'), $args); }
   public function setDB($dbName) {
     $db = $this->get();
-    if (! $db->select_db($dbName)) $this->nonSQLError("Unable to set database to $dbName");
+    if (! $db->select_db($dbName)) return $this->nonSQLError("Unable to set database to $dbName");
     $this->current_db = $dbName;
   }
   
@@ -364,7 +364,7 @@ class MeekroDB {
     
     if (! isset($args[0])) { // update will have all the data of the insert
       if (isset($data[0]) && is_array($data[0])) { //multiple insert rows specified -- failing!
-        $this->nonSQLError("Badly formatted insertUpdate() query -- you didn't specify the update component!");
+        return $this->nonSQLError("Badly formatted insertUpdate() query -- you didn't specify the update component!");
       }
       
       $args[0] = $data;
@@ -461,7 +461,7 @@ class MeekroDB {
       // handle numbered parameters
       if ($arg_number_length = strspn($sql, '0123456789', $new_pos_back)) {
         $arg_number = substr($sql, $new_pos_back, $arg_number_length);
-        if (! array_key_exists($arg_number, $args_all)) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
+        if (! array_key_exists($arg_number, $args_all)) return $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
         
         $arg = $args_all[$arg_number];
         
@@ -471,8 +471,8 @@ class MeekroDB {
           $new_pos_back + $named_seperator_length) + $named_seperator_length;
         
         $arg_number = substr($sql, $new_pos_back + $named_seperator_length, $arg_number_length - $named_seperator_length);
-        if (count($args_all) != 1 || !is_array($args_all[0])) $this->nonSQLError("If you use named parameters, the second argument must be an array of parameters");
-        if (! array_key_exists($arg_number, $args_all[0])) $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
+        if (count($args_all) != 1 || !is_array($args_all[0])) return $this->nonSQLError("If you use named parameters, the second argument must be an array of parameters");
+        if (! array_key_exists($arg_number, $args_all[0])) return $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
         
         $arg = $args_all[0][$arg_number];
         
@@ -561,8 +561,8 @@ class MeekroDB {
       
       if ($type != '?') {
         $is_array_type = in_array($type, $array_types, true);
-        if ($is_array_type && !is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
-        else if (!$is_array_type && is_array($arg)) $this->nonSQLError("Badly formatted SQL query: Expected scalar, got array instead!");
+        if ($is_array_type && !is_array($arg)) return $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
+        else if (!$is_array_type && is_array($arg)) return $this->nonSQLError("Badly formatted SQL query: Expected scalar, got array instead!");
       }
       
       if ($type == 's') $result = $this->escape($arg);
@@ -582,7 +582,7 @@ class MeekroDB {
       
       else if ($type == '?') $result = $this->sanitize($arg);
       
-      else $this->nonSQLError("Badly formatted SQL query: Invalid MeekroDB param $type");
+      else return $this->nonSQLError("Badly formatted SQL query: Invalid MeekroDB param $type");
       
       if (is_array($result)) $result = '(' . implode(',', $result) . ')';
       
@@ -627,7 +627,7 @@ class MeekroDB {
         $row_type = 'raw';
         break;
       default:
-        $this->nonSQLError('Error -- invalid argument to queryHelper!');
+        return $this->nonSQLError('Error -- invalid argument to queryHelper!');
     }
 
     $sql = call_user_func_array(array($this, 'parseQueryParams'), $args);
@@ -780,7 +780,7 @@ class WhereClause {
   
   function __construct($type) {
     $type = strtolower($type);
-    if ($type !== 'or' && $type !== 'and') DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
+    if ($type !== 'or' && $type !== 'and') return DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
     $this->type = $type;
   }
   
