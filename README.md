@@ -106,7 +106,7 @@ It's dead simple. I don't even want to think about how many lines
 you'd need to pull this off in PDO.
 
     // Insert 2 rows at once
-      DB::query("INSERT INTO %b %lb VALUES %?", 'accounts',
+      DB::query("INSERT INTO %b %lb VALUES %ll?", 'accounts',
       array('username', 'password', 'last_login_timestamp'),
       array(
         array('Joe', 'joes_password', new DateTime('yesterday')),

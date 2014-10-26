@@ -306,7 +306,7 @@ class MeekroDB {
     $params = array_shift($args);
     $where = array_shift($args);
     
-    $query = str_replace('%', $this->param_char, "UPDATE %b SET %? WHERE ") . $where;
+    $query = str_replace('%', $this->param_char, "UPDATE %b SET %hc WHERE ") . $where;
     
     array_unshift($args, $params);
     array_unshift($args, $table);
@@ -319,6 +319,7 @@ class MeekroDB {
     $keys = $values = array();
     
     if (isset($datas[0]) && is_array($datas[0])) {
+      $var = '%ll?';
       foreach ($datas as $datum) {
         ksort($datum);
         if (! $keys) $keys = array_keys($datum);
@@ -326,6 +327,7 @@ class MeekroDB {
       }
       
     } else {
+      $var = '%l?';
       $keys = array_keys($datas);
       $values = array_values($datas);
     }
@@ -335,12 +337,12 @@ class MeekroDB {
     if (isset($options['update']) && is_array($options['update']) && $options['update'] && strtolower($which) == 'insert') {
       if (array_values($options['update']) !== $options['update']) {
         return $this->query(
-          str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE %?"), 
+          str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES $var ON DUPLICATE KEY UPDATE %hc"), 
           $table, $keys, $values, $options['update']);
       } else {
         $update_str = array_shift($options['update']);
         $query_param = array(
-          str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES %? ON DUPLICATE KEY UPDATE ") . $update_str, 
+          str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES $var ON DUPLICATE KEY UPDATE ") . $update_str, 
           $table, $keys, $values);
         $query_param = array_merge($query_param, $options['update']);
         return call_user_func_array(array($this, 'query'), $query_param);
@@ -349,7 +351,7 @@ class MeekroDB {
     } 
     
     return $this->query(
-      str_replace('%', $this->param_char, "%l INTO %b %lb VALUES %?"), 
+      str_replace('%', $this->param_char, "%l INTO %b %lb VALUES $var"), 
       $which, $table, $keys, $values);
   }
   
@@ -430,6 +432,11 @@ class MeekroDB {
       $this->param_char . 'b',  // backtick
       $this->param_char . 't',  // timestamp
       $this->param_char . '?',  // infer type
+      $this->param_char . 'l?',  // list of inferred types
+      $this->param_char . 'll?',  // list of lists of inferred types
+      $this->param_char . 'hc',  // hash `key`='value' pairs separated by commas
+      $this->param_char . 'ha',  // hash `key`='value' pairs separated by and
+      $this->param_char . 'ho',  // hash `key`='value' pairs separated by or
       $this->param_char . 'ss'  // search string (like string, surrounded with %'s)
     );
     
@@ -503,33 +510,53 @@ class MeekroDB {
   
   public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
-  public function sanitize($value) {
-    if (is_object($value)) {
-      if ($value instanceof MeekroDBEval) return $value->text;
-      else if ($value instanceof DateTime) return $this->escape($value->format('Y-m-d H:i:s'));
-      else return '';
-    }
-    
-    if (is_null($value)) return $this->usenull ? 'NULL' : "''";
-    else if (is_bool($value)) return ($value ? 1 : 0);
-    else if (is_int($value)) return $value;
-    else if (is_float($value)) return $value;
-    
-    else if (is_array($value)) {
-      // non-assoc array?
-      if (array_values($value) === $value) {
-        if (is_array($value[0])) return implode(', ', array_map(array($this, 'sanitize'), $value));
-        else return '(' . implode(', ', array_map(array($this, 'sanitize'), $value)) . ')';
+  protected function sanitize($value, $type='basic', $hashjoin=', ') {
+    if ($type == 'basic') {
+      if (is_object($value)) {
+        if ($value instanceof MeekroDBEval) return $value->text;
+        else if ($value instanceof DateTime) return $this->escape($value->format('Y-m-d H:i:s'));
+        else return '';
       }
       
-      $pairs = array();
-      foreach ($value as $k => $v) {
-        $pairs[] = $this->formatTableName($k) . '=' . $this->sanitize($v);
+      if (is_null($value)) return $this->usenull ? 'NULL' : "''";
+      else if (is_bool($value)) return ($value ? 1 : 0);
+      else if (is_int($value)) return $value;
+      else if (is_float($value)) return $value;
+      else if (is_array($value)) return "''";
+      else return $this->escape($value);
+
+    } else if ($type == 'list') {
+      if (is_array($value) && array_values($value) === $value) {
+        return '(' . implode(', ', array_map(array($this, 'sanitize'), $value)) . ')';
+      } else {
+        return $this->nonSQLError("Expected array parameter, got something different!");
       }
-      
-      return implode(', ', $pairs);
+    } else if ($type == 'doublelist') {
+      if (is_array($value) && array_values($value) === $value && is_array($value[0])) {        
+        $cleanvalues = array();
+        foreach ($value as $subvalue) {
+          $cleanvalues[] = $this->sanitize($subvalue, 'list');
+        }
+        return implode(', ', $cleanvalues);
+
+      } else {
+        return $this->nonSQLError("Expected double array parameter, got something different!");
+      }
+    } else if ($type == 'hash') {
+      if (is_array($value) && array_values($value) !== $value) {
+        $pairs = array();
+        foreach ($value as $k => $v) {
+          $pairs[] = $this->formatTableName($k) . '=' . $this->sanitize($v);
+        }
+        
+        return implode($hashjoin, $pairs);
+      } else {
+        return $this->nonSQLError("Expected hash (associative array) parameter, got something different!");
+      }
+    } else {
+      return $this->nonSQLError("Invalid type passed to sanitize()!");
     }
-    else return $this->escape($value);
+    
   }
   
   protected function parseTS($ts) {
@@ -547,7 +574,7 @@ class MeekroDB {
     $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
     
     $query = '';
-    $array_types = array('ls', 'li', 'ld', 'lb', 'll', 'lt');
+    $array_types = array('ls', 'li', 'ld', 'lb', 'll', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
     
     foreach ($chunkyQuery as $chunk) {
       if (is_string($chunk)) {
@@ -559,11 +586,9 @@ class MeekroDB {
       $arg = $chunk['value'];
       $result = '';
       
-      if ($type != '?') {
-        $is_array_type = in_array($type, $array_types, true);
-        if ($is_array_type && !is_array($arg)) return $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
-        else if (!$is_array_type && is_array($arg)) return $this->nonSQLError("Badly formatted SQL query: Expected scalar, got array instead!");
-      }
+      $is_array_type = in_array($type, $array_types, true);
+      if ($is_array_type && !is_array($arg)) return $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
+      else if (!$is_array_type && is_array($arg)) $arg = '';
       
       if ($type == 's') $result = $this->escape($arg);
       else if ($type == 'i') $result = $this->intval($arg);
@@ -581,6 +606,11 @@ class MeekroDB {
       else if ($type == 'lt') $result = array_map(array($this, 'escape'), array_map(array($this, 'parseTS'), $arg));
       
       else if ($type == '?') $result = $this->sanitize($arg);
+      else if ($type == 'l?') $result = $this->sanitize($arg, 'list');
+      else if ($type == 'll?') $result = $this->sanitize($arg, 'doublelist');
+      else if ($type == 'hc') $result = $this->sanitize($arg, 'hash');
+      else if ($type == 'ha') $result = $this->sanitize($arg, 'hash', ' AND ');
+      else if ($type == 'ho') $result = $this->sanitize($arg, 'hash', ' OR ');
       
       else return $this->nonSQLError("Badly formatted SQL query: Invalid MeekroDB param $type");
       

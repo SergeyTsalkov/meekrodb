@@ -214,7 +214,7 @@ class BasicTest extends SimpleTest {
       'height' => 199.194
     ));
     
-    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s AND height=%d", 'gonesoon', 199.194);
+    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE %ha", array('username' => 'gonesoon', 'height' => 199.194));
     $this->assert(intval($ct) === 1);
     
     $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s1 AND height=%d0 AND height=%d", 199.194, 'gonesoon');
