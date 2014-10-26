@@ -41,6 +41,8 @@ class DB {
   
   // internal
   protected static $mdb = null;
+  public static $variables_to_sync = array('param_char', 'escape_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
+    'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl', 'connect_options');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -49,16 +51,8 @@ class DB {
       $mdb = DB::$mdb = new MeekroDB();
     }
 
-    static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
-      'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl', 'connect_options');
-
-    $db_class_vars = get_class_vars('DB'); // the DB::$$var syntax only works in 5.3+
-
-    foreach ($variables_to_sync as $variable) {
-      if ($mdb->$variable !== $db_class_vars[$variable]) {
-        $mdb->$variable = $db_class_vars[$variable];
-      }
-    }
+    // Sync everytime because settings might have changed. It's fast.
+    $mdb->sync_config(); 
     
     return $mdb;
   }
@@ -158,6 +152,19 @@ class MeekroDB {
     $this->dbName = $dbName;
     $this->port = $port;
     $this->encoding = $encoding;
+
+    $this->sync_config();
+  }
+
+  // suck in config settings from static class
+  public function sync_config() {
+    $db_class_vars = get_class_vars('DB'); // the DB::$$var syntax only works in 5.3+
+
+    foreach (DB::$variables_to_sync as $variable) {
+      if ($this->$variable !== $db_class_vars[$variable]) {
+        $this->$variable = $db_class_vars[$variable];
+      }
+    }
   }
   
   public function get() {
