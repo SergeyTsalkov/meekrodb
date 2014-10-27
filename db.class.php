@@ -526,13 +526,14 @@ class MeekroDB {
       else return $this->escape($value);
 
     } else if ($type == 'list') {
-      if (is_array($value) && array_values($value) === $value) {
+      if (is_array($value)) {
+        $value = array_values($value);
         return '(' . implode(', ', array_map(array($this, 'sanitize'), $value)) . ')';
       } else {
         return $this->nonSQLError("Expected array parameter, got something different!");
       }
     } else if ($type == 'doublelist') {
-      if (is_array($value) && array_values($value) === $value && is_array($value[0])) {        
+      if (is_array($value) && array_values($value) === $value && is_array($value[0])) {
         $cleanvalues = array();
         foreach ($value as $subvalue) {
           $cleanvalues[] = $this->sanitize($subvalue, 'list');
@@ -543,7 +544,7 @@ class MeekroDB {
         return $this->nonSQLError("Expected double array parameter, got something different!");
       }
     } else if ($type == 'hash') {
-      if (is_array($value) && array_values($value) !== $value) {
+      if (is_array($value)) {
         $pairs = array();
         foreach ($value as $k => $v) {
           $pairs[] = $this->formatTableName($k) . '=' . $this->sanitize($v);
