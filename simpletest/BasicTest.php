@@ -200,6 +200,11 @@ class BasicTest extends SimpleTest {
     $this->assert(count($row) === 1);
     $this->assert($row[0]['username'] === 'newguy');
     $this->assert($row[0]['age'] === '172');
+
+    $row = DB::query("SELECT * FROM accounts WHERE password IN %li AND password IN %li0 AND username=%s", array('blahblahblahblah'), 'newguy');
+    $this->assert(count($row) === 1);
+    $this->assert($row[0]['username'] === 'newguy');
+    $this->assert($row[0]['age'] === '172');
     
     $true = DB::query("DELETE FROM accounts WHERE password=%s", 'blahblahblahblah');
     $this->assert($true === true);
