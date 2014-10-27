@@ -41,7 +41,7 @@ class DB {
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'escape_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
     'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl', 'connect_options');
   
   public static function getMDB() {
