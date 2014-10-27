@@ -510,7 +510,7 @@ class MeekroDB {
   
   public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
-  protected function sanitize($value, $type='basic', $hashjoin=', ') {
+  public function sanitize($value, $type='basic', $hashjoin=', ') {
     if ($type == 'basic') {
       if (is_object($value)) {
         if ($value instanceof MeekroDBEval) return $value->text;
