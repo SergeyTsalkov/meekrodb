@@ -515,7 +515,7 @@ class MeekroDB {
       if (is_object($value)) {
         if ($value instanceof MeekroDBEval) return $value->text;
         else if ($value instanceof DateTime) return $this->escape($value->format('Y-m-d H:i:s'));
-        else return '';
+        else return $this->escape($value); // use __toString() value for objects, when possible
       }
       
       if (is_null($value)) return $this->usenull ? 'NULL' : "''";
