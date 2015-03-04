@@ -23,7 +23,7 @@ class DB {
   public static $user = '';
   public static $password = '';
   public static $host = 'localhost';
-  public static $port = null;
+  public static $port = 3306; //hhvm complains if this is null
   public static $encoding = 'latin1';
   
   // configure workings
@@ -112,7 +112,7 @@ class MeekroDB {
   public $user = '';
   public $password = '';
   public $host = 'localhost';
-  public $port = null;
+  public $port = 3306;
   public $encoding = 'latin1';
   
   // configure workings
