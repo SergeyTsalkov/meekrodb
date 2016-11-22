@@ -137,3 +137,11 @@ versions of your application. Want to count up all your queries and their
 runtime? Just add a new success handler.
 
 ### More about MeekroDB's design philosophy: http://www.meekro.com/beliefs.php
+
+My Other Projects
+========
+A little shameless self-promotion!
+
+  * [ArkServers.io](https://arkservers.io) -- Ark: Survival Evolved server hosting!
+  * [ChunkHost](https://chunkhost.com) -- VPS Hosting starting at $5/month! We accept bitcoin!
+  * [brooce](https://github.com/SergeyTsalkov/brooce) - Language-agnostic job queue written in Go! Write your jobs in any language, schedule them from any language, run them anywhere!
