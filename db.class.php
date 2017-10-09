@@ -145,7 +145,7 @@ class MeekroDB {
     if ($password === null) $password = DB::$password;
     if ($dbName === null) $dbName = DB::$dbName;
     if ($port === null) $port = DB::$port;
-	if ($socket === null) $socket = DB::$socket;
+    if ($socket === null) $socket = DB::$socket;
     if ($encoding === null) $encoding = DB::$encoding;
     
     $this->host = $host;
@@ -153,7 +153,7 @@ class MeekroDB {
     $this->password = $password;
     $this->dbName = $dbName;
     $this->port = $port;
-	$this->socket = $socket;
+    $this->socket = $socket;
     $this->encoding = $encoding;
 
     $this->sync_config();
