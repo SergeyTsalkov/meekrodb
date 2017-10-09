@@ -113,6 +113,7 @@ class MeekroDB {
   public $password = '';
   public $host = 'localhost';
   public $port = 3306;
+  public $socket = null;
   public $encoding = 'latin1';
   
   // configure workings
@@ -138,12 +139,13 @@ class MeekroDB {
   public $nested_transactions_count = 0;
   
   
-  public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null) {
+  public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null, $socket=null)  {
     if ($host === null) $host = DB::$host;
     if ($user === null) $user = DB::$user;
     if ($password === null) $password = DB::$password;
     if ($dbName === null) $dbName = DB::$dbName;
     if ($port === null) $port = DB::$port;
+    if ($socket === null) $socket = DB::$socket;
     if ($encoding === null) $encoding = DB::$encoding;
     
     $this->host = $host;
@@ -151,6 +153,7 @@ class MeekroDB {
     $this->password = $password;
     $this->dbName = $dbName;
     $this->port = $port;
+    $this->socket = $socket;
     $this->encoding = $encoding;
 
     $this->sync_config();
@@ -185,7 +188,7 @@ class MeekroDB {
       }
 
       // suppress warnings, since we will check connect_error anyway
-      @$mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port, null, $connect_flags);
+      @$mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port, $this->socket, $connect_flags);
       
       if ($mysql->connect_error) {
         return $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
