@@ -24,6 +24,7 @@ class DB {
   public static $password = '';
   public static $host = 'localhost';
   public static $port = 3306; //hhvm complains if this is null
+  public static $socket = null;
   public static $encoding = 'latin1';
   
   // configure workings
