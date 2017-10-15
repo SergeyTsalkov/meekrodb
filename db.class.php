@@ -873,8 +873,8 @@ class WhereClause {
       $args = array_merge($args, $clause_args);
     }
     
-    if ($this->type == 'and') $sql = implode(' AND ', $sql);
-    else $sql = implode(' OR ', $sql);
+    if ($this->type == 'and') $sql = sprintf('(%s)', implode(' AND ', $sql));
+    else $sql = sprintf('(%s)', implode(' OR ', $sql));
     
     if ($this->negate) $sql = '(NOT ' . $sql . ')';
     return array($sql, $args);
