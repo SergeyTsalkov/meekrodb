@@ -514,6 +514,8 @@ class MeekroDB {
   
   public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
+  public function real_escape($str) { return $this->get()->real_escape_string(strval($str)); }
+	
   public function sanitize($value, $type='basic', $hashjoin=', ') {
     if ($type == 'basic') {
       if (is_object($value)) {
