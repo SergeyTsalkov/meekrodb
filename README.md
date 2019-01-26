@@ -5,7 +5,7 @@ Learn more: http://www.meekro.com
 MeekroDB is: 
 
 * A PHP MySQL library that lets you **get more done with fewer lines of code**, and **makes SQL injection 100% impossible**.
-* Google's #1 search result for "php mysql library" for over 2 years, with **thousands of deployments worldwide**.
+* Google's #1 search result for "php mysql library" since 2013, with **thousands of deployments worldwide**.
 * A library with a **perfect security track record**. No bugs relating to security or SQL injection have ever been discovered.
 
 Installation
@@ -143,5 +143,6 @@ My Other Projects
 A little shameless self-promotion!
 
   * [ArkServers.io](https://arkservers.io) -- Ark: Survival Evolved server hosting!
+  * [Best Minecraft Server Hosting](https://bestminecraft.org) -- Ranking and recommendations for minecraft server hosting!
   * [ChunkHost](https://chunkhost.com) -- VPS Hosting starting at $5/month! We accept bitcoin!
   * [brooce](https://github.com/SergeyTsalkov/brooce) - Language-agnostic job queue written in Go! Write your jobs in any language, schedule them from any language, run them anywhere!
