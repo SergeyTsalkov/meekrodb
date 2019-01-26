@@ -143,7 +143,7 @@ My Other Projects
 A little shameless self-promotion!
 
   * [Ark Server Hosting](https://arkservers.io) -- Ark: Survival Evolved server hosting by ArkServers.io!
-  * [7 Days To Die Server Hosting](https://arkservers.io/7days) -- Ark: Survival Evolved server hosting by ArkServers.io!
+  * [7 Days To Die Server Hosting](https://arkservers.io/7days) -- 7 Days to Die server hosting by ArkServers.io!
   * [Best Minecraft Server Hosting](https://bestminecraft.org) -- Ranking and recommendations for minecraft server hosting!
   * [ChunkHost](https://chunkhost.com) -- VPS Hosting starting at $5/month! We accept bitcoin!
   * [brooce](https://github.com/SergeyTsalkov/brooce) - Language-agnostic job queue written in Go! Write your jobs in any language, schedule them from any language, run them anywhere!
