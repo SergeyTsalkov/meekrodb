@@ -1,6 +1,6 @@
 <?php
 /*
-    Copyright (C) 2008-2012 Sergey Tsalkov (stsalkov@gmail.com)
+    Copyright (C) 2008 Sergey Tsalkov (stsalkov@gmail.com)
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Lesser General Public License as published by
@@ -338,7 +338,7 @@ class MeekroDB {
     
     if (isset($options['ignore']) && $options['ignore']) $which = 'INSERT IGNORE';
     
-    if (isset($options['update']) && is_array($options['update']) && $options['update'] && strtolower($which) == 'insert') {
+    if (isset($options['update']) && is_array($options['update']) && $options['update'] && strtoupper($which) == 'INSERT') {
       if (array_values($options['update']) !== $options['update']) {
         return $this->query(
           str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES $var ON DUPLICATE KEY UPDATE %hc"), 
