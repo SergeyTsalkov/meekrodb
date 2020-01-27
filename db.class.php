@@ -335,10 +335,12 @@ class MeekroDB {
       $keys = array_keys($datas);
       $values = array_values($datas);
     }
+
+    if ($which != 'INSERT' && $which != 'INSERT IGNORE' && $which != 'REPLACE') {
+      return $this->nonSQLError('insertOrReplace() must be called with one of: INSERT, INSERT IGNORE, REPLACE');
+    }
     
-    if (isset($options['ignore']) && $options['ignore']) $which = 'INSERT IGNORE';
-    
-    if (isset($options['update']) && is_array($options['update']) && $options['update'] && strtoupper($which) == 'INSERT') {
+    if (isset($options['update']) && is_array($options['update']) && $options['update'] && $which == 'INSERT') {
       if (array_values($options['update']) !== $options['update']) {
         return $this->query(
           str_replace('%', $this->param_char, "INSERT INTO %b %lb VALUES $var ON DUPLICATE KEY UPDATE %hc"), 
@@ -360,7 +362,7 @@ class MeekroDB {
   }
   
   public function insert($table, $data) { return $this->insertOrReplace('INSERT', $table, $data); }
-  public function insertIgnore($table, $data) { return $this->insertOrReplace('INSERT', $table, $data, array('ignore' => true)); }
+  public function insertIgnore($table, $data) { return $this->insertOrReplace('INSERT IGNORE', $table, $data); }
   public function replace($table, $data) { return $this->insertOrReplace('REPLACE', $table, $data); }
   
   public function insertUpdate() {
