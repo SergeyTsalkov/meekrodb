@@ -443,7 +443,9 @@ class MeekroDB {
       $this->param_char . 'hc',  // hash `key`='value' pairs separated by commas
       $this->param_char . 'ha',  // hash `key`='value' pairs separated by and
       $this->param_char . 'ho',  // hash `key`='value' pairs separated by or
-      $this->param_char . 'ss'  // search string (like string, surrounded with %'s)
+      $this->param_char . 'ss',  // search string (like string, surrounded with %'s)
+      $this->param_char . 'ssb', // search string (like, begins with)
+      $this->param_char . 'sse', // search string (like, ends with)
     );
     
     // generate list of all MeekroDB variables in our query, and their position
@@ -603,6 +605,8 @@ class MeekroDB {
       else if ($type == 'b') $result = $this->formatTableName($arg);
       else if ($type == 'l') $result = $arg;
       else if ($type == 'ss') $result = $this->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg) . "%");
+      else if ($type == 'ssb') $result = $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg) . "%");
+      else if ($type == 'sse') $result = $this->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg));
       else if ($type == 't') $result = $this->escape($this->parseTS($arg)); 
       
       else if ($type == 'ls') $result = array_map(array($this, 'escape'), $arg);
