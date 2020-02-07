@@ -34,6 +34,7 @@ class DB {
   public static $error_handler = true;
   public static $throw_exception_on_error = false;
   public static $nonsql_error_handler = null;
+  public static $pre_sql_handler = false;
   public static $throw_exception_on_nonsql_error = false;
   public static $nested_transactions = false;
   public static $usenull = true;
@@ -43,7 +44,7 @@ class DB {
   // internal
   protected static $mdb = null;
   public static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
-    'nonsql_error_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl', 'connect_options');
+    'nonsql_error_handler', 'pre_sql_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl', 'connect_options');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -124,6 +125,7 @@ class MeekroDB {
   public $error_handler = true;
   public $throw_exception_on_error = false;
   public $nonsql_error_handler = null;
+  public $pre_sql_handler = false;
   public $throw_exception_on_nonsql_error = false;
   public $nested_transactions = false;
   public $usenull = true;
@@ -672,6 +674,10 @@ class MeekroDB {
     }
 
     $sql = call_user_func_array(array($this, 'parseQueryParams'), $args);
+
+    if ($this->pre_sql_handler !== false && is_callable($this->pre_sql_handler)) {
+      $sql = call_user_func($this->pre_sql_handler, $sql);
+    }
     
     if ($this->success_handler) $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
