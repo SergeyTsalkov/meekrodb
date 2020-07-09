@@ -28,6 +28,7 @@ ini_set('date.timezone', 'America/Los_Angeles');
 error_reporting(E_ALL | E_STRICT);
 require_once '../db.class.php';
 include 'test_setup.php'; //test config values go here
+// WARNING: ALL tables in the database will be dropped before the tests, including non-test related tables. 
 DB::$user = $set_db_user;
 DB::$password = $set_password;
 DB::$dbName = $set_db;
