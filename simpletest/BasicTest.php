@@ -26,7 +26,7 @@ class BasicTest extends SimpleTest {
     
     $mysqli = DB::get();
     DB::disconnect();
-    @$this->assert($mysqli->server_info === null);
+    @$this->assert(!$mysqli->server_info);
   }
   
   function test_1_5_empty_table() {
