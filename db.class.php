@@ -164,11 +164,9 @@ class MeekroDB {
 
   // suck in config settings from static class
   public function sync_config() {
-    $db_class_vars = get_class_vars('DB'); // the DB::$$var syntax only works in 5.3+
-
     foreach (DB::$variables_to_sync as $variable) {
-      if ($this->$variable !== $db_class_vars[$variable]) {
-        $this->$variable = $db_class_vars[$variable];
+      if ($this->$variable !== DB::$$variable) {
+        $this->$variable = DB::$$variable;
       }
     }
   }
