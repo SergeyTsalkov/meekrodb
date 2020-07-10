@@ -308,14 +308,15 @@ class MeekroDB {
     $args = func_get_args();
     $table = array_shift($args);
     $params = array_shift($args);
-    $where = array_shift($args);
-    
-    $query = str_replace('%', $this->param_char, "UPDATE %b SET %hc WHERE ") . $where;
-    
-    array_unshift($args, $params);
-    array_unshift($args, $table);
-    array_unshift($args, $query);
-    return call_user_func_array(array($this, 'query'), $args);
+
+    $update_part = $this->parseQueryParams(
+      str_replace('%', $this->param_char, "UPDATE %b SET %hc"),
+      $table, $params
+    );
+
+    $where_part = call_user_func_array(array($this, 'parseQueryParams'), $args);
+    $query = $update_part . ' WHERE ' . $where_part;
+    return $this->query($query);
   }
   
   public function insertOrReplace($which, $table, $datas, $options=array()) {
@@ -387,10 +388,10 @@ class MeekroDB {
   public function delete() {
     $args = func_get_args();
     $table = $this->formatTableName(array_shift($args));
-    $where = array_shift($args);
-    $buildquery = "DELETE FROM $table WHERE $where";
-    array_unshift($args, $buildquery);
-    return call_user_func_array(array($this, 'query'), $args);
+
+    $where = call_user_func_array(array($this, 'parseQueryParams'), $args);
+    $query = "DELETE FROM {$table} WHERE {$where}";
+    return $this->query($query);
   }
   
   public function sqleval() {

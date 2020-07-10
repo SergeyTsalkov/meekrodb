@@ -23,6 +23,11 @@ class BasicTest extends SimpleTest {
     `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
     `signature` VARCHAR( 255 ) NULL DEFAULT 'donewriting'
     ) ENGINE = InnoDB");
+
+    DB::query("CREATE TABLE `fake%s_table` (
+    `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+    `name` VARCHAR( 255 ) NULL DEFAULT 'blah'
+    ) ENGINE = InnoDB");
     
     $mysqli = DB::get();
     DB::disconnect();
@@ -162,12 +167,12 @@ class BasicTest extends SimpleTest {
     $this->assert($columnlist[5] === 'height');
     
     $tablelist = DB::tableList();
-    $this->assert(count($tablelist) === 2);
+    $this->assert(count($tablelist) === 3);
     $this->assert($tablelist[0] === 'accounts');
     
     $tablelist = null;
     $tablelist = DB::tableList(DB::$dbName);
-    $this->assert(count($tablelist) === 2);
+    $this->assert(count($tablelist) === 3);
     $this->assert($tablelist[0] === 'accounts');
   }
   
@@ -186,7 +191,7 @@ class BasicTest extends SimpleTest {
     $true = DB::update('accounts', array(
       'password' => DB::sqleval("REPEAT('blah', %i)", 4),
       'favorite_word' => null,
-      ), 'username=%s', 'newguy');
+      ), 'username=%s_name', array('name' => 'newguy'));
     
     $row = null;
     $row = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
@@ -414,7 +419,16 @@ class BasicTest extends SimpleTest {
     DB::update('profile',array('signature'=> "%li "),"id = %d",1);
     $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
     $this->assert($signature === "%li ");
+  }
 
+  function test_902_faketable() {
+    DB::insert('fake%s_table', array('name' => 'karen'));
+    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
+    $this->assert($count === '1');
+    DB::update('fake%s_table', array('name' => 'haren%s'), 'name=%s_name', array('name' => 'karen'));
+    DB::delete('fake%s_table', 'name=%s0', 'haren%s');
+    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
+    $this->assert($count === '0');
   }
 
 
