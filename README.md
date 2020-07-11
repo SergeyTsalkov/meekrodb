@@ -136,8 +136,6 @@ You can easily have separate error handling behavior for the dev and live
 versions of your application. Want to count up all your queries and their 
 runtime? Just add a new success handler.
 
-### More about MeekroDB's design philosophy: http://www.meekro.com/beliefs.php
-
 My Other Projects
 ========
 A little shameless self-promotion!
