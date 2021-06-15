@@ -58,48 +58,10 @@ class DB {
     
     return $mdb;
   }
-  
-  // yes, this is ugly. __callStatic() only works in 5.3+
-  public static function get() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'get'), $args); }
-  public static function disconnect() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'disconnect'), $args); }
-  public static function query() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'query'), $args); }
-  public static function queryFirstRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstRow'), $args); }
-  public static function queryOneRow() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneRow'), $args); }
-  public static function queryAllLists() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryAllLists'), $args); }
-  public static function queryFullColumns() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFullColumns'), $args); }
-  public static function queryFirstList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstList'), $args); }
-  public static function queryOneList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneList'), $args); }
-  public static function queryFirstColumn() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstColumn'), $args); }
-  public static function queryOneColumn() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneColumn'), $args); }
-  public static function queryFirstField() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryFirstField'), $args); }
-  public static function queryOneField() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryOneField'), $args); }
-  public static function queryRaw() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryRaw'), $args); }
-  public static function queryRawUnbuf() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'queryRawUnbuf'), $args); }
-  
-  public static function insert() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insert'), $args); }
-  public static function insertIgnore() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertIgnore'), $args); }
-  public static function insertUpdate() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertUpdate'), $args); }
-  public static function replace() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'replace'), $args); }
-  public static function update() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'update'), $args); }
-  public static function delete() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'delete'), $args); }
-  
-  public static function insertId() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'insertId'), $args); }
-  public static function count() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'count'), $args); }
-  public static function affectedRows() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'affectedRows'), $args); }
-  
-  public static function useDB() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'useDB'), $args); }
-  public static function startTransaction() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'startTransaction'), $args); }
-  public static function commit() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'commit'), $args); }
-  public static function rollback() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'rollback'), $args); }
-  public static function tableList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'tableList'), $args); }
-  public static function columnList() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'columnList'), $args); }
-  
-  public static function sqlEval() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'sqlEval'), $args); }
-  public static function nonSQLError() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'nonSQLError'), $args); }
-  
-  public static function serverVersion() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'serverVersion'), $args); }
-  public static function transactionDepth() { $args = func_get_args(); return call_user_func_array(array(DB::getMDB(), 'transactionDepth'), $args); }
-  
+
+  public static function __callStatic($name, $args) {
+    return call_user_func_array(array(DB::getMDB(), $name), $args);
+  }
   
   public static function debugMode($handler = true) { 
     DB::$success_handler = $handler;
