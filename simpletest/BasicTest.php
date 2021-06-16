@@ -44,13 +44,7 @@ class BasicTest extends SimpleTest {
     $field = DB::queryFirstField("SELECT * FROM accounts");
     $this->assert($field === null);
     
-    $field = DB::queryOneField('nothere', "SELECT * FROM accounts");
-    $this->assert($field === null);
-    
     $column = DB::queryFirstColumn("SELECT * FROM accounts");
-    $this->assert(is_array($column) && count($column) === 0);
-    
-    $column = DB::queryOneColumn('nothere', "SELECT * FROM accounts"); //TODO: is this what we want?
     $this->assert(is_array($column) && count($column) === 0);
   }
   
@@ -117,16 +111,12 @@ class BasicTest extends SimpleTest {
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
     $this->assert($charlie_password === 'goodbye');
     
-    $charlie_password = DB::queryOneField('password', "SELECT * FROM accounts WHERE username IN %ls AND username = %s", 
-      array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
-    $this->assert($charlie_password === 'goodbye');
-    
     $passwords = DB::queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Bart');
     $this->assert(count($passwords) === 1);
     $this->assert($passwords[0] === 'hello');
     
     $username = $password = $age = null;
-    list($age, $username, $password) = DB::queryOneList("SELECT age,username,password FROM accounts WHERE username=%s", 'Bart');
+    list($age, $username, $password) = DB::queryFirstList("SELECT age,username,password FROM accounts WHERE username=%s", 'Bart');
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
@@ -176,7 +166,7 @@ class BasicTest extends SimpleTest {
       'height' => 111.15
     ));
     
-    $row = DB::queryOneRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
+    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
     $this->assert($row['username'] === 'newguy');
     $this->assert($row['age'] === '172');
     
@@ -186,7 +176,7 @@ class BasicTest extends SimpleTest {
       ), 'username=%s_name', array('name' => 'newguy'));
     
     $row = null;
-    $row = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
+    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
     $this->assert($true === true);
     $this->assert($row['password'] === 'blahblahblahblah');
     $this->assert($row['favorite_word'] === null);
@@ -260,7 +250,7 @@ class BasicTest extends SimpleTest {
     $this->assert($rows[1]['password'] === 'somethingelse');
     $this->assert($rows[1]['username'] === '2ofmany');
     
-    $nullrow = DB::queryOneRow("SELECT * FROM accounts WHERE username LIKE %ss", '3ofman');
+    $nullrow = DB::queryFirstRow("SELECT * FROM accounts WHERE username LIKE %ss", '3ofman');
     $this->assert($nullrow['password'] === NULL);
     $this->assert($nullrow['age'] === '15');
   }
@@ -282,7 +272,7 @@ class BasicTest extends SimpleTest {
     DB::insert('store data', array(
       'picture' => $smile,
     ));
-    DB::queryOneRow("INSERT INTO %b (picture) VALUES (%s)", 'store data', $smile);
+    DB::queryFirstRow("INSERT INTO %b (picture) VALUES (%s)", 'store data', $smile);
     
     $getsmile = DB::queryFirstField("SELECT picture FROM %b WHERE id=1", 'store data');
     $getsmile2 = DB::queryFirstField("SELECT picture FROM %b WHERE id=2", 'store data');

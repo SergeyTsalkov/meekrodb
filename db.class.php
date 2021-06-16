@@ -723,7 +723,6 @@ class MeekroDB {
     return $return;
   }
 
-  public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
   public function queryFirstRow() {
     $args = func_get_args();
     $result = call_user_func_array(array($this, 'query'), $args);
@@ -731,7 +730,6 @@ class MeekroDB {
     return reset($result);
   }
 
-  public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
   public function queryFirstList() {
     $args = func_get_args();
     $result = call_user_func_array(array($this, 'queryAllLists'), $args);
@@ -753,45 +751,11 @@ class MeekroDB {
     return $ret;
   }
   
-  public function queryOneColumn() {
-    $args = func_get_args();
-    $column = array_shift($args);
-    $results = call_user_func_array(array($this, 'query'), $args);
-    $ret = array();
-    
-    if (!count($results) || !count($results[0])) return $ret;
-    if ($column === null) {
-      $keys = array_keys($results[0]);
-      $column = $keys[0];
-    }
-    
-    foreach ($results as $row) {
-      $ret[] = $row[$column];
-    }
-    
-    return $ret;
-  }
-  
   public function queryFirstField() { 
     $args = func_get_args();
     $row = call_user_func_array(array($this, 'queryFirstList'), $args);
     if ($row == null) return null;    
     return $row[0];
-  }
-  
-  public function queryOneField() {
-    $args = func_get_args();
-    $column = array_shift($args);
-    
-    $row = call_user_func_array(array($this, 'queryOneRow'), $args);
-    if ($row == null) { 
-      return null;
-    } else if ($column === null) {
-      $keys = array_keys($row);
-      $column = $keys[0];
-    }  
-    
-    return $row[$column];
   }
 }
 
