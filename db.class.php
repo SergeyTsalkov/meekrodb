@@ -366,15 +366,15 @@ class MeekroDB {
   
   public function columnList($table) {
     $data = $this->query("SHOW COLUMNS FROM %b", $table);
-    $columns = [];
+    $columns = array();
     foreach ($data as $row) {
-      $columns[$row['Field']] = [
+      $columns[$row['Field']] = array(
         'type' => $row['Type'],
         'null' => $row['Null'],
         'key' => $row['Type'],
         'default' => $row['Default'],
         'extra' => $row['Extra']
-      ];
+      );
     }
 
     return $columns;
