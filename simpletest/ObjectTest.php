@@ -117,10 +117,12 @@ class ObjectTest extends SimpleTest {
     $results = $this->mdb->query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     $this->assert(count($results) === 2);
     
-    $columnlist = $this->mdb->columnList('accounts');
-    $this->assert(count($columnlist) === 6);
-    $this->assert($columnlist[0] === 'id');
-    $this->assert($columnlist[4] === 'height');
+    $columnList = $this->mdb->columnList('accounts');
+    $columnKeys = array_keys($columnList);
+    $this->assert(count($columnList) === 6);
+    $this->assert($columnList['id']['type'] == 'int(11)');
+    $this->assert($columnList['height']['type'] == 'double');
+    $this->assert($columnKeys[4] == 'height');
     
     $tablelist = $this->mdb->tableList();
     $this->assert(count($tablelist) === 1);

@@ -363,7 +363,19 @@ class MeekroDB {
   }
   
   public function columnList($table) {
-    return $this->queryOneColumn('Field', "SHOW COLUMNS FROM %b", $table);
+    $data = $this->query("SHOW COLUMNS FROM %b", $table);
+    $columns = [];
+    foreach ($data as $row) {
+      $columns[$row['Field']] = [
+        'type' => $row['Type'],
+        'null' => $row['Null'],
+        'key' => $row['Type'],
+        'default' => $row['Default'],
+        'extra' => $row['Extra']
+      ];
+    }
+
+    return $columns;
   }
   
   public function tableList($db = null) {

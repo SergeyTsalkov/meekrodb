@@ -161,10 +161,12 @@ class BasicTest extends SimpleTest {
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     $this->assert(count($results) === 3);
     
-    $columnlist = DB::columnList('accounts');
-    $this->assert(count($columnlist) === 8);
-    $this->assert($columnlist[0] === 'id');
-    $this->assert($columnlist[5] === 'height');
+    $columnList = DB::columnList('accounts');
+    $columnKeys = array_keys($columnList);
+    $this->assert(count($columnList) === 8);
+    $this->assert($columnList['id']['type'] == 'int(11)');
+    $this->assert($columnList['height']['type'] == 'double');
+    $this->assert($columnKeys[5] == 'height');
     
     $tablelist = DB::tableList();
     $this->assert(count($tablelist) === 3);
@@ -283,7 +285,7 @@ class BasicTest extends SimpleTest {
 
     $columns = DB::columnList('store data');
     $this->assert(count($columns) === 2);
-    $this->assert($columns[1] === 'picture');
+    $this->assert($columns['picture']['type'] === 'blob');
     
     
     $smile = file_get_contents(__DIR__ . '/smile1.jpg');
