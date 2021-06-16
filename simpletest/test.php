@@ -10,8 +10,6 @@ class SimpleTest {
     debug_print_backtrace();
     die;
   }
-  
-
 }
 
 function microtime_float()
@@ -20,14 +18,11 @@ function microtime_float()
     return ((float)$usec + (float)$sec);
 }
 
-if (phpversion() >= '5.3') $is_php_53 = true;
-else $is_php_53 = false;
-
 ini_set('date.timezone', 'America/Los_Angeles');
 
 error_reporting(E_ALL | E_STRICT);
-require_once '../db.class.php';
-include 'test_setup.php'; //test config values go here
+require_once __DIR__ . '/../db.class.php';
+require_once __DIR__ . '/test_setup.php'; //test config values go here
 // WARNING: ALL tables in the database will be dropped before the tests, including non-test related tables. 
 DB::$user = $set_db_user;
 DB::$password = $set_password;
@@ -35,13 +30,14 @@ DB::$dbName = $set_db;
 DB::$host = $set_host;
 DB::get(); //connect to mysql
 
-require_once 'BasicTest.php';
-require_once 'CallTest.php';
-require_once 'ObjectTest.php';
-require_once 'WhereClauseTest.php';
-require_once 'ErrorTest.php';
-require_once 'TransactionTest.php';
-require_once 'HelperTest.php';
+require_once __DIR__ . '/BasicTest.php';
+require_once __DIR__ . '/CallTest.php';
+require_once __DIR__ . '/ObjectTest.php';
+require_once __DIR__ . '/WhereClauseTest.php';
+require_once __DIR__ . '/ErrorTest.php';
+require_once __DIR__ . '/ErrorTest_53.php';
+require_once __DIR__ . '/TransactionTest.php';
+require_once __DIR__ . '/HelperTest.php';
 
 $classes_to_test = array(
   'BasicTest',
@@ -49,20 +45,14 @@ $classes_to_test = array(
   'WhereClauseTest',
   'ObjectTest',
   'ErrorTest',
+  'ErrorTest_53',
   'TransactionTest',
   'HelperTest',
 );
 
-if ($is_php_53) {
-  require_once 'ErrorTest_53.php';
-  $classes_to_test[] = 'ErrorTest_53';
-} else {
-  echo "PHP 5.3 not detected, skipping 5.3 tests..\n";
-}
-
 $mysql_version = DB::serverVersion();
 if ($mysql_version >= '5.5') {
-  require_once 'TransactionTest_55.php';
+  require_once __DIR__ . '/TransactionTest_55.php';
   $classes_to_test[] = 'TransactionTest_55';
 } else {
   echo "MySQL 5.5 not available (version is $mysql_version) -- skipping MySQL 5.5 tests\n";

@@ -215,7 +215,7 @@ class ObjectTest extends SimpleTest {
     ) ENGINE = InnoDB");
     
     
-    $smile = file_get_contents('smile1.jpg');
+    $smile = file_get_contents(__DIR__ . '/smile1.jpg');
     $this->mdb->insert('storedata', array(
       'picture' => $smile,
     ));

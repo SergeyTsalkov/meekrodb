@@ -286,7 +286,7 @@ class BasicTest extends SimpleTest {
     $this->assert($columns[1] === 'picture');
     
     
-    $smile = file_get_contents('smile1.jpg');
+    $smile = file_get_contents(__DIR__ . '/smile1.jpg');
     DB::insert('store data', array(
       'picture' => $smile,
     ));
