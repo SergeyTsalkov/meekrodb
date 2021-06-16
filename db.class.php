@@ -58,7 +58,12 @@ class DB {
   }
 
   public static function __callStatic($name, $args) {
-    return call_user_func_array(array(DB::getMDB(), $name), $args);
+    $fn = array(DB::getMDB(), $name);
+    if (! is_callable($fn)) {
+      throw new MeekroDBException("MeekroDB does not have a method called $name");
+    }
+
+    return call_user_func_array($fn, $args);
   }
   
   public static function debugMode($handler = true) { 
