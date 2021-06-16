@@ -37,14 +37,12 @@ class DB {
   public static $pre_sql_handler = false;
   public static $throw_exception_on_nonsql_error = false;
   public static $nested_transactions = false;
-  public static $usenull = true;
   public static $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   public static $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error',
-    'nonsql_error_handler', 'pre_sql_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'usenull', 'ssl', 'connect_options');
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error', 'nonsql_error_handler', 'pre_sql_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'ssl', 'connect_options');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -90,7 +88,6 @@ class MeekroDB {
   public $pre_sql_handler = false;
   public $throw_exception_on_nonsql_error = false;
   public $nested_transactions = false;
-  public $usenull = true;
   public $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   public $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
   
@@ -501,7 +498,7 @@ class MeekroDB {
         else return $this->escape($value); // use __toString() value for objects, when possible
       }
       
-      if (is_null($value)) return $this->usenull ? 'NULL' : "''";
+      if (is_null($value)) return 'NULL';
       else if (is_bool($value)) return ($value ? 1 : 0);
       else if (is_int($value)) return $value;
       else if (is_float($value)) return $value;

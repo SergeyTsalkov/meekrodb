@@ -100,16 +100,6 @@ class BasicTest extends SimpleTest {
     $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
     $this->assert($password === 'goodbye');
     
-    DB::$usenull = false;
-    DB::insertUpdate('accounts', array(
-      'id' => 3,
-      'favorite_word' => null,
-    ));
-    
-    $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word=%s AND favorite_word=%s", null, '');
-    $this->assert($password === 'goodbye');
-    
-    DB::$usenull = true;
     DB::insertUpdate('accounts', array(
       'id' => 3,
       'favorite_word' => null,
