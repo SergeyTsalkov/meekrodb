@@ -723,6 +723,11 @@ class MeekroDB {
     return $return;
   }
 
+  public function parse() {
+    $args = func_get_args();
+    return call_user_func_array(array($this, 'parseQueryParams'), $args);
+  }
+
   public function queryFirstRow() {
     $args = func_get_args();
     $result = call_user_func_array(array($this, 'query'), $args);

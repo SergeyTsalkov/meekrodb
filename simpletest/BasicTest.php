@@ -413,6 +413,12 @@ class BasicTest extends SimpleTest {
     $this->assert($count === '0');
   }
 
+  function test_10_parse() {
+    $parsed_query = DB::parse("SELECT * FROM %b WHERE id=%i AND name=%s", 'accounts', 5, 'Joe');
+    $correct_query = "SELECT * FROM `accounts` WHERE id=5 AND name='Joe'";
+    $this->assert($parsed_query === $correct_query);
+  }
+
 
 
 }
