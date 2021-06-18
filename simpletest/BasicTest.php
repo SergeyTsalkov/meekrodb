@@ -417,6 +417,10 @@ class BasicTest extends SimpleTest {
     $parsed_query = DB::parse("SELECT * FROM %b WHERE id=%i AND name=%s", 'accounts', 5, 'Joe');
     $correct_query = "SELECT * FROM `accounts` WHERE id=5 AND name='Joe'";
     $this->assert($parsed_query === $correct_query);
+
+    $parsed_query = DB::parse("SELECT DATE_FORMAT(birthday, '%%Y-%%M-%%d %%h:%%i:%%s') AS mydate FROM accounts WHERE id=%i", 5);
+    $correct_query = "SELECT DATE_FORMAT(birthday, '%Y-%M-%d %h:%i:%s') AS mydate FROM accounts WHERE id=5";
+    $this->assert($parsed_query === $correct_query);
   }
 
 

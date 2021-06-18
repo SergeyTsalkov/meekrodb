@@ -104,8 +104,7 @@ class MeekroDB {
   public $affected_rows = 0;
   public $current_db = null;
   public $nested_transactions_count = 0;
-  
-  
+
   public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null, $socket=null)  {
     if ($host === null) $host = DB::$host;
     if ($user === null) $user = DB::$user;
@@ -261,7 +260,7 @@ class MeekroDB {
     return $this->nested_transactions_count;
   }
   
-  protected function formatTableName($table) {
+  function formatTableName($table) {
     $table = trim($table, '`');
     
     if (strpos($table, '.')) return implode('.', array_map(array($this, 'formatTableName'), explode('.', $table)));
@@ -273,12 +272,14 @@ class MeekroDB {
     $table = array_shift($args);
     $params = array_shift($args);
 
-    $update_part = $this->parseQueryParams(
+    $update_part = $this->parse(
       str_replace('%', $this->param_char, "UPDATE %b SET %hc"),
       $table, $params
     );
 
-    $where_part = call_user_func_array(array($this, 'parseQueryParams'), $args);
+    // we don't know if they used named or numbered args, so the where clause
+    // must be run through the parser separately
+    $where_part = call_user_func_array(array($this, 'parse'), $args);
     $query = $update_part . ' WHERE ' . $where_part;
     return $this->query($query);
   }
@@ -353,14 +354,14 @@ class MeekroDB {
     $args = func_get_args();
     $table = $this->formatTableName(array_shift($args));
 
-    $where = call_user_func_array(array($this, 'parseQueryParams'), $args);
+    $where = call_user_func_array(array($this, 'parse'), $args);
     $query = "DELETE FROM {$table} WHERE {$where}";
     return $this->query($query);
   }
   
   public function sqleval() {
     $args = func_get_args();
-    $text = call_user_func_array(array($this, 'parseQueryParams'), $args);
+    $text = call_user_func_array(array($this, 'parse'), $args);
     return new MeekroDBEval($text);
   }
   
@@ -390,107 +391,190 @@ class MeekroDB {
     if (isset($olddb)) $this->useDB($olddb);
     return $result;
   }
-  
-  protected function preparseQueryParams() {
-    $args = func_get_args();
-    $sql = trim(strval(array_shift($args)));
-    $args_all = $args;
-    
-    if (count($args_all) == 0) return array($sql);
-      
-    $param_char_length = strlen($this->param_char);
-    $named_seperator_length = strlen($this->named_param_seperator);
-    
-    $types = array(
-      $this->param_char . 'll', // list of literals
-      $this->param_char . 'ls', // list of strings
-      $this->param_char . 'l',  // literal
-      $this->param_char . 'li', // list of integers
-      $this->param_char . 'ld', // list of decimals
-      $this->param_char . 'lb', // list of backticks
-      $this->param_char . 'lt', // list of timestamps
-      $this->param_char . 's',  // string
-      $this->param_char . 'i',  // integer
-      $this->param_char . 'd',  // double / decimal
-      $this->param_char . 'b',  // backtick
-      $this->param_char . 't',  // timestamp
-      $this->param_char . '?',  // infer type
-      $this->param_char . 'l?',  // list of inferred types
-      $this->param_char . 'll?',  // list of lists of inferred types
-      $this->param_char . 'hc',  // hash `key`='value' pairs separated by commas
-      $this->param_char . 'ha',  // hash `key`='value' pairs separated by and
-      $this->param_char . 'ho',  // hash `key`='value' pairs separated by or
-      $this->param_char . 'ss',  // search string (like string, surrounded with %'s)
-      $this->param_char . 'ssb', // search string (like, begins with)
-      $this->param_char . 'sse', // search string (like, ends with)
+
+  protected function paramsMap() {
+    $t = $this;
+
+    return array(
+      's' => function($arg) use ($t) { return $t->escape($arg); },
+      'i' => function($arg) use ($t) { return $t->intval($arg); },
+      'd' => function($arg) use ($t) { return doubleval($arg); },
+      'b' => function($arg) use ($t) { return $t->formatTableName($arg); },
+      'l' => function($arg) use ($t) { return strval($arg); },
+      't' => function($arg) use ($t) { return $t->escapeTS($arg); },
+      'ss' => function($arg) use ($t) { return $t->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg) . "%"); },
+
+      'ls' => function($arg) use ($t) { return array_map(array($t, 'escape'), $arg); },
+      'li' => function($arg) use ($t) { return array_map(array($t, 'intval'), $arg); },
+      'ld' => function($arg) use ($t) { return array_map('doubleval', $arg); },
+      'lb' => function($arg) use ($t) { return array_map(array($t, 'formatTableName'), $arg); },
+      'll' => function($arg) use ($t) { return array_map('strval', $arg); },
+      'lt' => function($arg) use ($t) { return array_map(array($t, 'escapeTS'), $arg); },
+
+      '?' => function($arg) use ($t) { return $t->sanitize($arg); },
+      'l?' => function($arg) use ($t) { return $t->sanitize($arg, 'list'); },
+      'll?' => function($arg) use ($t) { return $t->sanitize($arg, 'doublelist'); },
+      'hc' => function($arg) use ($t) { return $t->sanitize($arg, 'hash'); },
+      'ha' => function($arg) use ($t) { return $t->sanitize($arg, 'hash', ' AND '); },
+      'ho' => function($arg) use ($t) { return $t->sanitize($arg, 'hash', ' OR '); },
+
+      $this->param_char => function($arg) use ($t) { return $t->param_char; },
     );
-    
-    // generate list of all MeekroDB variables in our query, and their position
-    // in the form "offset => variable", sorted by offsets
-    $posList = array();
-    foreach ($types as $type) {
-      $lastPos = 0;
-      while (($pos = strpos($sql, $type, $lastPos)) !== false) {
-        $lastPos = $pos + 1;
-        if (isset($posList[$pos]) && strlen($posList[$pos]) > strlen($type)) continue;
-        $posList[$pos] = $type;
+  }
+
+  protected function nextQueryParam($query) {
+    $keys = array_keys($this->paramsMap());
+
+    $first_position = PHP_INT_MAX;
+    $first_param = null;
+    $first_type = null;
+    $arg = null;
+    $named_arg = null;
+    foreach ($keys as $key) {
+      $fullkey = $this->param_char . $key;
+      $pos = strpos($query, $fullkey);
+      if ($pos === false) continue;
+
+      if ($pos <= $first_position) {
+        $first_position = $pos;
+        $first_param = $fullkey;
+        $first_type = $key;
       }
     }
+
+    if (is_null($first_param)) return;
+
+    $first_position_end = $first_position + strlen($first_param);
+    $named_seperator_length = strlen($this->named_param_seperator);
+    $arg_mask = '0123456789';
+    $named_arg_mask = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_';
     
-    ksort($posList);
-    
-    // for each MeekroDB variable, substitute it with array(type: i, value: 53) or whatever
-    $chunkyQuery = array(); // preparsed query
-    $pos_adj = 0; // how much we've added or removed from the original sql string
-    foreach ($posList as $pos => $type) {
-      $type = substr($type, $param_char_length); // variable, without % in front of it
-      $length_type = strlen($type) + $param_char_length; // length of variable w/o %
-      
-      $new_pos = $pos + $pos_adj; // position of start of variable
-      $new_pos_back = $new_pos + $length_type; // position of end of variable
-      $arg_number_length = 0; // length of any named or numbered parameter addition
-      
-      // handle numbered parameters
-      if ($arg_number_length = strspn($sql, '0123456789', $new_pos_back)) {
-        $arg_number = substr($sql, $new_pos_back, $arg_number_length);
-        if (! array_key_exists($arg_number, $args_all)) return $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
-        
-        $arg = $args_all[$arg_number];
-        
-      // handle named parameters
-      } else if (substr($sql, $new_pos_back, $named_seperator_length) == $this->named_param_seperator) {
-        $arg_number_length = strspn($sql, 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_', 
-          $new_pos_back + $named_seperator_length) + $named_seperator_length;
-        
-        $arg_number = substr($sql, $new_pos_back + $named_seperator_length, $arg_number_length - $named_seperator_length);
-        if (count($args_all) != 1 || !is_array($args_all[0])) return $this->nonSQLError("If you use named parameters, the second argument must be an array of parameters");
-        if (! array_key_exists($arg_number, $args_all[0])) return $this->nonSQLError("Non existent argument reference (arg $arg_number): $sql");
-        
-        $arg = $args_all[0][$arg_number];
-        
-      } else {
-        $arg_number = 0;
-        $arg = array_shift($args);
+    if ($arg_number_length = strspn($query, $arg_mask, $first_position_end)) {
+      $arg = intval(substr($query, $first_position_end, $arg_number_length));
+      $first_param = substr($query, $first_position, strlen($first_param) + $arg_number_length);
+    }
+    else if (substr($query, $first_position_end, $named_seperator_length) == $this->named_param_seperator) {
+      $named_arg_length = strspn($query, $named_arg_mask, $first_position_end + $named_seperator_length);
+
+      if ($named_arg_length > 0) {
+        $named_arg = substr($query, $first_position_end + $named_seperator_length, $named_arg_length);
+        $first_param = substr($query, $first_position, strlen($first_param) + $named_seperator_length + $named_arg_length);
       }
-      
-      if ($new_pos > 0) $chunkyQuery[] = substr($sql, 0, $new_pos);
-      
-      if (is_object($arg) && ($arg instanceof WhereClause)) {
-        list($clause_sql, $clause_args) = $arg->textAndArgs();
+    }
+
+    return array(
+      'param' => $first_param,
+      'type' => $first_type,
+      'pos' => $first_position,
+      'arg' => $arg,
+      'named_arg' => $named_arg,
+    );
+  }
+
+  function parse($query) {
+    $args = func_get_args();
+    array_shift($args);
+    $query = trim($query);
+
+    if (! $args) return $query;
+
+    $arg_ct = 0;
+    $max_numbered_arg = 0;
+    $use_numbered_args = false;
+    $use_named_args = false;
+    
+    $queryParts = array();
+    while ($Param = $this->nextQueryParam($query)) {
+      if ($Param['pos'] > 0) {
+        $queryParts[] = substr($query, 0, $Param['pos']);
+      }
+
+      if ($Param['type'] != $this->param_char && is_null($Param['arg']) && is_null($Param['named_arg'])) {
+        $Param['arg'] = $arg_ct++;
+      }
+
+      if (! is_null($Param['arg'])) {
+        $use_numbered_args = true;
+        $max_numbered_arg = max($max_numbered_arg, $Param['arg']);
+      }
+      if (! is_null($Param['named_arg'])) {
+        $use_named_args = true;
+      }
+
+      $queryParts[] = $Param;
+      $query = substr($query, $Param['pos'] + strlen($Param['param']));
+    }
+
+    if (strlen($query) > 0) {
+      $queryParts[] = $query;
+    }
+
+    if ($use_named_args && $use_numbered_args) {
+      return $this->nonSQLError("You can't mix named and numbered args!");
+    }
+
+    if ($use_named_args && count($args) != 1) {
+      return $this->nonSQLError("If you use named args, you must pass an assoc array of args!");
+    }
+
+    if ($use_numbered_args && $max_numbered_arg+1 > count($args)) {
+      return $this->nonSQLError(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
+    }
+
+    $array_types = array('ls', 'li', 'ld', 'lb', 'll', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
+    $Map = $this->paramsMap();
+    $query = '';
+    foreach ($queryParts as $Part) {
+      if (is_string($Part)) {
+        $query .= $Part;
+        continue;
+      }
+
+      $fn = $Map[$Part['type']];
+      $is_array_type = in_array($Part['type'], $array_types, true);
+
+      $val = null;
+      if ($use_named_args && !is_null($Part['named_arg'])) {
+        $key = $Part['named_arg'];
+        if (! array_key_exists($key, $args[0])) {
+          return $this->nonSQLError("Couldn't find named arg {$key}!");
+        }
+
+        $val = $args[0][$key];
+      }
+      else if ($use_numbered_args && !is_null($Part['arg'])) {
+        $key = $Part['arg'];
+        $val = $args[$key];
+      }
+
+      if ($is_array_type && !is_array($val)) {
+        return $this->nonSQLError("Expected an array for arg $key but didn't get one!");
+      }
+      if ($is_array_type && count($val) == 0) {
+        return $this->nonSQLError("Arg {$key} array can't be empty!");
+      }
+      if (!$is_array_type && is_array($val)) {
+        $val = '';
+      }
+
+      if (is_object($val) && ($val instanceof WhereClause)) {
+        if ($Part['type'] != 'l') {
+          return $this->nonSQLError("WhereClause must be used with l arg, you used {$Part['type']} instead!");
+        }
+
+        list($clause_sql, $clause_args) = $val->textAndArgs();
         array_unshift($clause_args, $clause_sql); 
-        $preparsed_sql = call_user_func_array(array($this, 'preparseQueryParams'), $clause_args);
-        $chunkyQuery = array_merge($chunkyQuery, $preparsed_sql);  
-      } else {
-        $chunkyQuery[] = array('type' => $type, 'value' => $arg);
+        $result = call_user_func_array(array($this, 'parse'), $clause_args);
+      }
+      else {
+        $result = $fn($val);
+        if (is_array($result)) $result = '(' . implode(',', $result) . ')';
       }
       
-      $sql = substr($sql, $new_pos_back + $arg_number_length);
-      $pos_adj -= $new_pos_back + $arg_number_length;
+      $query .= $result;
     }
-    
-    if (strlen($sql) > 0) $chunkyQuery[] = $sql;
-    
-    return $chunkyQuery;
+
+    return $query;
   }
   
   public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
@@ -544,70 +628,21 @@ class MeekroDB {
     }
     
   }
-  
-  protected function parseTS($ts) {
-    if (is_string($ts)) return date('Y-m-d H:i:s', strtotime($ts));
-    else if (is_object($ts) && ($ts instanceof DateTime)) return $ts->format('Y-m-d H:i:s');
+
+  function escapeTS($ts) {
+    if (is_string($ts)) {
+      $str = date('Y-m-d H:i:s', strtotime($ts));
+    }
+    else if (is_object($ts) && ($ts instanceof DateTime)) {
+      $str = $ts->format('Y-m-d H:i:s');
+    }
+
+    return $this->escape($str);
   }
   
-  protected function intval($var) {
+  function intval($var) {
     if (PHP_INT_SIZE == 8) return intval($var);
     return floor(doubleval($var));
-  }
-  
-  public function parseQueryParams() {
-    $args = func_get_args();
-    $chunkyQuery = call_user_func_array(array($this, 'preparseQueryParams'), $args);
-    
-    $query = '';
-    $array_types = array('ls', 'li', 'ld', 'lb', 'll', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
-    
-    foreach ($chunkyQuery as $chunk) {
-      if (is_string($chunk)) {
-        $query .= $chunk;
-        continue;
-      }
-      
-      $type = $chunk['type'];
-      $arg = $chunk['value'];
-      $result = '';
-      
-      $is_array_type = in_array($type, $array_types, true);
-      if ($is_array_type && !is_array($arg)) return $this->nonSQLError("Badly formatted SQL query: Expected array, got scalar instead!");
-      else if (!$is_array_type && is_array($arg)) $arg = '';
-      
-      if ($type == 's') $result = $this->escape($arg);
-      else if ($type == 'i') $result = $this->intval($arg);
-      else if ($type == 'd') $result = doubleval($arg);
-      else if ($type == 'b') $result = $this->formatTableName($arg);
-      else if ($type == 'l') $result = $arg;
-      else if ($type == 'ss') $result = $this->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg) . "%");
-      else if ($type == 'ssb') $result = $this->escape(str_replace(array('%', '_'), array('\%', '\_'), $arg) . "%");
-      else if ($type == 'sse') $result = $this->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg));
-      else if ($type == 't') $result = $this->escape($this->parseTS($arg)); 
-      
-      else if ($type == 'ls') $result = array_map(array($this, 'escape'), $arg);
-      else if ($type == 'li') $result = array_map(array($this, 'intval'), $arg);
-      else if ($type == 'ld') $result = array_map('doubleval', $arg);
-      else if ($type == 'lb') $result = array_map(array($this, 'formatTableName'), $arg);
-      else if ($type == 'll') $result = $arg;
-      else if ($type == 'lt') $result = array_map(array($this, 'escape'), array_map(array($this, 'parseTS'), $arg));
-      
-      else if ($type == '?') $result = $this->sanitize($arg);
-      else if ($type == 'l?') $result = $this->sanitize($arg, 'list');
-      else if ($type == 'll?') $result = $this->sanitize($arg, 'doublelist');
-      else if ($type == 'hc') $result = $this->sanitize($arg, 'hash');
-      else if ($type == 'ha') $result = $this->sanitize($arg, 'hash', ' AND ');
-      else if ($type == 'ho') $result = $this->sanitize($arg, 'hash', ' OR ');
-      
-      else return $this->nonSQLError("Badly formatted SQL query: Invalid MeekroDB param $type");
-      
-      if (is_array($result)) $result = '(' . implode(',', $result) . ')';
-      
-      $query .= $result;
-    }
-      
-    return $query;
   }
   
   protected function prependCall($function, $args, $prepend) { array_unshift($args, $prepend); return call_user_func_array($function, $args); }
@@ -648,7 +683,7 @@ class MeekroDB {
         return $this->nonSQLError('Error -- invalid argument to queryHelper!');
     }
 
-    $sql = call_user_func_array(array($this, 'parseQueryParams'), $args);
+    $sql = call_user_func_array(array($this, 'parse'), $args);
 
     if ($this->pre_sql_handler !== false && is_callable($this->pre_sql_handler)) {
       $sql = call_user_func($this->pre_sql_handler, $sql);
@@ -721,11 +756,6 @@ class MeekroDB {
     }
     
     return $return;
-  }
-
-  public function parse() {
-    $args = func_get_args();
-    return call_user_func_array(array($this, 'parseQueryParams'), $args);
   }
 
   public function queryFirstRow() {
@@ -835,10 +865,6 @@ class WhereClause {
     if ($this->negate) $sql = '(NOT ' . $sql . ')';
     return array($sql, $args);
   }
-  
-  // backwards compatability
-  // we now return full WhereClause object here and evaluate it in preparseQueryParams
-  function text() { return $this; }
 }
 
 class DBTransaction {
