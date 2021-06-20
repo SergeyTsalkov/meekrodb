@@ -28,10 +28,6 @@ class BasicTest extends SimpleTest {
     `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
     `name` VARCHAR( 255 ) NULL DEFAULT 'blah'
     ) ENGINE = InnoDB");
-    
-    $mysqli = DB::get();
-    DB::disconnect();
-    @$this->assert(!$mysqli->server_info);
   }
   
   function test_1_5_empty_table() {
