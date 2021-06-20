@@ -471,13 +471,7 @@ class MeekroDB {
     );
   }
 
-  function parse($query) {
-    $args = func_get_args();
-    array_shift($args);
-    $query = trim($query);
-
-    if (! $args) return $query;
-
+  protected function preParse($query, $args) {
     $arg_ct = 0;
     $max_numbered_arg = 0;
     $use_numbered_args = false;
@@ -521,6 +515,17 @@ class MeekroDB {
       return $this->nonSQLError(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
     }
 
+    return $queryParts;
+  }
+
+  function parse($query) {
+    $args = func_get_args();
+    array_shift($args);
+    $query = trim($query);
+
+    if (! $args) return $query;
+    $queryParts = $this->preParse($query, $args);
+
     $array_types = array('ls', 'li', 'ld', 'lb', 'll', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
     $Map = $this->paramsMap();
     $query = '';
@@ -534,7 +539,7 @@ class MeekroDB {
       $is_array_type = in_array($Part['type'], $array_types, true);
 
       $val = null;
-      if ($use_named_args && !is_null($Part['named_arg'])) {
+      if (!is_null($Part['named_arg'])) {
         $key = $Part['named_arg'];
         if (! array_key_exists($key, $args[0])) {
           return $this->nonSQLError("Couldn't find named arg {$key}!");
@@ -542,7 +547,7 @@ class MeekroDB {
 
         $val = $args[0][$key];
       }
-      else if ($use_numbered_args && !is_null($Part['arg'])) {
+      else if (!is_null($Part['arg'])) {
         $key = $Part['arg'];
         $val = $args[$key];
       }
