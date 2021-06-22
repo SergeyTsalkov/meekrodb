@@ -30,19 +30,13 @@ class DB {
   // configure workings
   public static $param_char = '%';
   public static $named_param_seperator = '_';
-  public static $success_handler = false;
-  public static $error_handler = true;
-  public static $throw_exception_on_error = false;
-  public static $nonsql_error_handler = null;
-  public static $pre_sql_handler = false;
-  public static $throw_exception_on_nonsql_error = false;
   public static $nested_transactions = false;
   public static $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   public static $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'success_handler', 'error_handler', 'throw_exception_on_error', 'nonsql_error_handler', 'pre_sql_handler', 'throw_exception_on_nonsql_error', 'nested_transactions', 'ssl', 'connect_options');
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'ssl', 'connect_options');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -65,11 +59,6 @@ class DB {
 
     return call_user_func_array($fn, $args);
   }
-  
-  public static function debugMode($handler = true) { 
-    DB::$success_handler = $handler;
-  }
-  
 }
 
 
@@ -86,12 +75,6 @@ class MeekroDB {
   // configure workings
   public $param_char = '%';
   public $named_param_seperator = '_';
-  public $success_handler = false;
-  public $error_handler = true;
-  public $throw_exception_on_error = false;
-  public $nonsql_error_handler = null;
-  public $pre_sql_handler = false;
-  public $throw_exception_on_nonsql_error = false;
   public $nested_transactions = false;
   public $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   public $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
@@ -104,6 +87,14 @@ class MeekroDB {
   public $affected_rows = 0;
   public $current_db = null;
   public $nested_transactions_count = 0;
+
+  protected $hooks = array(
+    'pre_parse' => array(),
+    'pre_run' => array(),
+    'post_run' => array(),
+    'run_success' => array(),
+    'run_failed' => array(),
+  );
 
   public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null, $socket=null)  {
     if ($host === null) $host = DB::$host;
@@ -155,7 +146,7 @@ class MeekroDB {
       @$mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port, $this->socket, $connect_flags);
       
       if ($mysql->connect_error) {
-        return $this->nonSQLError('Unable to connect to MySQL server! Error: ' . $mysql->connect_error);
+        throw new MeekroDBException("Unable to connect to MySQL server! Error: {$mysql->connect_error}");
       }
       
       $mysql->set_charset($this->encoding);
@@ -174,23 +165,130 @@ class MeekroDB {
     }
     $this->internal_mysql = null; 
   }
-  
-  public function nonSQLError($message) {
-    if ($this->throw_exception_on_nonsql_error) {
-      $e = new MeekroDBException($message);
-      throw $e;
+
+  function addHook($type, $fn) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
     }
-    
-    $error_handler = is_callable($this->nonsql_error_handler) ? $this->nonsql_error_handler : 'meekrodb_error_handler';
-        
-    call_user_func($error_handler, array(
-      'type' => 'nonsql',
-      'error' => $message
-    ));
+
+    if (! is_callable($fn)) {
+      throw new MeekroDBException("Second arg to addHook() must be callable");
+    }
+
+    $this->hooks[$type][] = $fn;
+    end($this->hooks[$type]);
+    return key($this->hooks[$type]);
+  }
+
+  function removeHook($type, $index) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    if (! array_key_exists($index, $this->hooks[$type])) {
+      throw new MeekroDBException("That hook does not exist");
+    }
+
+    unset($this->hooks[$type][$index]);
+  }
+
+  function removeHooks($type) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    $this->hooks[$type] = array();
+  }
+
+  function runHook($type, $args=array()) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    if ($type == 'pre_parse') {
+      $query = $args['query'];
+      $args = $args['args'];
+
+      foreach ($this->hooks[$type] as $hook) {
+        $result = call_user_func($hook, array('query' => $query, 'args' => $args));
+        if ($result) {
+          if (!is_array($result) || count($result) != 2) {
+            throw new MeekroDBException("pre_parse hook must return an array of 2 items");
+          }
+          if (!is_string($result[0])) {
+            throw new MeekroDBException("pre_parse hook must return a string as its first item");
+          }
+          if (!is_array($result[1])) {
+            throw new MeekroDBException("pre_parse hook must return an array as its second item");
+          }
+        }
+
+        $query = $result[0];
+        $args = $result[1];
+      }
+
+      return array($query, $args);
+    }
+    else if ($type == 'pre_run') {
+      $query = $args['query'];
+
+      foreach ($this->hooks[$type] as $hook) {
+        $result = call_user_func($hook, array('query' => $query));
+        if (!is_string($result)) {
+          throw new MeekroDBException("pre_run hook must return a string");
+        }
+
+        $query = $result;
+      }
+
+      return $query;
+    }
+    else if ($type == 'post_run') {
+
+      foreach ($this->hooks[$type] as $hook) {
+        call_user_func($hook, $args);
+      }
+    }
+    else if ($type == 'run_success') {
+      
+      foreach ($this->hooks[$type] as $hook) {
+        call_user_func($hook, $args);
+      }
+    }
+    else if ($type == 'run_failed') {
+      
+      foreach ($this->hooks[$type] as $hook) {
+        $result = call_user_func($hook, $args);
+        if ($result === false) return false;
+      }
+    }
+    else {
+      throw new MeekroDBException("runHook() type $type not recognized");
+    }
   }
   
-  public function debugMode($handler = true) {
-    $this->success_handler = $handler;
+  function debugMode($enable = true) {
+    $fn = function($args) {
+      $results[] = sprintf('QUERY: %s [%s ms]', $args['query'], $args['runtime']);
+
+      if (isset($args['error'])) {
+        $results[] = 'ERROR: ' . $args['error'];
+      }
+
+      if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
+        echo implode("\n", $results) . "\n";
+      } else {
+        echo implode("<br>\n", $results) . "<br>\n";
+      }
+    };
+    
+    if ($enable && !isset($this->debug_mode_hook)) {
+      $this->debug_mode_hook = $this->addHook('post_run', $fn);
+    }
+    else if (!$enable && isset($this->debug_mode_hook)) {
+      $this->removeHook('post_run', $this->debug_mode_hook);
+      unset($this->debug_mode_hook);
+    }
   }
   
   public function serverVersion() { $this->get(); return $this->server_info; }
@@ -203,14 +301,14 @@ class MeekroDB {
   public function useDB() { $args = func_get_args(); return call_user_func_array(array($this, 'setDB'), $args); }
   public function setDB($dbName) {
     $db = $this->get();
-    if (! $db->select_db($dbName)) return $this->nonSQLError("Unable to set database to $dbName");
+    if (! $db->select_db($dbName)) throw new MeekroDBException("Unable to set database to $dbName");
     $this->current_db = $dbName;
   }
   
   
   public function startTransaction() {
     if ($this->nested_transactions && $this->serverVersion() < '5.5') {
-      return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
+      throw new MeekroDBException("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
     }
     
     if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
@@ -226,7 +324,7 @@ class MeekroDB {
   
   public function commit($all=false) {
     if ($this->nested_transactions && $this->serverVersion() < '5.5') {
-      return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
+      throw new MeekroDBException("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
     }
     
     if ($this->nested_transactions && $this->nested_transactions_count > 0)
@@ -244,7 +342,7 @@ class MeekroDB {
   
   public function rollback($all=false) {
     if ($this->nested_transactions && $this->serverVersion() < '5.5') {
-      return $this->nonSQLError("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
+      throw new MeekroDBException("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
     }
     
     if ($this->nested_transactions && $this->nested_transactions_count > 0)
@@ -303,7 +401,7 @@ class MeekroDB {
     }
 
     if ($which != 'INSERT' && $which != 'INSERT IGNORE' && $which != 'REPLACE') {
-      return $this->nonSQLError('insertOrReplace() must be called with one of: INSERT, INSERT IGNORE, REPLACE');
+      throw new MeekroDBException('insertOrReplace() must be called with one of: INSERT, INSERT IGNORE, REPLACE');
     }
     
     if (isset($options['update']) && is_array($options['update']) && $options['update'] && $which == 'INSERT') {
@@ -338,7 +436,7 @@ class MeekroDB {
     
     if (! isset($args[0])) { // update will have all the data of the insert
       if (isset($data[0]) && is_array($data[0])) { //multiple insert rows specified -- failing!
-        return $this->nonSQLError("Badly formatted insertUpdate() query -- you didn't specify the update component!");
+        throw new MeekroDBException("Badly formatted insertUpdate() query -- you didn't specify the update component!");
       }
       
       $args[0] = $data;
@@ -504,15 +602,15 @@ class MeekroDB {
     }
 
     if ($use_named_args && $use_numbered_args) {
-      return $this->nonSQLError("You can't mix named and numbered args!");
+      throw new MeekroDBException("You can't mix named and numbered args!");
     }
 
     if ($use_named_args && count($args) != 1) {
-      return $this->nonSQLError("If you use named args, you must pass an assoc array of args!");
+      throw new MeekroDBException("If you use named args, you must pass an assoc array of args!");
     }
 
     if ($use_numbered_args && $max_numbered_arg+1 > count($args)) {
-      return $this->nonSQLError(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
+      throw new MeekroDBException(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
     }
 
     return $queryParts;
@@ -542,7 +640,7 @@ class MeekroDB {
       if (!is_null($Part['named_arg'])) {
         $key = $Part['named_arg'];
         if (! array_key_exists($key, $args[0])) {
-          return $this->nonSQLError("Couldn't find named arg {$key}!");
+          throw new MeekroDBException("Couldn't find named arg {$key}!");
         }
 
         $val = $args[0][$key];
@@ -553,10 +651,10 @@ class MeekroDB {
       }
 
       if ($is_array_type && !is_array($val)) {
-        return $this->nonSQLError("Expected an array for arg $key but didn't get one!");
+        throw new MeekroDBException("Expected an array for arg $key but didn't get one!");
       }
       if ($is_array_type && count($val) == 0) {
-        return $this->nonSQLError("Arg {$key} array can't be empty!");
+        throw new MeekroDBException("Arg {$key} array can't be empty!");
       }
       if (!$is_array_type && is_array($val)) {
         $val = '';
@@ -564,7 +662,7 @@ class MeekroDB {
 
       if (is_object($val) && ($val instanceof WhereClause)) {
         if ($Part['type'] != 'l') {
-          return $this->nonSQLError("WhereClause must be used with l arg, you used {$Part['type']} instead!");
+          throw new MeekroDBException("WhereClause must be used with l arg, you used {$Part['type']} instead!");
         }
 
         list($clause_sql, $clause_args) = $val->textAndArgs();
@@ -604,7 +702,7 @@ class MeekroDB {
         $value = array_values($value);
         return '(' . implode(', ', array_map(array($this, 'sanitize'), $value)) . ')';
       } else {
-        return $this->nonSQLError("Expected array parameter, got something different!");
+        throw new MeekroDBException("Expected array parameter, got something different!");
       }
     } else if ($type == 'doublelist') {
       if (is_array($value) && array_values($value) === $value && is_array($value[0])) {
@@ -615,7 +713,7 @@ class MeekroDB {
         return implode(', ', $cleanvalues);
 
       } else {
-        return $this->nonSQLError("Expected double array parameter, got something different!");
+        throw new MeekroDBException("Expected double array parameter, got something different!");
       }
     } else if ($type == 'hash') {
       if (is_array($value)) {
@@ -626,10 +724,10 @@ class MeekroDB {
         
         return implode($hashjoin, $pairs);
       } else {
-        return $this->nonSQLError("Expected hash (associative array) parameter, got something different!");
+        throw new MeekroDBException("Expected hash (associative array) parameter, got something different!");
       }
     } else {
-      return $this->nonSQLError("Invalid type passed to sanitize()!");
+      throw new MeekroDBException("Invalid type passed to sanitize()!");
     }
     
   }
@@ -661,6 +759,7 @@ class MeekroDB {
   protected function queryHelper() {
     $args = func_get_args();
     $type = array_shift($args);
+    $query = array_shift($args);
     $db = $this->get();
 
     $is_buffered = true;
@@ -685,49 +784,17 @@ class MeekroDB {
         $row_type = 'raw';
         break;
       default:
-        return $this->nonSQLError('Error -- invalid argument to queryHelper!');
+        throw new MeekroDBException('Invalid argument to queryHelper!');
     }
 
-    $sql = call_user_func_array(array($this, 'parse'), $args);
-
-    if ($this->pre_sql_handler !== false && is_callable($this->pre_sql_handler)) {
-      $sql = call_user_func($this->pre_sql_handler, $sql);
-    }
+    list($query, $args) = $this->runHook('pre_parse', array('query' => $query, 'args' => $args));    
+    $sql = call_user_func_array(array($this, 'parse'), array_merge(array($query), $args));
+    $sql = $this->runHook('pre_run', array('query' => $sql));
     
-    if ($this->success_handler) $starttime = microtime(true);
+    $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
-    if ($this->success_handler) $runtime = microtime(true) - $starttime;
-    else $runtime = 0;
-
-    // ----- BEGIN ERROR HANDLING
-    if (!$sql || $db->error) {
-      if ($this->error_handler) {
-        $error_handler = is_callable($this->error_handler) ? $this->error_handler : 'meekrodb_error_handler';
-        
-        call_user_func($error_handler, array(
-          'type' => 'sql',
-          'query' => $sql,
-          'error' => $db->error,
-          'code' => $db->errno
-        ));
-      }
-      
-      if ($this->throw_exception_on_error) {
-        $e = new MeekroDBException($db->error, $sql, $db->errno);
-        throw $e;
-      }
-    } else if ($this->success_handler) {
-      $runtime = sprintf('%f', $runtime * 1000);
-      $success_handler = is_callable($this->success_handler) ? $this->success_handler : 'meekrodb_debugmode_handler';
-      
-      call_user_func($success_handler, array(
-        'query' => $sql,
-        'runtime' => $runtime,
-        'affected' => $db->affected_rows
-      )); 
-    }
-
-    // ----- END ERROR HANDLING
+    $runtime = microtime(true) - $starttime;
+    $runtime = sprintf('%f', $runtime * 1000);
 
     $this->insert_id = $db->insert_id;
     $this->affected_rows = $db->affected_rows;
@@ -735,6 +802,37 @@ class MeekroDB {
     // mysqli_result->num_rows won't initially show correct results for unbuffered data
     if ($is_buffered && ($result instanceof MySQLi_Result)) $this->num_rows = $result->num_rows;
     else $this->num_rows = null;
+
+    $Exception = null;
+    if (!$sql || $db->error) {
+      $Exception = new MeekroDBException($db->error, $sql, $db->errno);
+    }
+
+    $this->runHook('post_run', array(
+      'query' => $sql,
+      'runtime' => $runtime,
+      'affected' => $db->affected_rows,
+      'exception' => $Exception,
+      'error' => $Exception ? $Exception->getMessage() : null,
+    ));
+
+    if ($Exception) {
+      $result = $this->runHook('run_failed', array(
+        'query' => $sql,
+        'runtime' => $runtime,
+        'exception' => $Exception,
+        'error' => $Exception->getMessage(),
+      ));
+
+      if ($result !== false) throw $Exception;
+    }
+    else {
+      $this->runHook('run_success', array(
+        'query' => $sql,
+        'runtime' => $runtime,
+        'affected' => $db->affected_rows,
+      ));
+    }
 
     if ($row_type == 'raw' || !($result instanceof MySQLi_Result)) return $result;
 
@@ -797,6 +895,8 @@ class MeekroDB {
     if ($row == null) return null;    
     return $row[0];
   }
+
+
 }
 
 class WhereClause {
@@ -806,7 +906,7 @@ class WhereClause {
   
   function __construct($type) {
     $type = strtolower($type);
-    if ($type !== 'or' && $type !== 'and') return DB::nonSQLError('you must use either WhereClause(and) or WhereClause(or)');
+    if ($type !== 'or' && $type !== 'and') throw new MeekroDBException('you must use either WhereClause(and) or WhereClause(or)');
     $this->type = $type;
   }
   
@@ -895,7 +995,7 @@ class MeekroDBException extends Exception {
   function __construct($message='', $query='', $code = 0) {
     parent::__construct($message);
     $this->query = $query;
-	$this->code = $code;
+    $this->code = $code;
   }
   
   public function getQuery() { return $this->query; }
@@ -948,29 +1048,6 @@ class DBHelper {
       $target = $obj;
     }
     return $R;
-  }
-}
-
-function meekrodb_error_handler($params) {
-  if (isset($params['query'])) $out[] = "QUERY: " . $params['query'];
-  if (isset($params['error'])) $out[] = "ERROR: " . $params['error'];
-  $out[] = "";
-  
-  if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
-    echo implode("\n", $out);
-  } else {
-    echo implode("<br>\n", $out);
-  }
-  
-  die;
-}
-
-function meekrodb_debugmode_handler($params) {
-  echo "QUERY: " . $params['query'] . " [" . $params['runtime'] . " ms]";
-  if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
-    echo "\n";
-  } else {
-    echo "<br>\n";
   }
 }
 

@@ -35,7 +35,6 @@ require_once __DIR__ . '/CallTest.php';
 require_once __DIR__ . '/ObjectTest.php';
 require_once __DIR__ . '/WhereClauseTest.php';
 require_once __DIR__ . '/ErrorTest.php';
-require_once __DIR__ . '/ErrorTest_53.php';
 require_once __DIR__ . '/TransactionTest.php';
 require_once __DIR__ . '/HelperTest.php';
 
@@ -45,7 +44,6 @@ $classes_to_test = array(
   'WhereClauseTest',
   'ObjectTest',
   'ErrorTest',
-  'ErrorTest_53',
   'TransactionTest',
   'HelperTest',
 );
