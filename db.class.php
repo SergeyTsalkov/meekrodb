@@ -33,10 +33,11 @@ class DB {
   public static $nested_transactions = false;
   public static $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   public static $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
+  public static $logfile;
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'ssl', 'connect_options');
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'ssl', 'connect_options', 'logfile');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -59,6 +60,11 @@ class DB {
 
     return call_user_func_array($fn, $args);
   }
+
+  static function debugMode($enable=true) {
+    if ($enable) self::$logfile = STDOUT;
+    else self::$logfile = null;
+  }
 }
 
 
@@ -78,6 +84,7 @@ class MeekroDB {
   public $nested_transactions = false;
   public $ssl = array('key' => '', 'cert' => '', 'ca_cert' => '', 'ca_path' => '', 'cipher' => '');
   public $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
+  public $logfile;
   
   // internal
   public $internal_mysql = null;
@@ -266,29 +273,44 @@ class MeekroDB {
       throw new MeekroDBException("runHook() type $type not recognized");
     }
   }
+
+  protected function defaultRunHook($args) {
+    if (! $this->logfile) return;
+
+    $query = $args['query'];
+    $query = preg_replace('/\s+/', ' ', $query);
+    $query = preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', $query);
+
+    $results[] = sprintf('QUERY: %s', $query);
+    $results[] = sprintf('RUNTIME: %s ms', $args['runtime']);
+
+    if (isset($args['affected']) && $args['affected']) {
+      $results[] = sprintf('AFFECTED ROWS: %s', $args['affected']);
+    }
+    if (isset($args['rows']) && $args['rows']) {
+      $results[] = sprintf('RETURNED ROWS: %s', $args['rows']);
+    }
+    if (isset($args['error'])) {
+      $results[] = 'ERROR: ' . $args['error'];
+    }
+
+    $is_console = (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR']));
+    if (!$is_console && $this->logfile === STDOUT) {
+      $results = implode("<br>\n", $results) . "<br>\n";
+    } else {
+      $results = implode("\n", $results) . "\n\n";
+    }
+
+    if (is_resource($this->logfile)) {
+      fwrite($this->logfile, $results);
+    } else {
+      file_put_contents($this->logfile, $results, FILE_APPEND);
+    }
+  }
   
-  function debugMode($enable = true) {
-    $fn = function($args) {
-      $results[] = sprintf('QUERY: %s [%s ms]', $args['query'], $args['runtime']);
-
-      if (isset($args['error'])) {
-        $results[] = 'ERROR: ' . $args['error'];
-      }
-
-      if (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR'])) {
-        echo implode("\n", $results) . "\n";
-      } else {
-        echo implode("<br>\n", $results) . "<br>\n";
-      }
-    };
-    
-    if ($enable && !isset($this->debug_mode_hook)) {
-      $this->debug_mode_hook = $this->addHook('post_run', $fn);
-    }
-    else if (!$enable && isset($this->debug_mode_hook)) {
-      $this->removeHook('post_run', $this->debug_mode_hook);
-      unset($this->debug_mode_hook);
-    }
+  function debugMode($enable=true) {
+    if ($enable) $this->logfile = STDOUT;
+    else $this->logfile = null;
   }
   
   public function serverVersion() { $this->get(); return $this->server_info; }
@@ -808,30 +830,24 @@ class MeekroDB {
       $Exception = new MeekroDBException($db->error, $sql, $db->errno);
     }
 
-    $this->runHook('post_run', array(
-      'query' => $sql,
-      'runtime' => $runtime,
-      'affected' => $db->affected_rows,
-      'exception' => $Exception,
-      'error' => $Exception ? $Exception->getMessage() : null,
-    ));
-
+    $hookHash = array('query' => $sql, 'runtime' => $runtime);
     if ($Exception) {
-      $result = $this->runHook('run_failed', array(
-        'query' => $sql,
-        'runtime' => $runtime,
-        'exception' => $Exception,
-        'error' => $Exception->getMessage(),
-      ));
+      $hookHash['exception'] = $Exception;
+      $hookHash['error'] = $Exception->getMessage();
+    } else if ($this->num_rows) {
+      $hookHash['rows'] = $this->num_rows;
+    } else {
+      $hookHash['affected'] = $db->affected_rows;
+    }
 
+    $this->defaultRunHook($hookHash);
+    $this->runHook('post_run', $hookHash);
+    if ($Exception) {
+      $result = $this->runHook('run_failed', $hookHash);
       if ($result !== false) throw $Exception;
     }
     else {
-      $this->runHook('run_success', array(
-        'query' => $sql,
-        'runtime' => $runtime,
-        'affected' => $db->affected_rows,
-      ));
+      $this->runHook('run_success', $hookHash);
     }
 
     if ($row_type == 'raw' || !($result instanceof MySQLi_Result)) return $result;
@@ -896,7 +912,7 @@ class MeekroDB {
     $row = call_user_func_array(array($this, 'queryFirstList'), $args);
     if ($row == null) return null;    
     return $row[0];
-  }  
+  }
 
   // --- begin deprecated methods (kept for backwards compatability)
   public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
