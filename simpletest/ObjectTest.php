@@ -32,7 +32,13 @@ class ObjectTest extends SimpleTest {
     $field = $this->mdb->queryFirstField("SELECT * FROM accounts");
     $this->assert($field === null);
     
+    $field = $this->mdb->queryOneField('nothere', "SELECT * FROM accounts");
+    $this->assert($field === null);
+    
     $column = $this->mdb->queryFirstColumn("SELECT * FROM accounts");
+    $this->assert(is_array($column) && count($column) === 0);
+    
+    $column = $this->mdb->queryOneColumn('nothere', "SELECT * FROM accounts"); //TODO: is this what we want?
     $this->assert(is_array($column) && count($column) === 0);
   }
   
@@ -82,12 +88,16 @@ class ObjectTest extends SimpleTest {
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
     $this->assert($charlie_password === 'goodbye');
     
+    $charlie_password = $this->mdb->queryOneField('password', "SELECT * FROM accounts WHERE username IN %ls AND username = %s", 
+      array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
+    $this->assert($charlie_password === 'goodbye');
+    
     $passwords = $this->mdb->queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Bart');
     $this->assert(count($passwords) === 1);
     $this->assert($passwords[0] === 'hello');
     
     $username = $password = $age = null;
-    list($age, $username, $password) = $this->mdb->queryFirstList("SELECT age,username,password FROM accounts WHERE username=%s", 'Bart');
+    list($age, $username, $password) = $this->mdb->queryOneList("SELECT age,username,password FROM accounts WHERE username=%s", 'Bart');
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
@@ -132,7 +142,7 @@ class ObjectTest extends SimpleTest {
       'height' => 111.15
     ));
     
-    $row = $this->mdb->queryFirstRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
+    $row = $this->mdb->queryOneRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
     $this->assert($row['username'] === 'newguy');
     $this->assert($row['age'] === '172');
     
@@ -142,7 +152,7 @@ class ObjectTest extends SimpleTest {
       ), 'username=%s', 'newguy');
     
     $row = null;
-    $row = $this->mdb->queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
+    $row = $this->mdb->queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
     $this->assert($row['password'] === 'blahblahblahblah');
     $this->assert($row['favorite_word'] === null);
     
