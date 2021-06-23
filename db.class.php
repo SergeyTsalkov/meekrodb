@@ -61,8 +61,9 @@ class DB {
     return call_user_func_array($fn, $args);
   }
 
+  // --- begin deprecated methods (kept for backwards compatability)
   static function debugMode($enable=true) {
-    if ($enable) self::$logfile = STDOUT;
+    if ($enable) self::$logfile = fopen('php://output', 'w');
     else self::$logfile = null;
   }
 }
@@ -281,6 +282,7 @@ class MeekroDB {
     $query = preg_replace('/\s+/', ' ', $query);
     $query = preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', $query);
 
+    $results[] = sprintf('[%s]', date('Y-m-d H:i:s'));
     $results[] = sprintf('QUERY: %s', $query);
     $results[] = sprintf('RUNTIME: %s ms', $args['runtime']);
 
@@ -293,24 +295,14 @@ class MeekroDB {
     if (isset($args['error'])) {
       $results[] = 'ERROR: ' . $args['error'];
     }
-
-    $is_console = (php_sapi_name() == 'cli' && empty($_SERVER['REMOTE_ADDR']));
-    if (!$is_console && $this->logfile === STDOUT) {
-      $results = implode("<br>\n", $results) . "<br>\n";
-    } else {
-      $results = implode("\n", $results) . "\n\n";
-    }
+    
+    $results = implode("\n", $results) . "\n\n";
 
     if (is_resource($this->logfile)) {
       fwrite($this->logfile, $results);
     } else {
       file_put_contents($this->logfile, $results, FILE_APPEND);
     }
-  }
-  
-  function debugMode($enable=true) {
-    if ($enable) $this->logfile = STDOUT;
-    else $this->logfile = null;
   }
   
   public function serverVersion() { $this->get(); return $this->server_info; }
@@ -915,6 +907,11 @@ class MeekroDB {
   }
 
   // --- begin deprecated methods (kept for backwards compatability)
+  public function debugMode($enable=true) {
+    if ($enable) $this->logfile = fopen('php://output', 'w');
+    else $this->logfile = null;
+  }
+
   public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
   public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
 
