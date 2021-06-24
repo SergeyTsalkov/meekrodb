@@ -95,6 +95,7 @@ class MeekroDB {
   public $affected_rows = 0;
   public $current_db = null;
   public $nested_transactions_count = 0;
+  public $last_query;
 
   protected $hooks = array(
     'pre_parse' => array(),
@@ -309,10 +310,11 @@ class MeekroDB {
   public function transactionDepth() { return $this->nested_transactions_count; }
   public function insertId() { return $this->insert_id; }
   public function affectedRows() { return $this->affected_rows; }
-  public function count() { $args = func_get_args(); return call_user_func_array(array($this, 'numRows'), $args); }
+  public function count() { return call_user_func_array(array($this, 'numRows'), func_get_args()); }
   public function numRows() { return $this->num_rows; }
+  public function lastQuery() { return $this->last_query; }
   
-  public function useDB() { $args = func_get_args(); return call_user_func_array(array($this, 'setDB'), $args); }
+  public function useDB() { return call_user_func_array(array($this, 'setDB'), func_get_args()); }
   public function setDB($dbName) {
     $db = $this->get();
     if (! $db->select_db($dbName)) throw new MeekroDBException("Unable to set database to $dbName");
@@ -763,48 +765,26 @@ class MeekroDB {
   }
   
   protected function prependCall($function, $args, $prepend) { array_unshift($args, $prepend); return call_user_func_array($function, $args); }
-  public function query() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'assoc'); }
-  public function queryAllLists() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'list'); }
-  public function queryFullColumns() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'full'); }
-
-  public function queryRaw() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'raw_buf'); }
-  public function queryRawUnbuf() { $args = func_get_args(); return $this->prependCall(array($this, 'queryHelper'), $args, 'raw_unbuf'); }
+  public function query() { return $this->queryHelper(array('assoc' => true), func_get_args()); }
+  public function queryAllLists() { return $this->queryHelper(array(), func_get_args()); }
+  public function queryFullColumns() { return $this->queryHelper(array('fullcols' => true), func_get_args()); }
+  public function queryWalk() { return $this->queryHelper(array('walk' => true), func_get_args()); }
   
-  protected function queryHelper() {
-    $args = func_get_args();
-    $type = array_shift($args);
+  protected function queryHelper($opts, $args) {
     $query = array_shift($args);
-    $db = $this->get();
 
-    $is_buffered = true;
-    $row_type = 'assoc'; // assoc, list, raw
-    $full_names = false;
-
-    switch ($type) {
-      case 'assoc':
-        break;
-      case 'list':
-        $row_type = 'list';
-        break;
-      case 'full':
-        $row_type = 'list';
-        $full_names = true;
-        break;
-      case 'raw_buf':
-        $row_type = 'raw';
-        break;
-      case 'raw_unbuf':
-        $is_buffered = false;
-        $row_type = 'raw';
-        break;
-      default:
-        throw new MeekroDBException('Invalid argument to queryHelper!');
-    }
+    $opts_fullcols = (isset($opts['fullcols']) && $opts['fullcols']);
+    $opts_raw = (isset($opts['raw']) && $opts['raw']);
+    $opts_assoc = (isset($opts['assoc']) && $opts['assoc']);
+    $opts_walk = (isset($opts['walk']) && $opts['walk']);
+    $is_buffered = !($opts_raw || $opts_walk);
 
     list($query, $args) = $this->runHook('pre_parse', array('query' => $query, 'args' => $args));    
     $sql = call_user_func_array(array($this, 'parse'), array_merge(array($query), $args));
     $sql = $this->runHook('pre_run', array('query' => $sql));
+    $this->last_query = $sql;
     
+    $db = $this->get();
     $starttime = microtime(true);
     $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
     $runtime = microtime(true) - $starttime;
@@ -818,7 +798,7 @@ class MeekroDB {
     else $this->num_rows = null;
 
     $Exception = null;
-    if (!$sql || $db->error) {
+    if ($db->error) {
       $Exception = new MeekroDBException($db->error, $sql, $db->errno);
     }
 
@@ -841,12 +821,14 @@ class MeekroDB {
     else {
       $this->runHook('run_success', $hookHash);
     }
-
-    if ($row_type == 'raw' || !($result instanceof MySQLi_Result)) return $result;
+    
+    if (!($result instanceof MySQLi_Result)) return $result; // no results returned?
+    if ($opts_raw) return $result;
+    if ($opts_walk) return new MeekroDBWalk($db, $result);
 
     $return = array();
 
-    if ($full_names) {
+    if ($opts_fullcols) {
       $infos = array();
       foreach ($result->fetch_fields() as $info) {
         if (strlen($info->table)) $infos[] = $info->table . '.' . $info->name;
@@ -854,8 +836,8 @@ class MeekroDB {
       }
     }
 
-    while ($row = ($row_type == 'assoc' ? $result->fetch_assoc() : $result->fetch_row())) {
-      if ($full_names) $row = array_combine($infos, $row);
+    while ($row = ($opts_assoc ? $result->fetch_assoc() : $result->fetch_row())) {
+      if ($opts_fullcols) $row = array_combine($infos, $row);
       $return[] = $row;
     }
 
@@ -912,8 +894,9 @@ class MeekroDB {
     else $this->logfile = null;
   }
 
-  public function queryOneList() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstList'), $args); }
-  public function queryOneRow() { $args = func_get_args(); return call_user_func_array(array($this, 'queryFirstRow'), $args); }
+  public function queryRaw() { return $this->queryHelper(array('raw' => true), func_get_args()); }
+  public function queryOneList() { return call_user_func_array(array($this, 'queryFirstList'), func_get_args()); }
+  public function queryOneRow() { return call_user_func_array(array($this, 'queryFirstRow'), func_get_args()); }
 
   public function queryOneField() {
     $args = func_get_args();
@@ -949,6 +932,38 @@ class MeekroDB {
     return $ret;
   }
 
+}
+
+class MeekroDBWalk {
+  protected $mysqli;
+  protected $result;
+  protected $freed;
+
+  function __construct(MySQLi $mysqli, MySQLi_Result $result) {
+    $this->mysqli = $mysqli;
+    $this->result = $result;
+  }
+
+  function next() {
+    if ($row = $this->result->fetch_assoc()) return $row;
+    else $this->free();
+  }
+
+  function free() {
+    if ($this->freed) return;
+
+    $this->result->free();
+    while ($this->mysqli->more_results()) {
+      $this->mysqli->next_result();
+      if ($result = $this->mysqli->use_result()) $result->free();
+    }
+
+    $this->freed = true;
+  }
+
+  function __destruct() {
+    $this->free();
+  }
 }
 
 class WhereClause {

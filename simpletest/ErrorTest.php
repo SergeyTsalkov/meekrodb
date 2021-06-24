@@ -55,6 +55,7 @@ class ErrorTest extends SimpleTest {
       $exception_was_caught = 1;
     }
     $this->assert($exception_was_caught === 1);
+    $this->assert(DB::lastQuery() === 'SELET * FROM accounts');
     
     try {
       DB::insert("`$dbname`.`accounts`", array(

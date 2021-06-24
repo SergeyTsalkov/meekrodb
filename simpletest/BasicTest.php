@@ -33,6 +33,7 @@ class BasicTest extends SimpleTest {
   function test_1_5_empty_table() {
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(0));
+    $this->assert(DB::lastQuery() === 'SELECT COUNT(*) FROM accounts');
     
     $row = DB::queryFirstRow("SELECT * FROM accounts");
     $this->assert($row === null);
