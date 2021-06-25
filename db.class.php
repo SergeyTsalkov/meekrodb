@@ -936,7 +936,6 @@ class MeekroDB {
 class MeekroDBWalk {
   protected $mysqli;
   protected $result;
-  protected $freed;
 
   function __construct(MySQLi $mysqli, $result) {
     $this->mysqli = $mysqli;
@@ -951,7 +950,6 @@ class MeekroDBWalk {
   }
 
   function free() {
-    if ($this->freed) return;
     if (! ($this->result instanceof MySQLi_Result)) return;
 
     $this->result->free();
@@ -960,7 +958,7 @@ class MeekroDBWalk {
       if ($result = $this->mysqli->use_result()) $result->free();
     }
 
-    $this->freed = true;
+    $this->result = null;
   }
 
   function __destruct() {
