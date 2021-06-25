@@ -31,6 +31,7 @@ DB::$host = $set_host;
 DB::get(); //connect to mysql
 
 require_once __DIR__ . '/BasicTest.php';
+require_once __DIR__ . '/WalkTest.php';
 require_once __DIR__ . '/CallTest.php';
 require_once __DIR__ . '/ObjectTest.php';
 require_once __DIR__ . '/WhereClauseTest.php';
@@ -40,6 +41,7 @@ require_once __DIR__ . '/HelperTest.php';
 
 $classes_to_test = array(
   'BasicTest',
+  'WalkTest',
   'CallTest',
   'WhereClauseTest',
   'ObjectTest',
