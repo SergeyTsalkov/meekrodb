@@ -821,10 +821,10 @@ class MeekroDB {
       $this->runHook('run_success', $hookHash);
     }
     
-    if (!($result instanceof MySQLi_Result)) return $result; // no results returned?
-    if ($opts_raw) return $result;
     if ($opts_walk) return new MeekroDBWalk($db, $result);
-
+    if (!($result instanceof MySQLi_Result)) return $result; // query was not a SELECT?
+    if ($opts_raw) return $result;
+    
     $return = array();
 
     if ($opts_fullcols) {
@@ -938,18 +938,21 @@ class MeekroDBWalk {
   protected $result;
   protected $freed;
 
-  function __construct(MySQLi $mysqli, MySQLi_Result $result) {
+  function __construct(MySQLi $mysqli, $result) {
     $this->mysqli = $mysqli;
     $this->result = $result;
   }
 
   function next() {
+    // $result can be non-object if the query was not a SELECT
+    if (! ($this->result instanceof MySQLi_Result)) return;
     if ($row = $this->result->fetch_assoc()) return $row;
     else $this->free();
   }
 
   function free() {
     if ($this->freed) return;
+    if (! ($this->result instanceof MySQLi_Result)) return;
 
     $this->result->free();
     while ($this->mysqli->more_results()) {

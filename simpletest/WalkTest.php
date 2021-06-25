@@ -12,8 +12,32 @@ class WalkTest extends SimpleTest {
     $this->assert(count($results) == 8);
     $this->assert($results[7]['username'] == 'vookoo');
   }
+  
+  function test_2_walk_empty() {
+    $Walk = DB::queryWalk("SELECT * FROM accounts WHERE id>100");
 
-  function test_2_walk_stop() {
+    $results = array();
+    while ($row = $Walk->next()) {
+      $results[] = $row;
+    }
+
+    $this->assert(count($results) == 0);
+  }
+
+  function test_3_walk_insert() {
+    $Walk = DB::queryWalk("INSERT INTO profile (id) VALUES (100)");
+
+    $results = array();
+    while ($row = $Walk->next()) {
+      $results[] = $row;
+    }
+
+    $this->assert(count($results) == 0);
+
+    DB::query("DELETE FROM profile WHERE id=100");
+  }
+
+  function test_4_walk_incomplete() {
     $Walk = DB::queryWalk("SELECT * FROM accounts");
     $Walk->next();
     unset($Walk);
