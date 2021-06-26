@@ -220,18 +220,19 @@ class MeekroDB {
 
       foreach ($this->hooks[$type] as $hook) {
         $result = call_user_func($hook, array('query' => $query, 'args' => $args));
-        if ($result) {
-          if (!is_array($result) || count($result) != 2) {
-            throw new MeekroDBException("pre_parse hook must return an array of 2 items");
-          }
-          if (!is_string($result[0])) {
-            throw new MeekroDBException("pre_parse hook must return a string as its first item");
-          }
-          if (!is_array($result[1])) {
-            throw new MeekroDBException("pre_parse hook must return an array as its second item");
-          }
+        if (is_null($result)) {
+          $result = array($query, $args);
         }
-
+        if (!is_array($result) || count($result) != 2) {
+          throw new MeekroDBException("pre_parse hook must return an array of 2 items");
+        }
+        if (!is_string($result[0])) {
+          throw new MeekroDBException("pre_parse hook must return a string as its first item");
+        }
+        if (!is_array($result[1])) {
+          throw new MeekroDBException("pre_parse hook must return an array as its second item");
+        }
+        
         $query = $result[0];
         $args = $result[1];
       }
@@ -243,9 +244,8 @@ class MeekroDB {
 
       foreach ($this->hooks[$type] as $hook) {
         $result = call_user_func($hook, array('query' => $query));
-        if (!is_string($result)) {
-          throw new MeekroDBException("pre_run hook must return a string");
-        }
+        if (is_null($result)) $result = $query;
+        if (!is_string($result)) throw new MeekroDBException("pre_run hook must return a string");
 
         $query = $result;
       }
