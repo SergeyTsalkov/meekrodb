@@ -37,7 +37,6 @@ require_once __DIR__ . '/ObjectTest.php';
 require_once __DIR__ . '/WhereClauseTest.php';
 require_once __DIR__ . '/HookTest.php';
 require_once __DIR__ . '/TransactionTest.php';
-require_once __DIR__ . '/HelperTest.php';
 
 $classes_to_test = array(
   'BasicTest',
@@ -47,7 +46,6 @@ $classes_to_test = array(
   'ObjectTest',
   'HookTest',
   'TransactionTest',
-  'HelperTest',
 );
 
 $mysql_version = DB::serverVersion();
