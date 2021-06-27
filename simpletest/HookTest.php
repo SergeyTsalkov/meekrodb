@@ -180,6 +180,106 @@ class HookTest extends SimpleTest {
     DB::removeHooks('pre_parse');
   }
 
+  function test_9_enough_args() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id=%i AND username=%s", 1);
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == 'Expected 2 args, but only got 1!') {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+  function test_10_named_keys_present() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id=%i_id AND username=%s_username", array('username' => 'asdf'));
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == "Couldn't find named arg id!") {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+  function test_11_expect_array() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id IN %li", 5);
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == "Expected an array for arg 0 but didn't get one!") {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+  function test_12_named_keys_without_array() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id=%i_named", 1);
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == "If you use named args, you must pass an assoc array of args!") {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+  function test_13_mix_named_numbered_args() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id=%i_named AND username=%s", array('named' => 1));
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == "You can't mix named and numbered args!") {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+  function test_14_arrays_not_empty() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id IN %li", array());
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == "Arg 0 array can't be empty!") {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+  function test_15_named_array_not_empty() {
+    $error_worked = false;
+
+    try {
+      DB::query("SELECT * FROM accounts WHERE id IN %li_ids", array('ids' => array()));
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == "Arg ids array can't be empty!") {
+        $error_worked = true;
+      }
+    }
+
+    $this->assert($error_worked);
+  }
+
+
+
 
 
 }

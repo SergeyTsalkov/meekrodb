@@ -617,18 +617,22 @@ class MeekroDB {
       $queryParts[] = $query;
     }
 
-    if ($use_named_args && $use_numbered_args) {
-      throw new MeekroDBException("You can't mix named and numbered args!");
+    if ($use_named_args) {
+      if ($use_numbered_args) {
+        throw new MeekroDBException("You can't mix named and numbered args!");
+      }
+
+      if (count($args) != 1 || !is_array($args[0])) {
+        throw new MeekroDBException("If you use named args, you must pass an assoc array of args!");
+      }
     }
 
-    if ($use_named_args && count($args) != 1) {
-      throw new MeekroDBException("If you use named args, you must pass an assoc array of args!");
+    if ($use_numbered_args) {
+      if ($max_numbered_arg+1 > count($args)) {
+        throw new MeekroDBException(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
+      }
     }
-
-    if ($use_numbered_args && $max_numbered_arg+1 > count($args)) {
-      throw new MeekroDBException(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
-    }
-
+    
     return $queryParts;
   }
 
