@@ -50,11 +50,11 @@ Code Examples
     
 ### Grab one row or field
 
-	$account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
-	$number_accounts = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
+    $account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+    $number_accounts = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
 
 ### Use a list in a query
-	DB::query("SELECT * FROM tbl WHERE name IN %ls AND age NOT IN %li", array('John', 'Bob'), array(12, 15));
+    DB::query("SELECT * FROM tbl WHERE name IN %ls AND age NOT IN %li", array('John', 'Bob'), array(12, 15));
 
 ### Nested Transactions
 
@@ -84,13 +84,17 @@ MeekroDB works. Still, if you need database objects, MeekroDB can do that too.
 The code below escapes your parameters for safety, runs the query, and grabs 
 the first row of results. Try doing that in one line with PDO.
 
-	$account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+    $account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+
+Or how about just one field?
+
+    $created_at = DB::queryFirstField("SELECT created_at FROM accounts WHERE username=%s", 'Joe');
 
 ### Work with list parameters easily
 Using MySQL's IN keyword should not be hard. MeekroDB smooths out the syntax for you, 
 PDO does not.
 
-	$accounts = DB::query("SELECT * FROM accounts WHERE username IN %ls", array('Joe', 'Frank'));
+    $accounts = DB::query("SELECT * FROM accounts WHERE username IN %ls", array('Joe', 'Frank'));
 
 
 ### Simple inserts
@@ -98,21 +102,7 @@ Using MySQL's INSERT should not be more complicated than passing in an
 associative array. MeekroDB also simplifies many related commands, including 
 the useful and bizarre INSERT .. ON DUPLICATE UPDATE command. PDO does none of this.
 
-	DB::insert('accounts', array('username' => 'John', 'password' => 'whatever'));
-
-### Focus on the goal, not the task
-Want to do INSERT yourself rather than relying on DB::insert()? 
-It's dead simple. I don't even want to think about how many lines 
-you'd need to pull this off in PDO.
-
-    // Insert 2 rows at once
-      DB::query("INSERT INTO %b %lb VALUES %ll?", 'accounts',
-      array('username', 'password', 'last_login_timestamp'),
-      array(
-        array('Joe', 'joes_password', new DateTime('yesterday')),
-        array('Frank', 'franks_password', new DateTime('last Monday'))
-      )
-    );
+    DB::insert('accounts', array('username' => 'John', 'password' => 'whatever'));
 
 ### Nested transactions
 MySQL's SAVEPOINT commands lets you create nested transactions, but only 
@@ -130,18 +120,14 @@ so you can have nested transactions with no complexity or learning curve.
     // .. some queries..
     DB::commit(); // commit outer transaction
 
-### Flexible error and success handlers
-Set your own custom function run on errors, or on every query that succeeds. 
-You can easily have separate error handling behavior for the dev and live 
-versions of your application. Want to count up all your queries and their 
-runtime? Just add a new success handler.
+### Flexible debug logging and error handling
+You can log all queries (and any errors they produce) to a file for debugging purposes. You can also add hooks that let you run your own functions at any point in the query handling process.
+
 
 My Other Projects
 ========
 A little shameless self-promotion!
 
   * [Ark Server Hosting](https://arkservers.io) -- Ark: Survival Evolved server hosting by ArkServers.io!
-  * [7 Days To Die Server Hosting](https://arkservers.io/7days) -- 7 Days to Die server hosting by ArkServers.io!
   * [Best Minecraft Server Hosting](https://bestminecraft.org) -- Ranking and recommendations for minecraft server hosting!
-  * [ChunkHost](https://chunkhost.com) -- VPS Hosting starting at $5/month! We accept bitcoin!
   * [brooce](https://github.com/SergeyTsalkov/brooce) - Language-agnostic job queue written in Go! Write your jobs in any language, schedule them from any language, run them anywhere!
