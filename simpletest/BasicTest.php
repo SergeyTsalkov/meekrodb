@@ -163,6 +163,12 @@ class BasicTest extends SimpleTest {
     $tablelist = DB::tableList(DB::$dbName);
     $this->assert(count($tablelist) === 3);
     $this->assert($tablelist[0] === 'accounts');
+
+    $date = DB::queryFirstField("SELECT DATE_FORMAT(birthday, '%%m/%%d/%%Y') FROM accounts WHERE username=%s", "Charlie's Friend");
+    $this->assert($date === '09/10/2000');
+
+    $date = DB::queryFirstField("SELECT DATE_FORMAT('2009-10-04 22:23:00', '%m/%d/%Y')");;
+    $this->assert($date === '10/04/2009');
   }
   
   function test_4_1_query() {
