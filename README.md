@@ -15,61 +15,85 @@ When you're ready to get started, see the [Quick Start Guide](http://www.meekro.
 ### Manual Setup
 Include the `db.class.php` file into your project and set it up like this:
 
-    require_once 'db.class.php';
-    DB::$user = 'my_database_user';
-    DB::$password = 'my_database_password';
-    DB::$dbName = 'my_database_name';
+```php
+require_once 'db.class.php';
+DB::$user = 'my_database_user';
+DB::$password = 'my_database_password';
+DB::$dbName = 'my_database_name';
+```
 
 ### Composer
 Add this to your `composer.json`
 
-    {
-      "require": {
-        "sergeytsalkov/meekrodb": "*"
-      }
-    }
+```json
+{
+  "require": {
+    "sergeytsalkov/meekrodb": "*"
+  }
+}
+```
 
 Code Examples
 ========
 ### Grab some rows from the database and print out a field from each row.
 
-    $accounts = DB::query("SELECT * FROM accounts WHERE type = %s AND age > %i", $type, 15);
-    foreach ($accounts as $account) {
-      echo $account['username'] . "\n";
-    }
+```php
+$accounts = DB::query("SELECT * FROM accounts WHERE type = %s AND age > %i", $type, 15);
+foreach ($accounts as $account) {
+  echo $account['username'] . "\n";
+}
+```
+
+
 
 ### Insert a new row.
 
-    DB::insert('mytable', array(
-      'name' => $name,
-      'rank' => $rank,
-      'location' => $location,
-      'age' => $age,
-      'intelligence' => $intelligence
-    ));
+```php
+DB::insert('mytable', array(
+  'name' => $name,
+  'rank' => $rank,
+  'location' => $location,
+  'age' => $age,
+  'intelligence' => $intelligence
+));
+```
     
 ### Grab one row or field
 
-    $account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
-    $number_accounts = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
+```php
+$account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+$number_accounts = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
+```
 
 ### Use a list in a query
-    DB::query("SELECT * FROM tbl WHERE name IN %ls AND age NOT IN %li", array('John', 'Bob'), array(12, 15));
+```php
+DB::query("SELECT * FROM tbl WHERE name IN %ls AND age NOT IN %li", array('John', 'Bob'), array(12, 15));
+```
+
+### Log all queries and errors
+```php
+// log all queries and errors to file, or ..
+DB::$logfile = '/home/username/logfile.txt';
+
+// log all queries and errors to screen
+DB::$logfile = fopen('php://output', 'w');
+```
 
 ### Nested Transactions
-
-    DB::$nested_transactions = true;
-    DB::startTransaction(); // outer transaction
-    // .. some queries..
-    $depth = DB::startTransaction(); // inner transaction
-    echo $depth . 'transactions are currently active'; // 2
-     
-    // .. some queries..
-    DB::commit(); // commit inner transaction
-    // .. some queries..
-    DB::commit(); // commit outer transaction
+```php
+DB::$nested_transactions = true;
+DB::startTransaction(); // outer transaction
+// .. some queries..
+$depth = DB::startTransaction(); // inner transaction
+echo $depth . 'transactions are currently active'; // 2
+ 
+// .. some queries..
+DB::commit(); // commit inner transaction
+// .. some queries..
+DB::commit(); // commit outer transaction
+```
     
-### Lots More - See: http://www.meekro.com/docs.php
+### Lots More - See: http://meekro.com/docs
 
     
 How is MeekroDB better than PDO?
@@ -84,17 +108,23 @@ MeekroDB works. Still, if you need database objects, MeekroDB can do that too.
 The code below escapes your parameters for safety, runs the query, and grabs 
 the first row of results. Try doing that in one line with PDO.
 
-    $account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+```php
+$account = DB::queryFirstRow("SELECT * FROM accounts WHERE username=%s", 'Joe');
+```
 
 Or how about just one field?
 
-    $created_at = DB::queryFirstField("SELECT created_at FROM accounts WHERE username=%s", 'Joe');
+```php
+$created_at = DB::queryFirstField("SELECT created_at FROM accounts WHERE username=%s", 'Joe');
+```
 
 ### Work with list parameters easily
 Using MySQL's IN keyword should not be hard. MeekroDB smooths out the syntax for you, 
 PDO does not.
 
-    $accounts = DB::query("SELECT * FROM accounts WHERE username IN %ls", array('Joe', 'Frank'));
+```php
+$accounts = DB::query("SELECT * FROM accounts WHERE username IN %ls", array('Joe', 'Frank'));
+```
 
 
 ### Simple inserts
@@ -102,23 +132,27 @@ Using MySQL's INSERT should not be more complicated than passing in an
 associative array. MeekroDB also simplifies many related commands, including 
 the useful and bizarre INSERT .. ON DUPLICATE UPDATE command. PDO does none of this.
 
-    DB::insert('accounts', array('username' => 'John', 'password' => 'whatever'));
+```php
+DB::insert('accounts', array('username' => 'John', 'password' => 'whatever'));
+```
 
 ### Nested transactions
 MySQL's SAVEPOINT commands lets you create nested transactions, but only 
 if you keep track of SAVEPOINT ids yourself. MeekroDB does this for you, 
 so you can have nested transactions with no complexity or learning curve.
 
-    DB::$nested_transactions = true;
-    DB::startTransaction(); // outer transaction
-    // .. some queries..
-    $depth = DB::startTransaction(); // inner transaction
-    echo $depth . 'transactions are currently active'; // 2
-     
-    // .. some queries..
-    DB::commit(); // commit inner transaction
-    // .. some queries..
-    DB::commit(); // commit outer transaction
+```php
+DB::$nested_transactions = true;
+DB::startTransaction(); // outer transaction
+// .. some queries..
+$depth = DB::startTransaction(); // inner transaction
+echo $depth . 'transactions are currently active'; // 2
+ 
+// .. some queries..
+DB::commit(); // commit inner transaction
+// .. some queries..
+DB::commit(); // commit outer transaction
+```
 
 ### Flexible debug logging and error handling
 You can log all queries (and any errors they produce) to a file for debugging purposes. You can also add hooks that let you run your own functions at any point in the query handling process.
