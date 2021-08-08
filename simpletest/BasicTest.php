@@ -279,7 +279,10 @@ class BasicTest extends SimpleTest {
     $columns = DB::columnList('store data');
     $this->assert(count($columns) === 2);
     $this->assert($columns['picture']['type'] === 'blob');
-    
+    $this->assert($columns['picture']['null'] === 'YES');
+    $this->assert($columns['picture']['key'] === '');
+    $this->assert($columns['picture']['default'] === NULL);
+    $this->assert($columns['picture']['extra'] === '');
     
     $smile = file_get_contents(__DIR__ . '/smile1.jpg');
     DB::insert('store data', array(

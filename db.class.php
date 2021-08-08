@@ -486,7 +486,7 @@ class MeekroDB {
       $columns[$row['Field']] = array(
         'type' => $row['Type'],
         'null' => $row['Null'],
-        'key' => $row['Type'],
+        'key' => $row['Key'],
         'default' => $row['Default'],
         'extra' => $row['Extra']
       );
