@@ -778,9 +778,10 @@ class MeekroDB {
 
     $opts_fullcols = (isset($opts['fullcols']) && $opts['fullcols']);
     $opts_raw = (isset($opts['raw']) && $opts['raw']);
+    $opts_unbuf = (isset($opts['unbuf']) && $opts['unbuf']);
     $opts_assoc = (isset($opts['assoc']) && $opts['assoc']);
     $opts_walk = (isset($opts['walk']) && $opts['walk']);
-    $is_buffered = !($opts_raw || $opts_walk);
+    $is_buffered = !($opts_unbuf || $opts_walk);
 
     list($query, $args) = $this->runHook('pre_parse', array('query' => $query, 'args' => $args));    
     $sql = call_user_func_array(array($this, 'parse'), array_merge(array($query), $args));
@@ -898,6 +899,7 @@ class MeekroDB {
   }
 
   public function queryRaw() { return $this->queryHelper(array('raw' => true), func_get_args()); }
+  public function queryRawUnbuf() { return $this->queryHelper(array('raw' => true, 'unbuf' => true), func_get_args()); }
   public function queryOneList() { return call_user_func_array(array($this, 'queryFirstList'), func_get_args()); }
   public function queryOneRow() { return call_user_func_array(array($this, 'queryFirstRow'), func_get_args()); }
 
