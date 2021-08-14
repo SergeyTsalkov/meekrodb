@@ -45,4 +45,20 @@ class WalkTest extends SimpleTest {
     // if $Walk hasn't been properly freed, this will produce an out of sync error
     DB::query("SELECT * FROM accounts");
   }
+
+  function test_5_walk_error() {
+    $Walk = DB::queryWalk("SELECT * FROM accounts");
+    $Walk->next();
+    
+    try {
+      // this will produce an out of sync error
+      DB::query("SELECT * FROM accounts");
+    } catch (MeekroDBException $e) {
+      if (substr_count($e->getMessage(), 'out of sync')) {
+        $exception_was_caught = 1;
+      }
+    }
+
+    $this->assert($exception_was_caught === 1);
+  }
 }
