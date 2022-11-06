@@ -11,7 +11,7 @@ class CallTest extends SimpleTest {
   function test_2_run_procedure() {
     $r = DB::query("CALL myProc()");
     $this->assert($r[0]['username'] === 'Abe');
-    $this->assert($r[2]['age'] === '914');
+    $this->assert($r[2]['user.age'] === '914');
   }
 
 }
