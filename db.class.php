@@ -287,7 +287,6 @@ class MeekroDB {
 
     $query = $args['query'];
     $query = preg_replace('/\s+/', ' ', $query);
-    $query = preg_replace('/[\x00-\x1F\x7F-\xFF]/', '', $query);
 
     $results[] = sprintf('[%s]', date('Y-m-d H:i:s'));
     $results[] = sprintf('QUERY: %s', $query);
