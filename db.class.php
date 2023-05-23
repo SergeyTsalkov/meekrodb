@@ -18,13 +18,13 @@
 
 
 /**
- * @method static query()
- * @method static queryFirstColumn()
- * @method static queryFirstRow()
- * @method static queryFirstField()
- * @method static insert()
- * @method static update()
- * @method static delete()
+ * @method static query(string $query, ...$parameters)
+ * @method static queryFirstColumn(string $query, ...$parameters)
+ * @method static queryFirstRow(string $query, ...$parameters)
+ * @method static queryFirstField(string $query, ...$parameters)
+ * @method static insert(string $tablename, array $data, ...$parameters)
+ * @method static update(string $tablename, array $data, ...$parameters)
+ * @method static delete(string $tablename, ...$parameters)
  */
 class DB {
   // initial connection
