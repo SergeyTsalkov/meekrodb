@@ -16,7 +16,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
+/**
+ * @method static query(string $query, ...$parameters)
+ * @method static queryFirstColumn(string $query, ...$parameters)
+ * @method static queryFirstRow(string $query, ...$parameters)
+ * @method static queryFirstField(string $query, ...$parameters)
+ * @method static insert(string $tablename, array $data, ...$parameters)
+ * @method static update(string $tablename, array $data, ...$parameters)
+ * @method static delete(string $tablename, ...$parameters)
+ */
 class DB {
   // initial connection
   public static $dbName = '';
