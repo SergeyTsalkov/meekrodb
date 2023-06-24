@@ -16,7 +16,49 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
+/**
+ * @link https://meekro.com/docs/retrieving-data.html Retrieving Data
+ * 
+ * @method static query(string $query, ...$parameters)
+ * @method static queryFirstRow(string $query, ...$parameters)
+ * @method static queryFirstField(string $query, ...$parameters)
+ * @method static queryFirstList(string $query, ...$parameters)
+ * @method static queryFirstColumn(string $query, ...$parameters)
+ * @method static queryFullColumns(string $query, ...$parameters)
+ * 
+ * @link https://meekro.com/docs/altering-data.html Altering Data
+ * 
+ * @method static insert(string $table_name, array $data, ...$parameters)
+ * @method static int insertId()
+ * @method static insertIgnore(string $table_name, array $data, ...$parameters)
+ * @method static insertUpdate(string $table_name, array $data, ...$parameters)
+ * @method static replace(string $table_name, array $data, ...$parameters)
+ * @method static update(string $table_name, array $data, ...$parameters)
+ * @method static delete(string $table_name, ...$parameters)
+ * @method static int affectedRows()
+ * 
+ * @link https://meekro.com/docs/transactions.html Transactions
+ * 
+ * @method static startTransaction()
+ * @method static commit()
+ * @method static rollback()
+ * 
+ * @link https://meekro.com/docs/hooks.html
+ * 
+ * @method static int addHook(string $hook_type, callable $fn)
+ * @method static removeHook(string $hook_type, int $hook_id)
+ * @method static removeHooks(string $hook_type)
+ * 
+ * @link https://meekro.com/docs/misc-methods.html Misc Methods and Variables
+ * 
+ * @method static useDB(string $database_name)
+ * @method static array tableList(?string $database_name = null)
+ * @method static array columnList(string $table_name)
+ * @method static disconnect()
+ * @method static mysqli get()
+ * @method static mixed lastQuery()
+ * @method static string parse(string $query, ...$parameters)
+ */
 class DB {
   // initial connection
   public static $dbName = '';
