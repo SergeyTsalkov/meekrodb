@@ -190,6 +190,11 @@ class MeekroDB {
     $mysql = $this->internal_mysql;
     
     if (!($mysql instanceof MySQLi)) {
+      // PHP 8.1+ sets a reporting mode by default, causing it to throw mysqli_sql_exceptions
+      // we don't want this because we're checking mysqli->error anyway
+      $driver = new mysqli_driver();
+      $driver->report_mode = MYSQLI_REPORT_OFF;
+
       if (! $this->port) $this->port = ini_get('mysqli.default_port');
       $this->current_db = $this->dbName;
       $mysql = new mysqli();
@@ -378,10 +383,6 @@ class MeekroDB {
   
   
   public function startTransaction() {
-    if ($this->nested_transactions && $this->serverVersion() < '5.5') {
-      throw new MeekroDBException("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
-    }
-    
     if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
       $this->query('START TRANSACTION');
       $this->nested_transactions_count = 1;
@@ -394,10 +395,6 @@ class MeekroDB {
   }
   
   public function commit($all=false) {
-    if ($this->nested_transactions && $this->serverVersion() < '5.5') {
-      throw new MeekroDBException("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
-    }
-    
     if ($this->nested_transactions && $this->nested_transactions_count > 0)
       $this->nested_transactions_count--;
     
@@ -412,10 +409,6 @@ class MeekroDB {
   }
   
   public function rollback($all=false) {
-    if ($this->nested_transactions && $this->serverVersion() < '5.5') {
-      throw new MeekroDBException("Nested transactions are only available on MySQL 5.5 and greater. You are using MySQL " . $this->serverVersion());
-    }
-    
     if ($this->nested_transactions && $this->nested_transactions_count > 0)
       $this->nested_transactions_count--;
     

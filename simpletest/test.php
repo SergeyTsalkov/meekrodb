@@ -37,6 +37,7 @@ require_once __DIR__ . '/ObjectTest.php';
 require_once __DIR__ . '/WhereClauseTest.php';
 require_once __DIR__ . '/HookTest.php';
 require_once __DIR__ . '/TransactionTest.php';
+require_once __DIR__ . '/TransactionTest_55.php';
 
 $classes_to_test = array(
   'BasicTest',
@@ -46,15 +47,8 @@ $classes_to_test = array(
   'ObjectTest',
   'HookTest',
   'TransactionTest',
+  'TransactionTest_55',
 );
-
-$mysql_version = DB::serverVersion();
-if ($mysql_version >= '5.5') {
-  require_once __DIR__ . '/TransactionTest_55.php';
-  $classes_to_test[] = 'TransactionTest_55';
-} else {
-  echo "MySQL 5.5 not available (version is $mysql_version) -- skipping MySQL 5.5 tests\n";
-}
 
 $time_start = microtime_float();
 foreach ($classes_to_test as $class) {
