@@ -16,6 +16,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+// If the mysqli extension is missing, trying to load MeekroDB will fail
+// because the MYSQLI_OPT_CONNECT_TIMEOUT constant will be missing.
+// Putting our warning here is the only way to make sure the user sees a sensible
+// error message.
+if (! extension_loaded('mysqli')) {
+  throw new Exception("MeekroDB requires the mysqli extension for PHP");
+}
+
 /**
  * @link https://meekro.com/docs/retrieving-data.html Retrieving Data
  * 
