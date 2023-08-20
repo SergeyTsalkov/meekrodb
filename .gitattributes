@@ -1,0 +1,3 @@
+# normally core.autocrlf is controlled by every developer's own git settings
+# but we want it off for the whole repo
+* -text
