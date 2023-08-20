@@ -32,6 +32,8 @@ function runtest($type, $test) {
 ini_set('date.timezone', 'America/Los_Angeles');
 
 error_reporting(E_ALL | E_STRICT);
+$skip_db_tests = false;
+$skip_orm_tests = false;
 require_once __DIR__ . '/../db.class.php';
 require_once __DIR__ . '/../orm.class.php';
 require_once __DIR__ . '/test_setup.php'; //test config values go here
@@ -58,11 +60,15 @@ $orm_tests = array(
 );
 
 $time_start = microtime_float();
-foreach ($db_tests as $test) {
-  runtest('db', $test);
+if (!$skip_db_tests) {
+  foreach ($db_tests as $test) {
+    runtest('db', $test);
+  }
 }
-foreach ($orm_tests as $test) {
-  runtest('orm', $test);
+if (!$skip_orm_tests) {
+  foreach ($orm_tests as $test) {
+    runtest('orm', $test);
+  }
 }
 $time = round(microtime_float() - $time_start, 2);
 
