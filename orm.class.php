@@ -209,27 +209,15 @@ class MeekroORM implements ArrayAccess {
   public function offsetUnset($offset) { $this->__set($offset, null); }
 
   // -------------- CONSTRUCTORS
-  public function __construct(array $row = array(), $loaded = false) {
+  public static function LoadFromHash(array $row = array()) {
+    $class_name = get_called_class();
+    $Obj = new $class_name();
     foreach ($row as $key => $value) {
-      if (! $loaded) $this->$key = $value; // run any setters and getters
-      else $this->_attribute_set($key, $value); // merely run strval,doubleval,etc as needed
+      $Obj->_attribute_set($key, $value);
     }
     
-    if ($loaded) $this->_orm_row_orig = $this->_orm_row;
-  }
-
-  // alias for "new $class", kept for backwards compatibility
-  public static function Build(array $row = array(), $loaded = false) {
-    $name = get_called_class();
-    return new $name($row, $loaded);
-  }
-
-  public static function BuildMany(array $rows, $loaded = false) {
-    $many = array();
-    foreach ($rows as $row) {
-      $many[] = static::Build($row, $loaded);
-    }
-    return $many;
+    $Obj->_orm_row_orig = $Obj->_orm_row;
+    return $Obj;
   }
 
   public static function Load() {
@@ -264,7 +252,7 @@ class MeekroORM implements ArrayAccess {
     }
 
     $row = call_user_func_array(array(static::_orm_meekrodb(), 'queryFirstRow'), $args);
-    if (is_array($row)) return static::Build($row, true);
+    if (is_array($row)) return static::LoadFromHash($row);
     else return null;
   }
 
@@ -273,10 +261,15 @@ class MeekroORM implements ArrayAccess {
 
     $args = func_get_args();
     if (is_array($args[0])) $args = static::_orm_query_from_hash($args[0], false);
-
+    
+    $result = [];
     $rows = call_user_func_array(array(static::_orm_meekrodb(), 'query'), $args);
-    if (is_array($rows) && count($rows)) return static::BuildMany($rows, true);
-    else return array();
+    if (is_array($rows)) {
+      foreach ($rows as $row) {
+        $result[] = static::LoadFromHash($row);
+      }
+    }
+    return $result;
   }
 
 
@@ -323,6 +316,7 @@ class MeekroORM implements ArrayAccess {
   public function save($run_callbacks=true) {
     $is_fresh = $this->_orm_is_fresh();
     $dirty_fields = $this->_orm_dirty_fields();
+    $have_committed = false;
 
     DB::startTransaction();
 
