@@ -84,31 +84,23 @@ class MeekroORM implements ArrayAccess {
     return $data[0]['Field'];
   }
 
-  public static function _orm_format_value($column, $value) {
-    $struct = static::_orm_tablestruct();
-    $type = strval($struct[$column]['Type'][0]);
-    
-    if (is_null($value)) return null;
-    if (substr($type, -3) == 'int') return intval($value);
-    if ($type == 'float' || $type == 'double' || $type == 'decimal') return doubleval($value);
-
-    return strval($value);
-  }
-
   protected function _orm_fields() {
     return array_keys(static::_orm_tablestruct());
   }
 
   protected function _orm_dirty_fields() {
-    $dirty = [];
+    return array_keys($this->_orm_dirtyhash());
+  }
+
+  protected function _orm_dirtyhash() {
+    $hash = [];
     foreach ($this->_orm_row as $key => $value) {
       if (!array_key_exists($key, $this->_orm_row_orig) || $value !== $this->_orm_row_orig[$key]) {
-        $dirty[] = $key;
+        $hash[$key] = static::_orm_run_marshal($value, $key);
       }
     }
 
-    sort($dirty);
-    return $dirty;
+    return $hash;
   }
 
   protected function _where() {
@@ -134,7 +126,6 @@ class MeekroORM implements ArrayAccess {
 
   public function _attribute_set($key, $value) {
     if ($this->_attribute_exists($key)) {
-      $value = $this->_orm_format_value($key, $value);
       return $this->_orm_row[$key] = $value;
     } else {
       return $this->$key = $value;
@@ -150,6 +141,81 @@ class MeekroORM implements ArrayAccess {
   }
   
   public function _attribute_exists($key) { return array_key_exists($key, static::_orm_tablestruct()); }
+
+
+  // -------------- TYPES AND MARSHAL / UNMARSHAL
+  public static function _orm_colinfo($column, $type) {
+    if (! is_array(static::$_orm_columns)) return;
+    if (! array_key_exists($column, static::$_orm_columns)) return;
+
+    $info = static::$_orm_columns[$column];
+    return $info[$type] ?? null;
+  }
+
+  public static function _orm_coltype($column) {
+    if ($type = static::_orm_colinfo($column, 'type')) {
+      return $type;
+    }
+
+    $struct = static::_orm_tablestruct();
+    $type = strval($struct[$column]['Type'][0]);
+
+    static $typemap = [
+      'tinyint' => 'int',
+      'smallint' => 'int',
+      'mediumint' => 'int',
+      'int' => 'int',
+      'bigint' => 'int',
+      'float' => 'double',
+      'double' => 'double',
+      'decimal' => 'double',
+      'datetime' => 'datetime',
+      'timestamp' => 'datetime',
+    ];
+
+    if (array_key_exists($type, $typemap)) {
+      return $typemap[$type];
+    }
+
+    return 'string';
+  }
+
+  public static function _orm_colnull($column) {
+    $struct = static::_orm_tablestruct();
+    $type = strtolower($struct[$column]['Null']);
+    return $type == 'yes';
+  }
+
+  public static function _orm_run_marshal($data, $column) {
+    $type = static::_orm_coltype($column);
+    $fn = array(get_class(), "_orm_typemarshal_{$type}");
+    if (is_callable($fn)) {
+      $data = call_user_func($fn, $data);
+    }
+
+    $is_null = static::_orm_colnull($column);
+    if (!$is_null && is_null($data)) {
+      if ($type == 'int' || $type == 'double') $data = 0;
+      else if ($type == 'datetime') $data = '0000-00-00 00:00:00';
+      else $data = '';
+    }
+
+    return $data;
+  }
+
+  public static function _orm_run_unmarshal($data, $column) {
+    $type = static::_orm_coltype($column);
+    $fn = array(get_class(), "_orm_typeunmarshal_{$type}");
+    if (is_callable($fn)) {
+      $data = call_user_func($fn, $data);
+    }
+    return $data;
+  }
+
+  public static function _orm_typemarshal_bool($data) { return $data ? 1 : 0; }
+  public static function _orm_typeunmarshal_bool($data) { return !!$data; }
+  public static function _orm_typeunmarshal_int($data) { return intval($data); }
+  public static function _orm_typeunmarshal_double($data) { return doubleval($data); }
 
   // -------------- ASSOCIATIONS
   protected function _cache_set($key, $value) { return $this->_orm_cache[$key] = $value; }
@@ -213,7 +279,7 @@ class MeekroORM implements ArrayAccess {
     $class_name = get_called_class();
     $Obj = new $class_name();
     foreach ($row as $key => $value) {
-      $Obj->_attribute_set($key, $value);
+      $Obj->_orm_row[$key] = static::_orm_run_unmarshal($value, $key);
     }
     
     $Obj->_orm_row_orig = $Obj->_orm_row;
@@ -315,32 +381,26 @@ class MeekroORM implements ArrayAccess {
 
   public function save($run_callbacks=true) {
     $is_fresh = $this->_orm_is_fresh();
-    $dirty_fields = $this->_orm_dirty_fields();
     $have_committed = false;
 
     DB::startTransaction();
 
     try {
       if ($run_callbacks) {
-        if ($is_fresh) $validate_fields = $this->_orm_fields();
-        else $validate_fields = $this->_orm_dirty_fields();
+        $fields = $this->_orm_dirty_fields();
 
-        foreach ($validate_fields as $field) {
+        foreach ($fields as $field) {
           $this->_orm_run_callback("_validate_{$field}");
         }
         
-        $this->_orm_run_callback('_pre_save', $dirty_fields);
-        if ($is_fresh) $this->_orm_run_callback('_pre_create', $dirty_fields);
-        else $this->_orm_run_callback('_pre_update', $dirty_fields);
+        $this->_orm_run_callback('_pre_save', $fields);
+        if ($is_fresh) $this->_orm_run_callback('_pre_create', $fields);
+        else $this->_orm_run_callback('_pre_update', $fields);
       }
       
-      // dirty fields list might change during _pre_* and must be re-calculated
-      $dirty_fields = $this->_orm_dirty_fields();
-
-      $replace = array();
-      foreach ($dirty_fields as $field) {
-        $replace[$field] = $this->_attribute_get($field);
-      }
+      // dirty fields list might change while running the _pre callbacks
+      $replace = $this->_orm_dirtyhash();
+      $fields = array_keys($replace);
 
       if ($is_fresh) {
         static::_orm_meekrodb()->insert(static::_orm_tablename(), $replace);
@@ -351,16 +411,15 @@ class MeekroORM implements ArrayAccess {
         
       } else if (count($replace) > 0) {
         static::_orm_meekrodb()->update(static::_orm_tablename(), $replace, "%l", $this->_where());
-
       }
       
       $this->_orm_row_orig = $this->_orm_row;
-      if ($is_fresh) $this->reload(); // for INSERTs, pick up any default values that MySQL may have set
+      $this->reload(); // for INSERTs, pick up any default values that MySQL may have set
 
       if ($run_callbacks) {
-        if ($is_fresh) $this->_orm_run_callback('_post_create', $dirty_fields);
-        else $this->_orm_run_callback('_post_update', $dirty_fields);
-        $this->_orm_run_callback('_post_save', $dirty_fields);
+        if ($is_fresh) $this->_orm_run_callback('_post_create', $fields);
+        else $this->_orm_run_callback('_post_update', $fields);
+        $this->_orm_run_callback('_post_save', $fields);
       }
       DB::commit();
       $have_committed = true;
@@ -370,7 +429,7 @@ class MeekroORM implements ArrayAccess {
     }
 
     if ($run_callbacks) {
-      $this->_orm_run_callback('_post_commit', $dirty_fields);
+      $this->_orm_run_callback('_post_commit', $fields);
     }
   }
 
