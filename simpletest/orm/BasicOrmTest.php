@@ -30,6 +30,7 @@ class BasicOrmTest extends SimpleTest {
         `id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
         `name` varchar(255) NOT NULL,
         `age` int unsigned NOT NULL,
+        `friends_name` varchar(255) NULL,
         `last_happy_moment` timestamp NOT NULL,
         `is_alive` tinyint(1) NOT NULL
       ) ENGINE = InnoDB
@@ -77,6 +78,30 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->last_happy_moment->diffInSeconds() <= 1);
 
     $Person->last_happy_moment = null;
+    $Person->Save();
+  }
+
+  // * NOT NULL values will be set to empty string (or equivalent) when we try to null them
+  function test_4_null() {
+    $Person = Person::Load(1);
+    $this->assert($Person->friends_name === null);
+    $Person->friends_name = 'Jason';
+    $Person->Save();
+
+    $Person = Person::Load(1);
+    $this->assert($Person->friends_name === 'Jason');
+    $Person->friends_name = null;
+    $Person->name = null;
+    $Person->age = null;
+    $Person->Save();
+
+    $Person = Person::Load(1);
+    $this->assert($Person->friends_name === null);
+    $this->assert($Person->name === '');
+    $this->assert($Person->age === 0);
+
+    $Person->name = 'Nick';
+    $Person->age = 23;
     $Person->Save();
   }
 
