@@ -214,8 +214,18 @@ class MeekroORM implements ArrayAccess {
 
   public static function _orm_typemarshal_bool($data) { return $data ? 1 : 0; }
   public static function _orm_typeunmarshal_bool($data) { return !!$data; }
+
   public static function _orm_typeunmarshal_int($data) { return intval($data); }
   public static function _orm_typeunmarshal_double($data) { return doubleval($data); }
+
+  public static function _orm_typemarshal_datetime($data) {
+    if ($data instanceof \DateTime) return $data->format('Y-m-d H:i:s');
+    return $data;
+  }
+  public static function _orm_typeunmarshal_datetime($data) {
+    if (!$data || !class_exists('Carbon\Carbon')) return $data;
+    return new Carbon\Carbon($data);
+  }
 
   // -------------- ASSOCIATIONS
   protected function _cache_set($key, $value) { return $this->_orm_cache[$key] = $value; }

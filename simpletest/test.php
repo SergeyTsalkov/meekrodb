@@ -1,5 +1,7 @@
 #!/usr/bin/php
 <?php
+require_once 'vendor/autoload.php';
+
 class SimpleTest {
   public function assert($boolean) {
     if (! $boolean) $this->fail();
@@ -28,8 +30,6 @@ function runtest($type, $test) {
     $object->$method();
   }
 }
-
-ini_set('date.timezone', 'America/Los_Angeles');
 
 error_reporting(E_ALL | E_STRICT);
 $skip_db_tests = false;

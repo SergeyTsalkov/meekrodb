@@ -1,1 +1,3 @@
 simpletest/test_setup.php
+simpletest/vendor/
+simpletest/composer.lock
