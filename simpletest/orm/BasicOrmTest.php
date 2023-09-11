@@ -13,6 +13,7 @@ class Person extends MeekroORM {
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
 // TODO: still works when Carbon is not available
+// TODO: test with mysql strict mode enabled?
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
