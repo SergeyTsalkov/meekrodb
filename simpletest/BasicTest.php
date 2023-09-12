@@ -439,6 +439,15 @@ class BasicTest extends SimpleTest {
     $this->assert($parsed_query === $correct_query);
   }
 
+  function test_11_timeout() {
+    $default = DB::$reconnect_after;
+    DB::$reconnect_after = 1;
+    DB::query("SET SESSION wait_timeout=1");
+    sleep(2);
+    DB::query("SELECT * FROM accounts");
+    DB::$reconnect_after = $default;
+  }
+
 
 
 }

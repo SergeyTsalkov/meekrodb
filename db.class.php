@@ -84,11 +84,12 @@ class DB {
   public static $ssl = null;
   public static $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
   public static $connect_flags = 0;
+  public static $reconnect_after = 14400;
   public static $logfile;
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'ssl', 'connect_options', 'connect_flags', 'logfile');
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'ssl', 'connect_options', 'connect_flags', 'reconnect_after', 'logfile');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -137,6 +138,7 @@ class MeekroDB {
   public $ssl = null;
   public $connect_options = array(MYSQLI_OPT_CONNECT_TIMEOUT => 30);
   public $connect_flags = 0;
+  public $reconnect_after = 14400;
   public $logfile;
   
   // internal
@@ -148,6 +150,7 @@ class MeekroDB {
   public $current_db = null;
   public $nested_transactions_count = 0;
   public $last_query;
+  public $last_query_at=0;
 
   protected $hooks = array(
     'pre_parse' => array(),
@@ -846,10 +849,15 @@ class MeekroDB {
     $opts_walk = (isset($opts['walk']) && $opts['walk']);
     $is_buffered = !($opts_unbuf || $opts_walk);
 
+    if ($this->reconnect_after > 0 && time() - $this->last_query_at >= $this->reconnect_after) {
+      $this->disconnect();
+    }
+
     list($query, $args) = $this->runHook('pre_parse', array('query' => $query, 'args' => $args));    
     $sql = call_user_func_array(array($this, 'parse'), array_merge(array($query), $args));
     $sql = $this->runHook('pre_run', array('query' => $sql));
     $this->last_query = $sql;
+    $this->last_query_at = time();
     
     $db = $this->get();
     $starttime = microtime(true);
