@@ -228,10 +228,8 @@ class MeekroDB {
   }
   
   public function disconnect() {
-    $mysqli = $this->internal_mysql;
-    if ($mysqli instanceof MySQLi) {
-      if ($thread_id = $mysqli->thread_id) $mysqli->kill($thread_id); 
-      $mysqli->close();
+    if ($this->internal_mysql) {
+      $this->internal_mysql->close();
     }
     $this->internal_mysql = null; 
   }
