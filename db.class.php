@@ -443,18 +443,47 @@ class MeekroDB {
   
   public function update() {
     $args = func_get_args();
+    if (count($args) < 3) {
+      throw new MeekroDBException("update(): at least 3 arguments expected");
+    }
+
     $table = array_shift($args);
     $params = array_shift($args);
-
+    if (! is_array($params)) {
+      throw new MeekroDBException("update(): second argument must be assoc array");
+    }
     $update_part = $this->parse(
       str_replace('%', $this->param_char, "UPDATE %b SET %hc"),
       $table, $params
     );
 
-    // we don't know if they used named or numbered args, so the where clause
-    // must be run through the parser separately
-    $where_part = call_user_func_array(array($this, 'parse'), $args);
+    if (is_array($args[0])) {
+      $where_part = $this->parse(str_replace('%', $this->param_char, "%ha"), $args[0]);
+    } else {
+      // we don't know if they used named or numbered args, so the where clause
+      // must be run through the parser separately
+      $where_part = call_user_func_array(array($this, 'parse'), $args);
+    }
+    
     $query = $update_part . ' WHERE ' . $where_part;
+    return $this->query($query);
+  }
+
+  public function delete() {
+    $args = func_get_args();
+    if (count($args) < 2) {
+      throw new MeekroDBException("delete(): at least 2 arguments expected");
+    }
+
+    $table = $this->formatTableName(array_shift($args));
+
+    if (is_array($args[0])) {
+      $where = $this->parse(str_replace('%', $this->param_char, "%ha"), $args[0]);
+    } else {
+      $where = call_user_func_array(array($this, 'parse'), $args);
+    }
+    
+    $query = "DELETE FROM {$table} WHERE {$where}";
     return $this->query($query);
   }
   
@@ -522,15 +551,6 @@ class MeekroDB {
     else $update = $args;
     
     return $this->insertOrReplace('INSERT', $table, $data, array('update' => $update)); 
-  }
-  
-  public function delete() {
-    $args = func_get_args();
-    $table = $this->formatTableName(array_shift($args));
-
-    $where = call_user_func_array(array($this, 'parse'), $args);
-    $query = "DELETE FROM {$table} WHERE {$where}";
-    return $this->query($query);
   }
   
   public function sqleval() {
