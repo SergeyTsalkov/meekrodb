@@ -348,13 +348,13 @@ class MeekroDB {
     $results[] = sprintf('QUERY: %s', $query);
     $results[] = sprintf('RUNTIME: %s ms', $args['runtime']);
 
-    if (isset($args['affected']) && $args['affected']) {
+    if ($args['affected']) {
       $results[] = sprintf('AFFECTED ROWS: %s', $args['affected']);
     }
-    if (isset($args['rows']) && $args['rows']) {
+    if ($args['rows']) {
       $results[] = sprintf('RETURNED ROWS: %s', $args['rows']);
     }
-    if (isset($args['error'])) {
+    if ($args['error']) {
       $results[] = 'ERROR: ' . $args['error'];
     }
     
@@ -877,7 +877,14 @@ class MeekroDB {
       $Exception = new MeekroDBException($db->error, $sql, $db->errno);
     }
 
-    $hookHash = array('query' => $sql, 'runtime' => $runtime);
+    $hookHash = array(
+      'query' => $sql,
+      'runtime' => $runtime,
+      'exception' => null,
+      'error' => null,
+      'rows' => null,
+      'affected' => null
+    );
     if ($Exception) {
       $hookHash['exception'] = $Exception;
       $hookHash['error'] = $Exception->getMessage();

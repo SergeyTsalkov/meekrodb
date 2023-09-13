@@ -101,7 +101,7 @@ class HookTest extends SimpleTest {
     $callback_worked = false;
 
     $fn = function($hash) use (&$callback_worked) {
-      if (!isset($hash['error']) && !isset($hash['exception'])) {
+      if (!$hash['error'] && !$hash['exception']) {
         $callback_worked = true;
       }
     };
