@@ -904,9 +904,16 @@ class MeekroDB {
       $this->runHook('run_success', $hookHash);
     }
     
-    if ($opts_walk) return new MeekroDBWalk($db, $result);
-    if (!($result instanceof MySQLi_Result)) return $result; // query was not a SELECT?
-    if ($opts_raw) return $result;
+    if ($opts_walk) {
+      return new MeekroDBWalk($db, $result);
+    }
+    if (!($result instanceof MySQLi_Result)) {
+      // query was not a SELECT
+      return $result ? $this->affected_rows : $result;
+    }
+    if ($opts_raw) {
+      return $result;
+    }
     
     $return = array();
 
