@@ -448,11 +448,17 @@ class MeekroDB {
     return '`' . str_replace('`', '``', $name) . '`'; 
   }
 
-  protected function formatTableName($table) {
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function formatTableName($table) {
     return $this->formatBackticks($table, true);
   }
 
-  protected function formatColumnName($column) {
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function formatColumnName($column) {
     return $this->formatBackticks($column, false);
   }
   
@@ -801,9 +807,15 @@ class MeekroDB {
     return $query;
   }
   
-  protected function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
   
-  protected function sanitize($value, $type='basic', $hashjoin=', ') {
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function sanitize($value, $type='basic', $hashjoin=', ') {
     if ($type == 'basic') {
       if (is_object($value)) {
         if ($value instanceof MeekroDBEval) return $value->text;
@@ -853,7 +865,10 @@ class MeekroDB {
     
   }
 
-  protected function escapeTS($ts) {
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function escapeTS($ts) {
     if (is_string($ts)) {
       $str = date('Y-m-d H:i:s', strtotime($ts));
     }
@@ -864,7 +879,10 @@ class MeekroDB {
     return $this->escape($str);
   }
   
-  protected function intval($var) {
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function intval($var) {
     if (PHP_INT_SIZE == 8) return intval($var);
     return floor(doubleval($var));
   }
