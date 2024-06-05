@@ -144,7 +144,6 @@ class MeekroDB {
   public $internal_pdo = null;
   public $server_info = null;
   public $insert_id = 0;
-  public $num_rows = 0;
   public $affected_rows = 0;
   public $current_db = null;
   public $nested_transactions_count = 0;
@@ -352,16 +351,6 @@ class MeekroDB {
       file_put_contents($this->logfile, $results, FILE_APPEND);
     }
   }
-  
-  /**
-   * @deprecated No longer recommended.
-   */
-  public function count() { return call_user_func_array(array($this, 'numRows'), func_get_args()); }
-
-  /**
-   * @deprecated No longer recommended.
-   */
-  public function numRows() { return $this->num_rows; }
 
   public function serverVersion() { $this->get(); return $this->server_info; }
   public function transactionDepth() { return $this->nested_transactions_count; }
@@ -909,11 +898,11 @@ class MeekroDB {
     
     $runtime = microtime(true) - $starttime;
     $runtime = sprintf('%f', $runtime * 1000);
-
+    
     $this->insert_id = $pdo->lastInsertId();
-    $this->affected_rows = $result ? $result->rowCount() : false;
-
-    // TODO: handle num_rows
+    $got_result_set = ($result && $result->columnCount() > 0);
+    if ($result && !$got_result_set) $this->affected_rows = $result->rowCount();
+    else $this->affected_rows = false;
 
     $hookHash = array(
       'query' => $sql,
@@ -926,31 +915,14 @@ class MeekroDB {
     if ($Exception) {
       $hookHash['exception'] = $Exception;
       $hookHash['error'] = $Exception->getMessage();
-    } else if ($this->num_rows) {
-      $hookHash['rows'] = $this->num_rows;
     } else {
       $hookHash['affected'] = $this->affected_rows;
     }
 
-    $this->defaultRunHook($hookHash);
-    $this->runHook('post_run', $hookHash);
-    if ($Exception) {
-      if ($this->runHook('run_failed', $hookHash) !== false) {
-        throw $Exception;
-      }
-    }
-    else {
-      $this->runHook('run_success', $hookHash);
-    }
+    $return = false;
+    $skip_result_fetch = ($opts_walk || $opts_raw);
     
-    if ($opts_walk) {
-      return new MeekroDBWalk($result);
-    }
-    if ($opts_raw) {
-      return $result;
-    }
-    
-    if ($result && $result->columnCount() > 0) {
+    if (!$skip_result_fetch && $got_result_set) {
       $return = array();
 
       $infos = null;
@@ -968,13 +940,28 @@ class MeekroDB {
         $return[] = $row;
       }
     }
+
+    if (is_array($return)) {
+      $hookHash['rows'] = count($return);
+    }
+
+    $this->defaultRunHook($hookHash);
+    $this->runHook('post_run', $hookHash);
+    if ($Exception) {
+      if ($this->runHook('run_failed', $hookHash) !== false) {
+        throw $Exception;
+      }
+    }
     else {
-      // no result set, because we are not a SELECT query or there was an error
-      $return = $this->affected_rows;
+      $this->runHook('run_success', $hookHash);
     }
     
-    if ($result) $result->closeCursor();
-    return $return;
+    if ($opts_walk) return new MeekroDBWalk($result);
+    else if ($opts_raw) return $result;
+    else if ($result) $result->closeCursor();
+
+    if (is_array($return)) return $return;
+    return $this->affected_rows;
   }
 
   
