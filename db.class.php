@@ -79,14 +79,13 @@ class DB {
   public static $param_char = '%';
   public static $named_param_seperator = '_';
   public static $nested_transactions = false;
-  public static $ssl = null;
   public static $connect_options = array(PDO::ATTR_TIMEOUT => 30);
   public static $reconnect_after = 14400;
   public static $logfile;
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'ssl', 'connect_options', 'reconnect_after', 'logfile');
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'connect_options', 'reconnect_after', 'logfile');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
@@ -132,7 +131,6 @@ class MeekroDB {
   public $param_char = '%';
   public $named_param_seperator = '_';
   public $nested_transactions = false;
-  public $ssl = null;
   public $connect_options = array(PDO::ATTR_TIMEOUT => 30);
   public $reconnect_after = 14400;
   public $logfile;
