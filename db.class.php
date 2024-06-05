@@ -16,12 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// If the mysqli extension is missing, trying to load MeekroDB will fail
-// because the MYSQLI_OPT_CONNECT_TIMEOUT constant will be missing.
-// Putting our warning here is the only way to make sure the user sees a sensible
-// error message.
-if (! extension_loaded('mysqli')) {
-  throw new Exception("MeekroDB requires the mysqli extension for PHP");
+if (! extension_loaded('pdo')) {
+  throw new Exception("MeekroDB requires the pdo extension for PHP");
 }
 
 /**
@@ -65,7 +61,7 @@ if (! extension_loaded('mysqli')) {
  * @method static array tableList(?string $database_name = null)
  * @method static array columnList(string $table_name)
  * @method static void disconnect()
- * @method static mysqli get()
+ * @method static PDO get()
  * @method static string lastQuery()
  * @method static string parse(string $query, ...$parameters)
  * @method static string serverVersion()
@@ -145,7 +141,7 @@ class MeekroDB {
   public $logfile;
   
   // internal
-  public $internal_mysql = null;
+  public $internal_pdo = null;
   public $server_info = null;
   public $insert_id = 0;
   public $num_rows = 0;
@@ -196,51 +192,35 @@ class MeekroDB {
   }
   
   public function get() {
-    $mysql = $this->internal_mysql;
+    $pdo = $this->internal_pdo;
     
-    if (!($mysql instanceof MySQLi)) {
-      // PHP 8.1+ sets a reporting mode by default, causing it to throw mysqli_sql_exceptions
-      // we don't want this because we're checking mysqli->error anyway
-      $driver = new mysqli_driver();
-      $driver->report_mode = MYSQLI_REPORT_OFF;
-
-      if (! $this->port) $this->port = ini_get('mysqli.default_port');
+    if (!($pdo instanceof PDO)) {
       $this->current_db = $this->dbName;
-      $mysql = new mysqli();
-
-      $connect_flags = $this->connect_flags;
-      if (is_array($this->ssl)) {
-        // PHP produces a warning when trying to access undefined array keys
-        $ssl_default = array('key' => NULL, 'cert' => NULL, 'ca_cert' => NULL, 'ca_path' => NULL, 'cipher' => NULL);
-        $ssl = array_merge($ssl_default, $this->ssl);
-        $mysql->ssl_set($ssl['key'], $ssl['cert'], $ssl['ca_cert'], $ssl['ca_path'], $ssl['cipher']);
-        $connect_flags |= MYSQLI_CLIENT_SSL;
-      }
-
-      foreach ($this->connect_options as $key => $value) {
-        $mysql->options($key, $value);
-      }
-
-      // suppress warnings, since we will check connect_error anyway
-      @$mysql->real_connect($this->host, $this->user, $this->password, $this->dbName, $this->port, $this->socket, $connect_flags);
       
-      if ($mysql->connect_error) {
-        throw new MeekroDBException("Unable to connect to MySQL server! Error: {$mysql->connect_error}");
+      $dsn = array('host' => $this->host ?: 'localhost');
+      if ($this->dbName) $dsn['dbname'] = $this->dbName;
+      if ($this->port) $dsn['port'] = $this->port;
+      if ($this->socket) $dsn['unix_socket'] = $this->socket;
+      if ($this->encoding) $dsn['charset'] = $this->encoding;
+      $dsn_parts = array();
+      foreach ($dsn as $key => $value) {
+        $dsn_parts[] = $key . '=' . $value;
       }
-      
-      $mysql->set_charset($this->encoding);
-      $this->internal_mysql = $mysql;
-      $this->server_info = $mysql->server_info;
+      $dsn = 'mysql:' . implode(';', $dsn_parts);
+      $pdo = new PDO($dsn, $this->user, $this->password);
+
+      // TODO: confirm SSL works
+      // TODO: connection errors?
+      // TODO: server_info
+
+      $this->internal_pdo = $pdo;
     }
     
-    return $mysql;
+    return $pdo;
   }
   
   public function disconnect() {
-    if ($this->internal_mysql) {
-      $this->internal_mysql->close();
-    }
-    $this->internal_mysql = null; 
+    $this->internal_pdo = null;
   }
 
   function addHook($type, $fn) {
@@ -392,8 +372,7 @@ class MeekroDB {
   
   public function useDB() { return call_user_func_array(array($this, 'setDB'), func_get_args()); }
   public function setDB($dbName) {
-    $db = $this->get();
-    if (! $db->select_db($dbName)) throw new MeekroDBException("Unable to set database to $dbName");
+    $this->query("USE %b", $dbName);
     $this->current_db = $dbName;
   }
   
@@ -810,7 +789,7 @@ class MeekroDB {
   /**
    * @internal has to be public for PHP 5.3 compatability
    */
-  public function escape($str) { return "'" . $this->get()->real_escape_string(strval($str)) . "'"; }
+  public function escape($str) { return $this->get()->quote(strval($str)); }
   
   /**
    * @internal has to be public for PHP 5.3 compatability
@@ -916,23 +895,25 @@ class MeekroDB {
     $this->last_query = $sql;
     $this->last_query_at = time();
     
-    $db = $this->get();
+    $pdo = $this->get();
     $starttime = microtime(true);
-    $result = $db->query($sql, $is_buffered ? MYSQLI_STORE_RESULT : MYSQLI_USE_RESULT);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
+
+    $result = $Exception = null;
+    try {
+      $result = $pdo->query($sql);
+    } catch (PDOException $e) {
+      $Exception = new MeekroDBException($e->getMessage(), $sql, $e->getCode());
+    }
+    
     $runtime = microtime(true) - $starttime;
     $runtime = sprintf('%f', $runtime * 1000);
 
-    $this->insert_id = $db->insert_id;
-    $this->affected_rows = $db->affected_rows;
+    $this->insert_id = $pdo->lastInsertId();
+    $this->affected_rows = $result ? $result->rowCount() : false;
 
-    // mysqli_result->num_rows won't initially show correct results for unbuffered data
-    if ($is_buffered && ($result instanceof MySQLi_Result)) $this->num_rows = $result->num_rows;
-    else $this->num_rows = null;
-
-    $Exception = null;
-    if ($db->error) {
-      $Exception = new MeekroDBException($db->error, $sql, $db->errno);
-    }
+    // TODO: handle num_rows
 
     $hookHash = array(
       'query' => $sql,
@@ -948,52 +929,51 @@ class MeekroDB {
     } else if ($this->num_rows) {
       $hookHash['rows'] = $this->num_rows;
     } else {
-      $hookHash['affected'] = $db->affected_rows;
+      $hookHash['affected'] = $this->affected_rows;
     }
 
     $this->defaultRunHook($hookHash);
     $this->runHook('post_run', $hookHash);
     if ($Exception) {
-      $result = $this->runHook('run_failed', $hookHash);
-      if ($result !== false) throw $Exception;
+      if ($this->runHook('run_failed', $hookHash) !== false) {
+        throw $Exception;
+      }
     }
     else {
       $this->runHook('run_success', $hookHash);
     }
     
     if ($opts_walk) {
-      return new MeekroDBWalk($db, $result);
-    }
-    if (!($result instanceof MySQLi_Result)) {
-      // query was not a SELECT
-      return $result ? $this->affected_rows : $result;
+      return new MeekroDBWalk($result);
     }
     if ($opts_raw) {
       return $result;
     }
     
-    $return = array();
+    if ($result && $result->columnCount() > 0) {
+      $return = array();
 
-    if ($opts_fullcols) {
-      $infos = array();
-      foreach ($result->fetch_fields() as $info) {
-        if (strlen($info->table)) $infos[] = $info->table . '.' . $info->name;
-        else $infos[] = $info->name;
+      $infos = null;
+      if ($opts_fullcols) {
+        $infos = array();
+        for ($i = 0; $i < $result->columnCount(); $i++) {
+          $info = $result->getColumnMeta($i);
+          if (strlen($info['table'])) $infos[$i] = $info['table'] . '.' . $info['name'];
+          else $infos[$i] = $info['name'];
+        }
+      }
+
+      while ($row = $result->fetch($opts_assoc ? PDO::FETCH_ASSOC : PDO::FETCH_NUM)) {
+        if ($infos) $row = array_combine($infos, $row);
+        $return[] = $row;
       }
     }
-
-    while ($row = ($opts_assoc ? $result->fetch_assoc() : $result->fetch_row())) {
-      if ($opts_fullcols) $row = array_combine($infos, $row);
-      $return[] = $row;
-    }
-
-    // free results
-    $result->free();
-    while ($db->more_results()) {
-      $db->next_result();
-      if ($result = $db->use_result()) $result->free();
+    else {
+      // no result set, because we are not a SELECT query or there was an error
+      $return = $this->affected_rows;
     }
     
+    if ($result) $result->closeCursor();
     return $return;
   }
 
@@ -1111,30 +1091,22 @@ class MeekroDB {
 }
 
 class MeekroDBWalk {
-  protected $mysqli;
   protected $result;
 
-  function __construct(MySQLi $mysqli, $result) {
-    $this->mysqli = $mysqli;
+  function __construct(PDOStatement $result) {
     $this->result = $result;
   }
 
   function next() {
-    // $result can be non-object if the query was not a SELECT
-    if (! ($this->result instanceof MySQLi_Result)) return;
-    if ($row = $this->result->fetch_assoc()) return $row;
-    else $this->free();
+    if (!$this->result) return;
+    $row = $this->result->fetch(PDO::FETCH_ASSOC);
+    if ($row === false) $this->free();
+    return $row;
   }
 
   function free() {
-    if (! ($this->result instanceof MySQLi_Result)) return;
-
-    $this->result->free();
-    while ($this->mysqli->more_results()) {
-      $this->mysqli->next_result();
-      if ($result = $this->mysqli->use_result()) $result->free();
-    }
-
+    if (!$this->result) return;
+    $this->result->closeCursor();
     $this->result = null;
   }
 

@@ -54,7 +54,7 @@ class WalkTest extends SimpleTest {
       // this will produce an out of sync error
       DB::query("SELECT * FROM accounts");
     } catch (MeekroDBException $e) {
-      if (substr_count($e->getMessage(), 'out of sync')) {
+      if (substr_count($e->getMessage(), 'out of sync') || substr_count($e->getMessage(), 'unbuffered queries')) {
         $exception_was_caught = 1;
       }
     }

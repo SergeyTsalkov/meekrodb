@@ -80,7 +80,7 @@ class BasicTest extends SimpleTest {
       'favorite_word' => null,
     ));
     
-    $this->assert(DB::insertId() === 3);
+    $this->assert(DB::insertId() == 3);
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
     
@@ -128,11 +128,12 @@ class BasicTest extends SimpleTest {
     $this->assert($password === 'hello');
     $this->assert($age == 15);
     
-    $mysqli_result = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
-    $this->assert($mysqli_result instanceof MySQLi_Result);
-    $row = $mysqli_result->fetch_assoc();
+    $statement = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
+    $this->assert($statement instanceof PDOStatement);
+    $row = $statement->fetch(PDO::FETCH_ASSOC);
+    $row2 = $statement->fetch(PDO::FETCH_ASSOC);
     $this->assert($row['password'] === 'goodbye');
-    $this->assert($mysqli_result->fetch_assoc() === null);
+    $this->assert($row2 === false);
   }
   
   function test_4_query() {
