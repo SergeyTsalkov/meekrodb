@@ -64,7 +64,6 @@ if (! extension_loaded('pdo')) {
  * @method static PDO get()
  * @method static string lastQuery()
  * @method static string parse(string $query, ...$parameters)
- * @method static string serverVersion()
  */
 class DB {
   // initial connection
@@ -142,7 +141,6 @@ class MeekroDB {
   
   // internal
   public $internal_pdo = null;
-  public $server_info = null;
   public $insert_id = 0;
   public $affected_rows = 0;
   public $current_db = null;
@@ -210,7 +208,6 @@ class MeekroDB {
 
       // TODO: confirm SSL works
       // TODO: connection errors?
-      // TODO: server_info
 
       $this->internal_pdo = $pdo;
     }
@@ -352,7 +349,6 @@ class MeekroDB {
     }
   }
 
-  public function serverVersion() { $this->get(); return $this->server_info; }
   public function transactionDepth() { return $this->nested_transactions_count; }
   public function insertId() { return $this->insert_id; }
   public function affectedRows() { return $this->affected_rows; }
