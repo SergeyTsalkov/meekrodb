@@ -74,22 +74,24 @@ class DB {
   public static $port = 3306; //hhvm complains if this is null
   public static $socket = null;
   public static $encoding = 'latin1';
+  public static $connect_options = array(PDO::ATTR_TIMEOUT => 30);
+  public static $dsn = null;
   
   // configure workings
   public static $param_char = '%';
   public static $named_param_seperator = '_';
   public static $nested_transactions = false;
-  public static $connect_options = array(PDO::ATTR_TIMEOUT => 30);
   public static $reconnect_after = 14400;
   public static $logfile;
   
   // internal
   protected static $mdb = null;
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'connect_options', 'reconnect_after', 'logfile');
+  public static $connection_variables = array('dbName', 'user', 'password', 'host', 'port', 'socket', 'encoding', 'connect_options', 'dsn');
+  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'reconnect_after', 'logfile');
   
   public static function getMDB() {
     $mdb = DB::$mdb;
-    
+
     if ($mdb === null) {
       $mdb = DB::$mdb = new MeekroDB();
     }
@@ -126,12 +128,13 @@ class MeekroDB {
   public $port = 3306;
   public $socket = null;
   public $encoding = 'latin1';
+  public $connect_options = array(PDO::ATTR_TIMEOUT => 30);
+  public $dsn = '';
   
   // configure workings
   public $param_char = '%';
   public $named_param_seperator = '_';
   public $nested_transactions = false;
-  public $connect_options = array(PDO::ATTR_TIMEOUT => 30);
   public $reconnect_after = 14400;
   public $logfile;
   
@@ -152,22 +155,15 @@ class MeekroDB {
     'run_failed' => array(),
   );
 
-  public function __construct($host=null, $user=null, $password=null, $dbName=null, $port=null, $encoding=null, $socket=null)  {
-    if ($host === null) $host = DB::$host;
-    if ($user === null) $user = DB::$user;
-    if ($password === null) $password = DB::$password;
-    if ($dbName === null) $dbName = DB::$dbName;
-    if ($port === null) $port = DB::$port;
-    if ($socket === null) $socket = DB::$socket;
-    if ($encoding === null) $encoding = DB::$encoding;
-    
-    $this->host = $host;
-    $this->user = $user;
-    $this->password = $password;
-    $this->dbName = $dbName;
-    $this->port = $port;
-    $this->socket = $socket;
-    $this->encoding = $encoding;
+  public function __construct(string $dsn='', string $user='', string $password='', array $opts=array()) {
+    foreach (DB::$connection_variables as $variable) {
+      $this->$variable = DB::$$variable;
+    }
+
+    if ($dsn) $this->dsn = $dsn;
+    if ($user) $this->user = $user;
+    if ($password) $this->password = $password;
+    if ($opts) $this->connect_options = $opts;
 
     $this->sync_config();
   }
@@ -178,9 +174,7 @@ class MeekroDB {
    */
   public function sync_config() {
     foreach (DB::$variables_to_sync as $variable) {
-      if ($this->$variable !== DB::$$variable) {
-        $this->$variable = DB::$$variable;
-      }
+      $this->$variable = DB::$$variable;
     }
   }
   
@@ -188,26 +182,29 @@ class MeekroDB {
     $pdo = $this->internal_pdo;
     
     if (!($pdo instanceof PDO)) {
-      $this->current_db = $this->dbName;
-      
-      $dsn = array('host' => $this->host ?: 'localhost');
-      if ($this->dbName) $dsn['dbname'] = $this->dbName;
-      if ($this->port) $dsn['port'] = $this->port;
-      if ($this->socket) $dsn['unix_socket'] = $this->socket;
-      if ($this->encoding) $dsn['charset'] = $this->encoding;
-      $dsn_parts = array();
-      foreach ($dsn as $key => $value) {
-        $dsn_parts[] = $key . '=' . $value;
+
+      // TODO: handle current_db
+      if (! $this->dsn) {
+        $this->current_db = $this->dbName;
+        $dsn = array('host' => $this->host ?: 'localhost');
+        if ($this->dbName) $dsn['dbname'] = $this->dbName;
+        if ($this->port) $dsn['port'] = $this->port;
+        if ($this->socket) $dsn['unix_socket'] = $this->socket;
+        if ($this->encoding) $dsn['charset'] = $this->encoding;
+        $dsn_parts = array();
+        foreach ($dsn as $key => $value) {
+          $dsn_parts[] = $key . '=' . $value;
+        }
+        $this->dsn = 'mysql:' . implode(';', $dsn_parts);
       }
-      $dsn = 'mysql:' . implode(';', $dsn_parts);
 
       try {
-        $pdo = new PDO($dsn, $this->user, $this->password, $this->connect_options);
+        $pdo = new PDO($this->dsn, $this->user, $this->password, $this->connect_options);
+        $this->internal_pdo = $pdo;
       } catch (PDOException $e) {
         throw new MeekroDBException($e->getMessage());
       }
-
-      $this->internal_pdo = $pdo;
+      
     }
     
     return $pdo;
