@@ -1,6 +1,23 @@
 #!/usr/bin/php
 <?php
 class SimpleTest {
+  public $db_type = 'mysql';
+
+  public $sql_types = array(
+    'mysql' => array(
+      'int_primary_auto' => 'INT NOT NULL AUTO_INCREMENT PRIMARY KEY',
+      'int_not_null' => 'INT NOT NULL',
+    ),
+    'sqlite' => array(
+      'int_primary_auto' => 'INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT',
+      'int_not_null' => 'INTEGER NOT NULL',
+    ),
+  );
+
+  public function sql_types() {
+    return $this->sql_types[$this->db_type];
+  }
+
   public function assert($boolean) {
     if (! $boolean) $this->fail();
   }
@@ -24,10 +41,15 @@ error_reporting(E_ALL | E_STRICT);
 require_once __DIR__ . '/../db.class.php';
 require_once __DIR__ . '/test_setup.php'; //test config values go here
 // WARNING: ALL tables in the database will be dropped before the tests, including non-test related tables. 
-DB::$user = $set_db_user;
-DB::$password = $set_password;
-DB::$dbName = $set_db;
-DB::$host = $set_host;
+// $db_type = 'mysql';
+// DB::$user = $set_db_user;
+// DB::$password = $set_password;
+// DB::$dbName = $set_db;
+// DB::$host = $set_host;
+
+$db_type = 'sqlite';
+DB::$dsn = 'sqlite:';
+
 DB::get(); //connect to mysql
 
 require_once __DIR__ . '/BasicTest.php';
@@ -53,6 +75,7 @@ $classes_to_test = array(
 $time_start = microtime_float();
 foreach ($classes_to_test as $class) {
   $object = new $class();
+  $object->db_type = $db_type;
   
   foreach (get_class_methods($object) as $method) {
     if (substr($method, 0, 4) != 'test') continue;

@@ -140,6 +140,7 @@ class MeekroDB {
   
   // internal
   public $internal_pdo = null;
+  public $db_type = 'mysql';
   public $insert_id = 0;
   public $affected_rows = 0;
   public $current_db = null;
@@ -183,7 +184,7 @@ class MeekroDB {
     
     if (!($pdo instanceof PDO)) {
 
-      // TODO: handle current_db
+      // TODO: handle current_db, dbName
       if (! $this->dsn) {
         $this->current_db = $this->dbName;
         $dsn = array('host' => $this->host ?: 'localhost');
@@ -197,6 +198,9 @@ class MeekroDB {
         }
         $this->dsn = 'mysql:' . implode(';', $dsn_parts);
       }
+
+      list($this->db_type) = explode(':', $this->dsn);
+      if (!$this->db_type) $this->db_type = 'mysql';
 
       try {
         $pdo = new PDO($this->dsn, $this->user, $this->password, $this->connect_options);
@@ -467,6 +471,7 @@ class MeekroDB {
     return $this->query($query);
   }
   
+  // TODO: get this working for sqlite 3.35+
   protected function insertOrReplace($which, $table, $datas, $options=array()) {
     $datas = unserialize(serialize($datas)); // break references within array
     $keys = $values = array();
@@ -488,16 +493,19 @@ class MeekroDB {
     if ($which != 'INSERT' && $which != 'INSERT IGNORE' && $which != 'REPLACE') {
       throw new MeekroDBException('insertOrReplace() must be called with one of: INSERT, INSERT IGNORE, REPLACE');
     }
+
+    if ($this->db_type == 'sqlite') $on_duplicate = 'ON CONFLICT DO UPDATE SET';
+    else $on_duplicate = 'ON DUPLICATE KEY UPDATE';
     
     if (isset($options['update']) && is_array($options['update']) && $options['update'] && $which == 'INSERT') {
       if (array_values($options['update']) !== $options['update']) {
         return $this->query(
-          str_replace('%', $this->param_char, "INSERT INTO %b %lc VALUES $var ON DUPLICATE KEY UPDATE %hc"), 
+          str_replace('%', $this->param_char, "INSERT INTO %b %lc VALUES {$var} {$on_duplicate} %hc"), 
           $table, $keys, $values, $options['update']);
       } else {
         $update_str = array_shift($options['update']);
         $query_param = array(
-          str_replace('%', $this->param_char, "INSERT INTO %b %lc VALUES $var ON DUPLICATE KEY UPDATE ") . $update_str, 
+          str_replace('%', $this->param_char, "INSERT INTO %b %lc VALUES {$var} {$on_duplicate} ") . $update_str, 
           $table, $keys, $values);
         $query_param = array_merge($query_param, $options['update']);
         return call_user_func_array(array($this, 'query'), $query_param);
@@ -540,16 +548,25 @@ class MeekroDB {
   }
   
   public function columnList($table) {
-    $data = $this->query("SHOW COLUMNS FROM %b", $table);
+    if ($this->db_type == 'sqlite') {
+      $query = 'PRAGMA table_info(%b)';
+      $primary = 'name';
+    }
+    else {
+      $query = 'SHOW COLUMNS FROM %b';
+      $primary = 'Field';
+    }
+
+    $data = $this->_query($query, $table);
     $columns = array();
     foreach ($data as $row) {
-      $columns[$row['Field']] = array(
-        'type' => $row['Type'],
-        'null' => $row['Null'],
-        'key' => $row['Key'],
-        'default' => $row['Default'],
-        'extra' => $row['Extra']
-      );
+      $key = $row[$primary];
+      $row2 = array();
+      foreach ($row as $name => $value) {
+        $row2[strtolower($name)] = $value;
+      }
+
+      $columns[$key] = $row2;
     }
 
     return $columns;
@@ -561,7 +578,14 @@ class MeekroDB {
       $this->useDB($db);
     }
 
-    $result = $this->queryFirstColumn('SHOW TABLES');
+    if ($this->db_type == 'sqlite') {
+      $cmd = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+    }
+    else {
+      $cmd = 'SHOW TABLES';
+    }
+
+    $result = $this->queryFirstColumn($cmd);
     if (isset($olddb)) $this->useDB($olddb);
     return $result;
   }
@@ -845,6 +869,17 @@ class MeekroDB {
     if (PHP_INT_SIZE == 8) return intval($var);
     return floor(doubleval($var));
   }
+
+  protected function _query() {
+    $param_char = $this->param_char;
+    $this->param_char = '%';
+
+    try {
+      return call_user_func_array(array($this, 'query'), func_get_args());
+    } finally {
+      $this->param_char = $param_char;
+    }
+  } 
 
   public function query() { return $this->queryHelper(array('assoc' => true), func_get_args()); }
 
