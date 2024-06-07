@@ -143,7 +143,6 @@ class MeekroDB {
   public $db_type = 'mysql';
   public $insert_id = 0;
   public $affected_rows = 0;
-  public $current_db = null;
   public $nested_transactions_count = 0;
   public $last_query;
   public $last_query_at=0;
@@ -189,9 +188,7 @@ class MeekroDB {
     $pdo = $this->internal_pdo;
     
     if (!($pdo instanceof PDO)) {
-      // TODO: handle current_db, dbName
       if (! $this->dsn) {
-        $this->current_db = $this->dbName;
         $dsn = array('host' => $this->host ?: 'localhost');
         if ($this->dbName) $dsn['dbname'] = $this->dbName;
         if ($this->port) $dsn['port'] = $this->port;
@@ -347,10 +344,7 @@ class MeekroDB {
   public function lastQuery() { return $this->last_query; }
   
   public function useDB() { return call_user_func_array(array($this, 'setDB'), func_get_args()); }
-  public function setDB($dbName) {
-    $this->query("USE %b", $dbName);
-    $this->current_db = $dbName;
-  }
+  public function setDB($dbName) { $this->query("USE %c", $dbName); }
   
   public function startTransaction() {
     $start_transaction = 'START TRANSACTION';
@@ -587,20 +581,21 @@ class MeekroDB {
   }
   
   public function tableList($db = null) {
-    if ($db) {
-      $olddb = $this->current_db;
-      $this->useDB($db);
-    }
-
     if ($this->db_type() == 'sqlite') {
-      $cmd = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+      if ($db) $tbl = "{$db}.sqlite_master";
+      else $tbl = "sqlite_master";
+
+      $result = $this->queryFirstColumn("SELECT name FROM %b 
+        WHERE type='table' AND name NOT LIKE 'sqlite_%'", $tbl);
     }
     else {
-      $cmd = 'SHOW TABLES';
+      if ($db) {
+        $result = $this->queryFirstColumn('SHOW TABLES FROM %b', $db);
+      } else {
+        $result = $this->queryFirstColumn('SHOW TABLES');
+      }
     }
 
-    $result = $this->queryFirstColumn($cmd);
-    if (isset($olddb)) $this->useDB($olddb);
     return $result;
   }
 
@@ -651,7 +646,6 @@ class MeekroDB {
         return new MeekroDBParsedQuery('?', array($str));
       },
       'ls' => function($arg) use ($t, $placeholders) {
-        // TODO: empty array should trigger exception, we should test for this
         $arg = array_map('strval', $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
@@ -987,7 +981,6 @@ class MeekroDB {
   public function queryFullColumns() { return $this->queryHelper(array('fullcols' => true), func_get_args()); }
   public function queryWalk() { return $this->queryHelper(array('walk' => true), func_get_args()); }
   
-  // TODO: update default hook to include query, params
   protected function queryHelper($opts, $args) {
     $opts_fullcols = (isset($opts['fullcols']) && $opts['fullcols']);
     $opts_raw = (isset($opts['raw']) && $opts['raw']);
