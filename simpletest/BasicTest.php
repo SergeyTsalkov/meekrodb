@@ -417,7 +417,7 @@ class BasicTest extends SimpleTest {
       'password' => 'dookoo',
     );
     
-    $affected_rows = DB::query("INSERT into accounts %lb VALUES %ls", array_keys($data), array_values($data));
+    $affected_rows = DB::query("INSERT into accounts %lc VALUES %ls", array_keys($data), array_values($data));
     $result = DB::query("SELECT * FROM accounts WHERE username=%s", 'vookoo');
     $this->assert($affected_rows === 1);
     $this->assert(count($result) === 1);
@@ -462,16 +462,6 @@ class BasicTest extends SimpleTest {
     $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
     $this->assert($affected_rows === 1);
     $this->assert($count === '0');
-  }
-
-  function test_10_parse() {
-    $parsed_query = DB::parse("SELECT * FROM %b WHERE id=%i AND name=%s", 'accounts', 5, 'Joe');
-    $correct_query = "SELECT * FROM `accounts` WHERE id=5 AND name='Joe'";
-    $this->assert($parsed_query === $correct_query);
-
-    $parsed_query = DB::parse("SELECT DATE_FORMAT(birthday, '%%Y-%%M-%%d %%h:%%i:%%s') AS mydate FROM accounts WHERE id=%i", 5);
-    $correct_query = "SELECT DATE_FORMAT(birthday, '%Y-%M-%d %h:%i:%s') AS mydate FROM accounts WHERE id=5";
-    $this->assert($parsed_query === $correct_query);
   }
 
   function test_11_timeout() {
