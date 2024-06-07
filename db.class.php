@@ -461,7 +461,6 @@ class MeekroDB {
     return $this->query($ParsedQuery);
   }
   
-  // TODO: get this working for sqlite 3.35+
   protected function insertOrReplace($mode, $table, $datas, $options=array()) {
     if ($mode == 'insert') {
       $action = 'INSERT';
@@ -1010,8 +1009,10 @@ class MeekroDB {
     $starttime = microtime(true);
     $pdo = $this->get();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
-
+    if ($this->db_type() == 'mysql') {
+      $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
+    }
+    
     $result = $Exception = null;
     try {
       if ($params) {

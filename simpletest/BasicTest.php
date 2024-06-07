@@ -13,7 +13,7 @@ class BasicTest extends SimpleTest {
     DB::query("CREATE TABLE `accounts` (
       `id` {$types['int_primary_auto']},
       `profile_id` {$types['int_not_null']} DEFAULT 0,
-      `username` VARCHAR( 255 ) NOT NULL ,
+      `username` VARCHAR( 255 ) NOT NULL DEFAULT '',
       `password` VARCHAR( 255 ) NULL ,
       `user.age` INT NOT NULL DEFAULT '10',
       `height` DOUBLE NOT NULL DEFAULT '10.0',
