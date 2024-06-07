@@ -47,6 +47,9 @@ class WalkTest extends SimpleTest {
   }
 
   function test_5_walk_error() {
+    // sqlite driver seems to always buffer results
+    if ($this->db_type == 'sqlite') return;
+
     $Walk = DB::queryWalk("SELECT * FROM accounts");
     $Walk->next();
     

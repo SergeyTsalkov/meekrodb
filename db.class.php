@@ -155,6 +155,7 @@ class MeekroDB {
     'run_failed' => array(),
   );
 
+  // TODO: note new constructor in docs
   public function __construct(string $dsn='', string $user='', string $password='', array $opts=array()) {
     foreach (DB::$connection_variables as $variable) {
       $this->$variable = DB::$$variable;
@@ -177,12 +178,18 @@ class MeekroDB {
       $this->$variable = DB::$$variable;
     }
   }
+
+  public function db_type() {
+    // $this->db_type var is only set after we connect, so we have to
+    // make sure we've connected before returning the info
+    $this->get();
+    return $this->db_type;
+  }
   
   public function get() {
     $pdo = $this->internal_pdo;
     
     if (!($pdo instanceof PDO)) {
-
       // TODO: handle current_db, dbName
       if (! $this->dsn) {
         $this->current_db = $this->dbName;
@@ -199,7 +206,9 @@ class MeekroDB {
       }
 
       list($this->db_type) = explode(':', $this->dsn);
-      if (!$this->db_type) $this->db_type = 'mysql';
+      if (!$this->db_type) {
+        throw new MeekroDBException("Invalid DSN: " . $this->dsn);
+      }
 
       try {
         $pdo = new PDO($this->dsn, $this->user, $this->password, $this->connect_options);
@@ -339,27 +348,38 @@ class MeekroDB {
     $this->current_db = $dbName;
   }
   
-  // TODO: use pdo's startTransaction, etc. functions where possible
+  // TODO: docs note that this does nothing when already in a transaction
   public function startTransaction() {
-    if (!$this->nested_transactions || $this->nested_transactions_count == 0) {
-      $this->query('START TRANSACTION');
-      $this->nested_transactions_count = 1;
-    } else {
+    $start_transaction = 'START TRANSACTION';
+    if ($this->db_type() == 'sqlite') {
+      $start_transaction = 'BEGIN TRANSACTION';
+    }
+
+    if ($this->nested_transactions_count == 0) {
+      $this->query($start_transaction);
+      $this->nested_transactions_count++;
+    }
+    else if ($this->nested_transactions) {
       $this->query("SAVEPOINT LEVEL{$this->nested_transactions_count}");
       $this->nested_transactions_count++;
     }
-    
+
     return $this->nested_transactions_count;
   }
   
   public function commit($all=false) {
-    if ($this->nested_transactions && $this->nested_transactions_count > 0)
-      $this->nested_transactions_count--;
-    
-    if (!$this->nested_transactions || $all || $this->nested_transactions_count == 0) {
+    if ($this->nested_transactions_count < 1) {
       $this->nested_transactions_count = 0;
+      return 0;
+    }
+
+    $this->nested_transactions_count--;
+    if ($all) $this->nested_transactions_count = 0;
+
+    if ($this->nested_transactions_count == 0) {
       $this->query('COMMIT');
-    } else {
+    }
+    else {
       $this->query("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
     }
     
@@ -367,13 +387,18 @@ class MeekroDB {
   }
   
   public function rollback($all=false) {
-    if ($this->nested_transactions && $this->nested_transactions_count > 0)
-      $this->nested_transactions_count--;
-    
-    if (!$this->nested_transactions || $all || $this->nested_transactions_count == 0) {
+    if ($this->nested_transactions_count < 1) {
       $this->nested_transactions_count = 0;
+      return 0;
+    }
+
+    $this->nested_transactions_count--;
+    if ($all) $this->nested_transactions_count = 0;
+
+    if ($this->nested_transactions_count == 0) {
       $this->query('ROLLBACK');
-    } else {
+    }
+    else {
       $this->query("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
     }
     
@@ -453,7 +478,7 @@ class MeekroDB {
     if ($mode == 'insert') {
       $action = 'INSERT';
     } else if ($mode == 'ignore') {
-      if ($this->db_type == 'sqlite') $action = 'INSERT';
+      if ($this->db_type() == 'sqlite') $action = 'INSERT';
       else $action = 'INSERT IGNORE';
     } else if ($mode == 'replace') {
       $action = 'REPLACE';
@@ -483,11 +508,11 @@ class MeekroDB {
     $do_update = $mode == 'insert' && isset($options['update']) 
       && is_array($options['update']) && $options['update'];
 
-    if ($mode == 'ignore' && $this->db_type == 'sqlite') {
+    if ($mode == 'ignore' && $this->db_type() == 'sqlite') {
       $ParsedQuery->add(' ON CONFLICT DO NOTHING');
     }
     else if ($do_update) {
-      if ($this->db_type == 'sqlite') $on_duplicate = 'ON CONFLICT DO UPDATE SET';
+      if ($this->db_type() == 'sqlite') $on_duplicate = 'ON CONFLICT DO UPDATE SET';
       else $on_duplicate = 'ON DUPLICATE KEY UPDATE';
       $ParsedQuery->add(" {$on_duplicate} ");
 
@@ -534,7 +559,7 @@ class MeekroDB {
   }
   
   public function columnList($table) {
-    if ($this->db_type == 'sqlite') {
+    if ($this->db_type() == 'sqlite') {
       $query = 'PRAGMA table_info(%b)';
       $primary = 'name';
     }
@@ -564,7 +589,7 @@ class MeekroDB {
       $this->useDB($db);
     }
 
-    if ($this->db_type == 'sqlite') {
+    if ($this->db_type() == 'sqlite') {
       $cmd = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
     }
     else {
@@ -987,8 +1012,8 @@ class MeekroDB {
     $this->last_query = $query;
     $this->last_query_at = time();
     
-    $pdo = $this->get();
     $starttime = microtime(true);
+    $pdo = $this->get();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
 

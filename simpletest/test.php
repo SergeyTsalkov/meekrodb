@@ -22,6 +22,15 @@ class SimpleTest {
     if (! $boolean) $this->fail();
   }
 
+  public function match_set(string $haystack, array $needles) {
+    $haystack = strtolower($haystack);
+    foreach ($needles as $needle) {
+      $needle = strtolower($needle);
+      if (substr_count($haystack, $needle)) return true;
+    }
+    return false;
+  }
+
   protected function fail($msg = '') {
     echo "FAILURE! $msg\n";
     debug_print_backtrace();

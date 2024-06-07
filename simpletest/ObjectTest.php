@@ -12,19 +12,34 @@ class ObjectTest extends SimpleTest {
   
   
   function test_1_create_table() {
+    $types = $this->sql_types();
+
     $this->mdb->query("CREATE TABLE `accounts` (
-    `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
-    `username` VARCHAR( 255 ) NOT NULL ,
-    `password` VARCHAR( 255 ) NULL ,
-    `age` INT NOT NULL DEFAULT '10',
-    `height` DOUBLE NOT NULL DEFAULT '10.0',
-    `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi'
-    ) ENGINE = InnoDB");
+      `id` {$types['int_primary_auto']},
+      `profile_id` {$types['int_not_null']} DEFAULT 0,
+      `username` VARCHAR( 255 ) NOT NULL ,
+      `password` VARCHAR( 255 ) NULL ,
+      `user.age` INT NOT NULL DEFAULT '10',
+      `height` DOUBLE NOT NULL DEFAULT '10.0',
+      `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
+      `birthday` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00'
+    )");
+
+    $this->mdb->query("CREATE TABLE `profile` (
+      `id` {$types['int_primary_auto']},
+      `signature` VARCHAR( 255 ) NULL DEFAULT 'donewriting'
+    )");
+
+    $this->mdb->query("CREATE TABLE `fake%s_table` (
+      `id` {$types['int_primary_auto']},
+      `name` VARCHAR( 255 ) NULL DEFAULT 'blah'
+    )");
   }
   
   function test_1_5_empty_table() {
     $counter = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(0));
+    $this->assert($this->mdb->lastQuery() === 'SELECT COUNT(*) FROM accounts');
     
     $row = $this->mdb->queryFirstRow("SELECT * FROM accounts");
     $this->assert($row === null);
@@ -43,11 +58,12 @@ class ObjectTest extends SimpleTest {
   }
   
   function test_2_insert_row() {
-    $this->mdb->insert('accounts', array(
+    $affected_rows = $this->mdb->insert('accounts', array(
       'username' => 'Abe',
       'password' => 'hello'
     ));
     
+    $this->assert($affected_rows === 1);
     $this->assert($this->mdb->affectedRows() === 1);
     
     $counter = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts");
@@ -58,30 +74,55 @@ class ObjectTest extends SimpleTest {
     $this->mdb->insert('`accounts`', array(
       'username' => 'Bart',
       'password' => 'hello',
-      'age' => 15,
+      'user.age' => 15,
       'height' => 10.371
     ));
-    $dbname = $this->mdb->dbName;
-    $this->mdb->insert("`$dbname`.`accounts`", array(
+
+    if ($this->db_type != 'sqlite') {
+      $table_name = sprintf("`%s`.`%s`", $this->mdb->dbName, 'accounts');
+    } else {
+      $table_name = 'accounts';
+    }
+
+    $this->mdb->insert($table_name, array(
       'username' => 'Charlie\'s Friend',
       'password' => 'goodbye',
-      'age' => 30,
+      'user.age' => 30,
       'height' => 155.23,
       'favorite_word' => null,
     ));
-    
+
     $this->assert($this->mdb->insertId() == 3);
-    
     $counter = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
     
+    $this->mdb->insert('`accounts`', array(
+      'username' => 'Deer',
+      'password' => '',
+      'user.age' => 15,
+      'height' => 10.371
+    ));
+
+    $username = $this->mdb->queryFirstField("SELECT username FROM accounts WHERE password=%s0", null);
+    $this->assert($username === 'Deer');
+
     $password = $this->mdb->queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
     $this->assert($password === 'goodbye');
     
+    // TODO: cleanup insertUpdate() for sqlite
+    if ($this->db_type != 'sqlite') {
+      $this->mdb->insertUpdate('accounts', array(
+        'id' => 3,
+        'favorite_word' => null,
+      ));
+    }
+    
     $this->mdb->param_char = '###';
-    $bart = $this->mdb->queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
+    $bart = $this->mdb->queryFirstRow("SELECT * FROM accounts WHERE `user.age` IN ###li AND height IN ###ld AND username IN ###ls", 
       array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
     $this->assert($bart['username'] === 'Bart');
+    $this->mdb->insert('accounts', array('username' => 'f_u'));
+    $this->mdb->query("DELETE FROM accounts WHERE username=###s", 'f_u');
     $this->mdb->param_char = '%';
     
     $charlie_password = $this->mdb->queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
@@ -97,67 +138,105 @@ class ObjectTest extends SimpleTest {
     $this->assert($passwords[0] === 'hello');
     
     $username = $password = $age = null;
-    list($age, $username, $password) = $this->mdb->queryOneList("SELECT age,username,password FROM accounts WHERE username=%s", 'Bart');
+    list($age, $username, $password) = $this->mdb->queryOneList("SELECT `user.age`,username,password FROM accounts WHERE username=%s", 'Bart');
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
     
-    $result = $this->mdb->queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
-    $this->assert($result instanceof PDOStatement);
-    $row = $result->fetch(PDO::FETCH_ASSOC);
-    $row2 = $result->fetch(PDO::FETCH_ASSOC);
+    $statement = $this->mdb->queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
+    $this->assert($statement instanceof PDOStatement);
+    $row = $statement->fetch(PDO::FETCH_ASSOC);
+    $row2 = $statement->fetch(PDO::FETCH_ASSOC);
     $this->assert($row['password'] === 'goodbye');
     $this->assert($row2 === false);
   }
   
   function test_4_query() {
-    $results = $this->mdb->query("SELECT * FROM accounts WHERE username=%s", 'Charlie\'s Friend');
+    $affected_rows = $this->mdb->update('accounts', array(
+      'birthday' => new DateTime('10 September 2000 13:13:13')
+    ), 'username=%s', 'Charlie\'s Friend');
+    
+    $results = $this->mdb->query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
+    $this->assert($affected_rows === 1);
     $this->assert(count($results) === 1);
-    $this->assert($results[0]['age'] == 30 && $results[0]['password'] == 'goodbye');
+    $this->assert($results[0]['user.age'] === '30' && $results[0]['password'] === 'goodbye');
+    $this->assert($results[0]['birthday'] == '2000-09-10 13:13:13');
     
     $results = $this->mdb->query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
-    $this->assert(count($results) === 2);
+    $this->assert(count($results) === 3);
     
     $columnList = $this->mdb->columnList('accounts');
     $columnKeys = array_keys($columnList);
-    $this->assert(count($columnList) === 6);
-    $this->assert($columnList['id']['type'] == 'int(11)');
-    $this->assert($columnList['height']['type'] == 'double');
-    $this->assert($columnKeys[4] == 'height');
+    $this->assert(count($columnList) === 8);
+
+    if ($this->db_type == 'mysql') {
+      $this->assert($columnList['id']['type'] == 'int(11)');
+      $this->assert($columnList['height']['type'] == 'double');
+    }
+    else if ($this->db_type == 'sqlite') {
+      $this->assert($columnList['id']['type'] == 'INTEGER');
+      $this->assert($columnList['height']['type'] == 'DOUBLE');
+    }
+    
+    $this->assert($columnKeys[5] == 'height');
     
     $tablelist = $this->mdb->tableList();
-    $this->assert(count($tablelist) === 1);
+    $this->assert(count($tablelist) === 3);
     $this->assert($tablelist[0] === 'accounts');
     
     $tablelist = null;
     $tablelist = $this->mdb->tableList($this->mdb->dbName);
-    $this->assert(count($tablelist) === 1);
+    $this->assert(count($tablelist) === 3);
     $this->assert($tablelist[0] === 'accounts');
+
+    if ($this->db_type == 'sqlite') {
+      $date = $this->mdb->queryFirstField("SELECT strftime('%%m/%%d/%%Y', birthday) FROM accounts WHERE username=%s", "Charlie's Friend");
+      $date2 = $this->mdb->queryFirstField("SELECT strftime('%m/%d/%Y', '2009-10-04 22:23:00')");
+    } else {
+      $date = $this->mdb->queryFirstField("SELECT DATE_FORMAT(birthday, '%%m/%%d/%%Y') FROM accounts WHERE username=%s", "Charlie's Friend");
+      $date2 = $this->mdb->queryFirstField("SELECT DATE_FORMAT('2009-10-04 22:23:00', '%m/%d/%Y')");;
+    }
+    $this->assert($date === '09/10/2000');
+    $this->assert($date2 === '10/04/2009');
   }
   
   function test_4_1_query() {
     $this->mdb->insert('accounts', array(
       'username' => 'newguy',
-      'password' => $this->mdb->sqleval("REPEAT('blah', %i)", '3'),
-      'age' => $this->mdb->sqleval('171+1'),
+      'password' => $this->mdb->sqleval("SUBSTR('abcdefgh', %i)", '3'),
+      'user.age' => $this->mdb->sqleval('171+1'),
       'height' => 111.15
     ));
     
-    $row = $this->mdb->queryOneRow("SELECT * FROM accounts WHERE password=%s", 'blahblahblah');
+    $row = $this->mdb->queryOneRow("SELECT * FROM accounts WHERE password=%s", 'cdefgh');
     $this->assert($row['username'] === 'newguy');
-    $this->assert($row['age'] === '172');
+    $this->assert($row['user.age'] === '172');
     
-    $this->mdb->update('accounts', array(
-      'password' => $this->mdb->sqleval("REPEAT('blah', %i)", 4),
+    $affected_rows = $this->mdb->update('accounts', array(
+      'password' => $this->mdb->sqleval("SUBSTR('abcdefgh', %i)", 4),
       'favorite_word' => null,
-      ), 'username=%s', 'newguy');
+      ), 'username=%s_name', array('name' => 'newguy'));
     
     $row = null;
     $row = $this->mdb->queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
-    $this->assert($row['password'] === 'blahblahblahblah');
+    $this->assert($affected_rows === 1);
+    $this->assert($row['password'] === 'defgh');
     $this->assert($row['favorite_word'] === null);
     
-    $this->mdb->query("DELETE FROM accounts WHERE password=%s", 'blahblahblahblah');
+    $row = $this->mdb->query("SELECT * FROM accounts WHERE password=%s_mypass AND (password=%s_mypass) AND username=%s_myuser", 
+      array('myuser' => 'newguy', 'mypass' => 'defgh')
+    );
+    $this->assert(count($row) === 1);
+    $this->assert($row[0]['username'] === 'newguy');
+    $this->assert($row[0]['user.age'] === '172');
+
+    $row = $this->mdb->query("SELECT * FROM accounts WHERE password IN %ls AND password IN %ls0 AND username=%s", array('defgh'), 'newguy');
+    $this->assert(count($row) === 1);
+    $this->assert($row[0]['username'] === 'newguy');
+    $this->assert($row[0]['user.age'] === '172');
+    
+    $affected_rows = $this->mdb->query("DELETE FROM accounts WHERE password=%s", 'defgh');
+    $this->assert($affected_rows === 1);
     $this->assert($this->mdb->affectedRows() === 1);
   }
   
@@ -165,17 +244,18 @@ class ObjectTest extends SimpleTest {
     $this->mdb->insert('accounts', array(
       'username' => 'gonesoon',
       'password' => 'something',
-      'age' => 61,
+      'user.age' => 61,
       'height' => 199.194
     ));
     
-    $ct = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s AND height=%d", 'gonesoon', 199.194);
+    $ct = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts WHERE %ha", array('username' => 'gonesoon', 'height' => 199.194));
     $this->assert(intval($ct) === 1);
     
     $ct = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s1 AND height=%d0 AND height=%d", 199.194, 'gonesoon');
     $this->assert(intval($ct) === 1);
     
-    $this->mdb->delete('accounts', 'username=%s AND age=%i AND height=%d', 'gonesoon', '61', '199.194');
+    $affected_rows = $this->mdb->delete('accounts', 'username=%s AND `user.age`=%i AND height=%d', 'gonesoon', '61', '199.194');
+    $this->assert($affected_rows === 1);
     $this->assert($this->mdb->affectedRows() === 1);
     
     $ct = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s AND height=%d", 'gonesoon', '199.194');
@@ -186,83 +266,112 @@ class ObjectTest extends SimpleTest {
     $ins[] = array(
       'username' => '1ofmany',
       'password' => 'something',
-      'age' => 23,
+      'user.age' => 23,
       'height' => 190.194
     );
     $ins[] = array(
       'password' => 'somethingelse',
       'username' => '2ofmany',
-      'age' => 25,
+      'user.age' => 25,
       'height' => 190.194
     );
+    $ins[] = array(
+      'password' => NULL,
+      'username' => '3ofmany',
+      'user.age' => 15,
+      'height' => 111.951
+    ); 
     
     $this->mdb->insert('accounts', $ins);
-    $this->assert($this->mdb->affectedRows() === 2);
+    $this->assert($this->mdb->affectedRows() === 3);
     
-    $rows = $this->mdb->query("SELECT * FROM accounts WHERE height=%d ORDER BY age ASC", 190.194);
+    $rows = $this->mdb->query("SELECT * FROM accounts WHERE height=%d ORDER BY `user.age` ASC", 190.194);
     $this->assert(count($rows) === 2);
     $this->assert($rows[0]['username'] === '1ofmany');
-    $this->assert($rows[0]['age'] === '23');
-    $this->assert($rows[1]['age'] === '25');
+    $this->assert($rows[0]['user.age'] === '23');
+    $this->assert($rows[1]['user.age'] === '25');
     $this->assert($rows[1]['password'] === 'somethingelse');
     $this->assert($rows[1]['username'] === '2ofmany');
     
+    $nullrow = $this->mdb->queryOneRow("SELECT * FROM accounts WHERE username LIKE %ss", '3ofman');
+    $this->assert($nullrow['password'] === NULL);
+    $this->assert($nullrow['user.age'] === '15');
   }
   
   
   
   function test_5_insert_blobs() {
-    $this->mdb->query("CREATE TABLE `storedata` (
-      `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY ,
+    $types = $this->sql_types();
+
+    $this->mdb->query("CREATE TABLE `store data` (
+      `id` {$types['int_primary_auto']},
       `picture` BLOB
-    ) ENGINE = InnoDB");
-    
+    )");
+
+    $columns = $this->mdb->columnList('store data');
+    $this->assert(count($columns) === 2);
+
+    if ($this->db_type == 'sqlite') {
+      $this->assert($columns['picture']['type'] === 'BLOB');
+      $this->assert($columns['picture']['notnull'] === '0');
+      $this->assert($columns['picture']['dflt_value'] === NULL);
+    } else {
+      $this->assert($columns['picture']['type'] === 'blob');
+      $this->assert($columns['picture']['null'] === 'YES');
+      $this->assert($columns['picture']['key'] === '');
+      $this->assert($columns['picture']['default'] === NULL);
+      $this->assert($columns['picture']['extra'] === '');
+    }
     
     $smile = file_get_contents(__DIR__ . '/smile1.jpg');
-    $this->mdb->insert('storedata', array(
+    $this->mdb->insert('store data', array(
       'picture' => $smile,
     ));
-    $this->mdb->query("INSERT INTO storedata (picture) VALUES (%s)", $smile);
+    $this->mdb->query("INSERT INTO %b (picture) VALUES (%s)", 'store data', $smile);
     
-    $getsmile = $this->mdb->queryFirstField("SELECT picture FROM storedata WHERE id=1");
-    $getsmile2 = $this->mdb->queryFirstField("SELECT picture FROM storedata WHERE id=2");
+    $getsmile = $this->mdb->queryFirstField("SELECT picture FROM %b WHERE id=1", 'store data');
+    $getsmile2 = $this->mdb->queryFirstField("SELECT picture FROM %b WHERE id=2", 'store data');
     $this->assert($smile === $getsmile);
     $this->assert($smile === $getsmile2);
   }
   
   function test_6_insert_ignore() {
-    $this->mdb->insertIgnore('accounts', array(
+    $affected_rows = $this->mdb->insertIgnore('accounts', array(
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'age' => 61,
+      'user.age' => 61,
       'height' => 199.194
     ));
+    $this->assert($affected_rows === 0);
   }
   
   function test_7_insert_update() {
-    $this->mdb->insertUpdate('accounts', array(
+    if ($this->db_type == 'sqlite') return;
+
+    $affected_rows = $this->mdb->insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'age' => 61,
+      'user.age' => 61,
       'height' => 199.194
-    ), 'age = age + %i', 1);
+    ), '`user.age` = `user.age` + %i', 1);
     
+    $this->assert($affected_rows === 2);
     $this->assert($this->mdb->affectedRows() === 2); // a quirk of MySQL, even though only 1 row was updated
     
-    $result = $this->mdb->query("SELECT * FROM accounts WHERE age = %i", 16);
+    $result = $this->mdb->query("SELECT * FROM accounts WHERE `user.age` = %i", 16);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['height'] === '10.371');
     
     $this->mdb->insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'blahblahdude',
-      'age' => 233,
+      'user.age' => 233,
       'height' => 199.194
     ));
     
-    $result = $this->mdb->query("SELECT * FROM accounts WHERE age = %i", 233);
+    $result = $this->mdb->query("SELECT * FROM accounts WHERE `user.age` = %i", 233);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['height'] === '199.194');
     $this->assert($result[0]['username'] === 'blahblahdude');
@@ -271,13 +380,13 @@ class ObjectTest extends SimpleTest {
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'age' => 61,
+      'user.age' => 61,
       'height' => 199.194
     ), array(
-      'age' => 74,
+      'user.age' => 74,
     ));
     
-    $result = $this->mdb->query("SELECT * FROM accounts WHERE age = %i", 74);
+    $result = $this->mdb->query("SELECT * FROM accounts WHERE `user.age` = %i", 74);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['height'] === '199.194');
     $this->assert($result[0]['username'] === 'blahblahdude');
@@ -286,27 +395,81 @@ class ObjectTest extends SimpleTest {
       'id' => 3, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'age' => 61,
+      'user.age' => 61,
       'height' => 199.194
     );
     $multiples[] = array(
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'age' => 61,
+      'user.age' => 61,
       'height' => 199.194
     );
     
-    $this->mdb->insertUpdate('accounts', $multiples, array('age' => 914));
+    $this->mdb->insertUpdate('accounts', $multiples, array('user.age' => 914));
     $this->assert($this->mdb->affectedRows() === 4);
     
-    $result = $this->mdb->query("SELECT * FROM accounts WHERE age=914 ORDER BY id ASC");
+    $result = $this->mdb->query("SELECT * FROM accounts WHERE `user.age`=914 ORDER BY id ASC");
     $this->assert(count($result) === 2);
     $this->assert($result[0]['username'] === 'Abe');
     $this->assert($result[1]['username'] === 'Charlie\'s Friend');
     
-    $this->mdb->query("UPDATE accounts SET age=15, username='Bart' WHERE age=%i", 74);
+    $affected_rows = $this->mdb->query("UPDATE accounts SET `user.age`=15, username='Bart' WHERE `user.age`=%i", 74);
+    $this->assert($affected_rows === 1);
     $this->assert($this->mdb->affectedRows() === 1);
+  }
+  
+  function test_8_lb() {
+    $data = array(
+      'username' => 'vookoo',
+      'password' => 'dookoo',
+    );
+    
+    $affected_rows = $this->mdb->query("INSERT into accounts %lc VALUES %ls", array_keys($data), array_values($data));
+    $result = $this->mdb->query("SELECT * FROM accounts WHERE username=%s", 'vookoo');
+    $this->assert($affected_rows === 1);
+    $this->assert(count($result) === 1);
+    $this->assert($result[0]['password'] === 'dookoo');
+  }
+
+  function test_9_fullcolumns() {
+    $affected_rows = $this->mdb->insert('profile', array(
+      'id' => 1,
+      'signature' => 'u_suck'
+    ));
+    $this->mdb->query("UPDATE accounts SET profile_id=1 WHERE id=2");
+
+    $r = $this->mdb->queryFullColumns("SELECT accounts.*, profile.*, 1+1 FROM accounts
+      INNER JOIN profile ON accounts.profile_id=profile.id");
+
+    $this->assert($affected_rows === 1);
+    $this->assert(count($r) === 1);
+    $this->assert($r[0]['accounts.id'] === '2');
+    $this->assert($r[0]['profile.id'] === '1');
+    $this->assert($r[0]['profile.signature'] === 'u_suck');
+    $this->assert($r[0]['1+1'] === '2');
+  }
+
+  function test_901_updatewithspecialchar() {
+    $data = 'www.mysite.com/product?s=t-%s-%%3d%%3d%i&RCAID=24322';
+    $this->mdb->update('profile', array('signature' => $data), 'id=%i', 1);
+    $signature = $this->mdb->queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
+    $this->assert($signature === $data);
+
+    $this->mdb->update('profile', array('signature'=> "%li "), array('id' => 1));
+    $signature = $this->mdb->queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
+    $this->assert($signature === "%li ");
+  }
+
+  function test_902_faketable() {
+    $this->mdb->insert('fake%s_table', array('name' => 'karen'));
+    $count = $this->mdb->queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
+    $this->assert($count === '1');
+    $this->mdb->update('fake%s_table', array('name' => 'haren%s'), 'name=%s_name', array('name' => 'karen'));
+    $affected_rows = $this->mdb->delete('fake%s_table', array('name' => 'haren%s'));
+    $count = $this->mdb->queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
+    $this->assert($affected_rows === 1);
+    $this->assert($count === '0');
   }
 
 }
