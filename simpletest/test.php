@@ -22,7 +22,7 @@ class SimpleTest {
     if (! $boolean) $this->fail();
   }
 
-  public function match_set(string $haystack, array $needles) {
+  public function match_set($haystack, array $needles) {
     $haystack = strtolower($haystack);
     foreach ($needles as $needle) {
       $needle = strtolower($needle);

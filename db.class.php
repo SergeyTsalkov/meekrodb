@@ -154,7 +154,7 @@ class MeekroDB {
     'run_failed' => array(),
   );
 
-  public function __construct(string $dsn='', string $user='', string $password='', array $opts=array()) {
+  public function __construct($dsn='', $user='', $password='', $opts=array()) {
     foreach (DB::$connection_variables as $variable) {
       $this->$variable = DB::$$variable;
     }
@@ -601,12 +601,12 @@ class MeekroDB {
   protected function paramsMap() {
     $t = $this;
 
-    $placeholders = function(int $count, int $batches = 1) {
+    $placeholders = function($count, $batches = 1) {
       $question_marks = '(' . implode(',', array_fill(0, $count, '?')) . ')';
       return implode(',', array_fill(0, $batches, $question_marks));
     };
 
-    $join = function(array $Queries, string $glue=',', string $start='', string $end=''): MeekroDBParsedQuery {
+    $join = function(array $Queries, $glue=',', $start='', $end='') {
       $Master = new MeekroDBParsedQuery();
       $parts = array();
       foreach ($Queries as $Query) {
@@ -912,7 +912,7 @@ class MeekroDB {
   /**
    * @internal has to be public for PHP 5.3 compatability
    */
-  public function sanitizeTS($ts): string {
+  public function sanitizeTS($ts) {
     if (is_string($ts)) {
       return date('Y-m-d H:i:s', strtotime($ts));
     }
@@ -925,7 +925,7 @@ class MeekroDB {
   /**
    * @internal has to be public for PHP 5.3 compatability
    */
-  public function sanitize($input): MeekroDBParsedQuery {
+  public function sanitize($input) {
     if (is_object($input)) {
       if ($input instanceof DateTime) {
         return new MeekroDBParsedQuery('?', array($input->format('Y-m-d H:i:s')));
@@ -1347,12 +1347,12 @@ class MeekroDBParsedQuery {
   public $query = '';
   public $params = array();
 
-  function __construct(string $query='', array $params = array()) {
+  function __construct($query='', $params = array()) {
     $this->query = $query;
     $this->params = $params;
   }
 
-  function add($query, array $params = array()) {
+  function add($query, $params = array()) {
     if ($query instanceof MeekroDBParsedQuery) {
       return $this->add($query->query, $query->params);
     }
@@ -1361,7 +1361,7 @@ class MeekroDBParsedQuery {
     $this->params = array_merge($this->params, array_values($params));
   }
 
-  function toArray(): array {
+  function toArray() {
     return array_merge(array($this->query), $this->params);
   }
 };
