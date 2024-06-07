@@ -139,29 +139,36 @@ class HookTest extends SimpleTest {
     DB::removeHooks('run_failed');
   }
 
-  // TODO: restore pre_run to working
-  // function test_7_pre_run() {
-  //   $callback_worked = false;
+  function test_7_pre_run() {
+    $callback_worked = false;
 
-  //   $fn = function($args) { return str_replace('SLCT', 'SELET', $args['query']); };
-  //   $fn2 = function($args) { return str_replace('SELET', 'SELECT', $args['query']); };
-  //   $fn3 = function($args) use (&$callback_worked) { $callback_worked = true; };
+    $fn = function($args) {
+      $query = str_replace('SLCT', 'SELET', $args['query']);
+      return array($query, $args['params']);
+    };
+    $fn2 = function($args) { 
+      $query = str_replace('SELET', 'SELECT', $args['query']);
+      return array($query, $args['params']);
+    };
+    $fn3 = function($args) use (&$callback_worked) { 
+      $callback_worked = true;
+    };
 
-  //   DB::addHook('pre_run', $fn);
-  //   DB::addHook('pre_run', $fn2);
-  //   $last_hook = DB::addHook('pre_run', $fn3);
-  //   $results = DB::query("SLCT * FROM accounts WHERE username!=%s", "Charlie's Friend");
-  //   $this->assert(count($results) == 4);
-  //   $this->assert($callback_worked);
+    DB::addHook('pre_run', $fn);
+    DB::addHook('pre_run', $fn2);
+    $last_hook = DB::addHook('pre_run', $fn3);
+    $results = DB::query("SLCT * FROM accounts WHERE username!=%s", "Charlie's Friend");
+    $this->assert(count($results) == 4);
+    $this->assert($callback_worked);
 
-  //   $callback_worked = false;
-  //   DB::removeHook('pre_run', $last_hook);
-  //   $results = DB::query("SLCT * FROM accounts WHERE username!=%s", "Charlie's Friend");
-  //   $this->assert(count($results) == 4);
-  //   $this->assert(!$callback_worked);
+    $callback_worked = false;
+    DB::removeHook('pre_run', $last_hook);
+    $results = DB::query("SLCT * FROM accounts WHERE username!=%s", "Charlie's Friend");
+    $this->assert(count($results) == 4);
+    $this->assert(!$callback_worked);
     
-  //   DB::removeHooks('pre_run');
-  // }
+    DB::removeHooks('pre_run');
+  }
 
   function test_9_enough_args() {
     $error_worked = false;

@@ -149,7 +149,6 @@ class MeekroDB {
   public $last_query_at=0;
 
   protected $hooks = array(
-    'pre_parse' => array(),
     'pre_run' => array(),
     'post_run' => array(),
     'run_success' => array(),
@@ -257,43 +256,23 @@ class MeekroDB {
       throw new MeekroDBException("Hook type $type is not recognized");
     }
 
-    if ($type == 'pre_parse') {
+    // TODO: update docs for pre_run hook
+    if ($type == 'pre_run') {
       $query = $args['query'];
-      $args = $args['args'];
+      $params = $args['params'];
 
       foreach ($this->hooks[$type] as $hook) {
-        $result = call_user_func($hook, array('query' => $query, 'args' => $args));
-        if (is_null($result)) {
-          $result = array($query, $args);
+        $result = call_user_func($hook, array('query' => $query, 'params' => $params));
+        if (!is_null($result)) {
+          if (is_array($result) && count($result) == 2) {
+            list($query, $params) = $result;
+          } else {
+            throw new MeekroDBException("pre_run hook must return a [query, params] array");
+          }
         }
-        if (!is_array($result) || count($result) != 2) {
-          throw new MeekroDBException("pre_parse hook must return an array of 2 items");
-        }
-        if (!is_string($result[0])) {
-          throw new MeekroDBException("pre_parse hook must return a string as its first item");
-        }
-        if (!is_array($result[1])) {
-          throw new MeekroDBException("pre_parse hook must return an array as its second item");
-        }
-        
-        $query = $result[0];
-        $args = $result[1];
       }
 
-      return array($query, $args);
-    }
-    else if ($type == 'pre_run') {
-      $query = $args['query'];
-
-      foreach ($this->hooks[$type] as $hook) {
-        $result = call_user_func($hook, array('query' => $query));
-        if (is_null($result)) $result = $query;
-        if (!is_string($result)) throw new MeekroDBException("pre_run hook must return a string");
-
-        $query = $result;
-      }
-
-      return $query;
+      return array($query, $params);
     }
     else if ($type == 'post_run') {
 
@@ -975,6 +954,7 @@ class MeekroDB {
   public function queryFullColumns() { return $this->queryHelper(array('fullcols' => true), func_get_args()); }
   public function queryWalk() { return $this->queryHelper(array('walk' => true), func_get_args()); }
   
+  // TODO: update default hook to include query, params
   protected function queryHelper($opts, $args) {
     $opts_fullcols = (isset($opts['fullcols']) && $opts['fullcols']);
     $opts_raw = (isset($opts['raw']) && $opts['raw']);
@@ -993,12 +973,11 @@ class MeekroDB {
     } else {
       $ParsedQuery = call_user_func_array(array($this, 'parse'), array_merge(array($query), $args));
     }
+    $query = $ParsedQuery->query;
+    $params = $ParsedQuery->params;
 
-    // TODO: cleanup pre_run, drop pre_parse
-    // list($query, $args) = $this->runHook('pre_parse', array('query' => $query, 'args' => $args));    
-    // $sql = $this->runHook('pre_run', array('query' => $sql));
-    
-    $this->last_query = $ParsedQuery->query;
+    list($query, $params) = $this->runHook('pre_run', array('query' => $query, 'params' => $params));
+    $this->last_query = $query;
     $this->last_query_at = time();
     
     $pdo = $this->get();
@@ -1008,17 +987,17 @@ class MeekroDB {
 
     $result = $Exception = null;
     try {
-      if ($ParsedQuery->params) {
-        $result = $pdo->prepare($ParsedQuery->query);
-        $result->execute($ParsedQuery->params);
+      if ($params) {
+        $result = $pdo->prepare($query);
+        $result->execute($params);
       }
       else {
-        $result = $pdo->query($ParsedQuery->query);
+        $result = $pdo->query($query);
       }
       
     } catch (PDOException $e) {
       $Exception = new MeekroDBException(
-        $e->getMessage(), $ParsedQuery->query, $ParsedQuery->params, $e->getCode()
+        $e->getMessage(), $query, $params, $e->getCode()
       );
     }
     
@@ -1032,8 +1011,8 @@ class MeekroDB {
 
     // TODO: make sure hooks get query and args
     $hookHash = array(
-      'query' => $ParsedQuery->query,
-      'params' => $ParsedQuery->params,
+      'query' => $query,
+      'params' => $params,
       'runtime' => $runtime,
       'exception' => null,
       'error' => null,
