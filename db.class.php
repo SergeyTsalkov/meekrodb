@@ -155,7 +155,6 @@ class MeekroDB {
     'run_failed' => array(),
   );
 
-  // TODO: note new constructor in docs
   public function __construct(string $dsn='', string $user='', string $password='', array $opts=array()) {
     foreach (DB::$connection_variables as $variable) {
       $this->$variable = DB::$$variable;
@@ -265,7 +264,6 @@ class MeekroDB {
       throw new MeekroDBException("Hook type $type is not recognized");
     }
 
-    // TODO: update docs for pre_run hook
     if ($type == 'pre_run') {
       $query = $args['query'];
       $params = $args['params'];
@@ -348,7 +346,6 @@ class MeekroDB {
     $this->current_db = $dbName;
   }
   
-  // TODO: docs note that this does nothing when already in a transaction
   public function startTransaction() {
     $start_transaction = 'START TRANSACTION';
     if ($this->db_type() == 'sqlite') {
@@ -660,7 +657,6 @@ class MeekroDB {
         $arg = array_map('doubleval', $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
-      // TODO: make sure lb and ll are dropped from docs
       'lc' => function($arg) use ($t) { 
         $str = '('. implode(',', array_map(array($t, 'formatColumnName'), $arg)) . ')';
         return new MeekroDBParsedQuery($str);
