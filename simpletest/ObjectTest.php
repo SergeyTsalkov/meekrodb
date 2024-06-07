@@ -53,7 +53,7 @@ class ObjectTest extends SimpleTest {
     $column = $this->mdb->queryFirstColumn("SELECT * FROM accounts");
     $this->assert(is_array($column) && count($column) === 0);
     
-    $column = $this->mdb->queryOneColumn('nothere', "SELECT * FROM accounts"); //TODO: is this what we want?
+    $column = $this->mdb->queryOneColumn('nothere', "SELECT * FROM accounts");
     $this->assert(is_array($column) && count($column) === 0);
   }
   

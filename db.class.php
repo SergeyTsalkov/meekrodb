@@ -313,6 +313,11 @@ class MeekroDB {
 
     $results[] = sprintf('[%s]', date('Y-m-d H:i:s'));
     $results[] = sprintf('QUERY: %s', $query);
+
+    if ($params = $args['params']) {
+      $results[] = sprintf('PARAMS: %s', implode(', ', $params));
+    }
+
     $results[] = sprintf('RUNTIME: %s ms', $args['runtime']);
 
     if ($args['affected']) {
@@ -853,7 +858,6 @@ class MeekroDB {
     return $queryParts;
   }
 
-  // TODO: trim() query just before running it, definitely not in parse()
   function parse($query) {
     $args = func_get_args();
     array_shift($args);
@@ -1006,6 +1010,7 @@ class MeekroDB {
     $params = $ParsedQuery->params;
 
     list($query, $params) = $this->runHook('pre_run', array('query' => $query, 'params' => $params));
+    $query = trim($query);
     $this->last_query = $query;
     $this->last_query_at = time();
     

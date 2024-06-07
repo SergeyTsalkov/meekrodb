@@ -49,7 +49,7 @@ class BasicTest extends SimpleTest {
     $column = DB::queryFirstColumn("SELECT * FROM accounts");
     $this->assert(is_array($column) && count($column) === 0);
     
-    $column = DB::queryOneColumn('nothere', "SELECT * FROM accounts"); //TODO: is this what we want?
+    $column = DB::queryOneColumn('nothere', "SELECT * FROM accounts");
     $this->assert(is_array($column) && count($column) === 0);
   }
   
