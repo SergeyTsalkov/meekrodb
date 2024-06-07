@@ -63,7 +63,7 @@ if (! extension_loaded('pdo')) {
  * @method static void disconnect()
  * @method static PDO get()
  * @method static string lastQuery()
- * @method static string parse(string $query, ...$parameters)
+ * @method static mixed parse(string $query, ...$parameters)
  */
 class DB {
   // initial connection
@@ -334,6 +334,7 @@ class MeekroDB {
     }
   }
 
+  public function serverVersion() { return $this->get()->getAttribute(PDO::ATTR_SERVER_VERSION); }
   public function transactionDepth() { return $this->nested_transactions_count; }
   public function insertId() { return $this->insert_id; }
   public function affectedRows() { return $this->affected_rows; }
@@ -352,51 +353,42 @@ class MeekroDB {
       $start_transaction = 'BEGIN TRANSACTION';
     }
 
-    if ($this->nested_transactions_count == 0) {
-      $this->query($start_transaction);
-      $this->nested_transactions_count++;
-    }
-    else if ($this->nested_transactions) {
+    if ($this->nested_transactions && $this->nested_transactions_count > 0) {
       $this->query("SAVEPOINT LEVEL{$this->nested_transactions_count}");
       $this->nested_transactions_count++;
+    } else {
+      $this->query($start_transaction);
+      $this->nested_transactions_count = 1;
     }
 
     return $this->nested_transactions_count;
   }
   
   public function commit($all=false) {
-    if ($this->nested_transactions_count < 1) {
-      $this->nested_transactions_count = 0;
-      return 0;
-    }
-
     $this->nested_transactions_count--;
-    if ($all) $this->nested_transactions_count = 0;
-
-    if ($this->nested_transactions_count == 0) {
-      $this->query('COMMIT');
+    if ($all || $this->nested_transactions_count < 0) {
+      $this->nested_transactions_count = 0;
     }
-    else {
+
+    if ($this->nested_transactions_count > 0) {
       $this->query("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
+    } else {
+      $this->query('COMMIT');
     }
     
     return $this->nested_transactions_count;
   }
   
   public function rollback($all=false) {
-    if ($this->nested_transactions_count < 1) {
-      $this->nested_transactions_count = 0;
-      return 0;
-    }
-
     $this->nested_transactions_count--;
-    if ($all) $this->nested_transactions_count = 0;
-
-    if ($this->nested_transactions_count == 0) {
-      $this->query('ROLLBACK');
+    if ($all || $this->nested_transactions_count < 0) {
+      $this->nested_transactions_count = 0;
     }
-    else {
+
+    if ($this->nested_transactions_count > 0) {
       $this->query("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
+    } else {
+      $this->query('ROLLBACK');
     }
     
     return $this->nested_transactions_count;
@@ -509,8 +501,17 @@ class MeekroDB {
       $ParsedQuery->add(' ON CONFLICT DO NOTHING');
     }
     else if ($do_update) {
-      if ($this->db_type() == 'sqlite') $on_duplicate = 'ON CONFLICT DO UPDATE SET';
-      else $on_duplicate = 'ON DUPLICATE KEY UPDATE';
+      if ($this->db_type() == 'sqlite') {
+        $on_duplicate = 'ON CONFLICT DO UPDATE SET';
+        
+        $sqlite_version = $this->serverVersion();
+        if ($sqlite_version < '3.35') {
+          throw new MeekroDBException("sqlite {$sqlite_version} does not support insertUpdate()");
+        }
+      }
+      else {
+        $on_duplicate = 'ON DUPLICATE KEY UPDATE';
+      }
       $ParsedQuery->add(" {$on_duplicate} ");
 
       if (array_values($options['update']) !== $options['update']) {

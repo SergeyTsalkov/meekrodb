@@ -105,12 +105,17 @@ class BasicTest extends SimpleTest {
     $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
     $this->assert($password === 'goodbye');
     
-    // TODO: cleanup insertUpdate() for sqlite
-    if ($this->db_type != 'sqlite') {
+    try {
       DB::insertUpdate('accounts', array(
         'id' => 3,
         'favorite_word' => null,
       ));
+    } catch (MeekroDBException $e) {
+      if (substr_count($e->getMessage(), 'does not support')) {
+        echo "Safe error, skipping test: " . $e->getMessage() . "\n";
+      } else {
+        throw $e;
+      }
     }
     
     DB::$param_char = '###';
