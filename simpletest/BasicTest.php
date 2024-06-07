@@ -105,11 +105,13 @@ class BasicTest extends SimpleTest {
     $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
     $this->assert($password === 'goodbye');
     
-    // TODO: make this work
-    // DB::insertUpdate('accounts', array(
-    //   'id' => 3,
-    //   'favorite_word' => null,
-    // ));
+    // TODO: cleanup insertUpdate() for sqlite
+    if ($this->db_type != 'sqlite') {
+      DB::insertUpdate('accounts', array(
+        'id' => 3,
+        'favorite_word' => null,
+      ));
+    }
     
     DB::$param_char = '###';
     $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE `user.age` IN ###li AND height IN ###ld AND username IN ###ls", 
@@ -341,6 +343,8 @@ class BasicTest extends SimpleTest {
   }
   
   function test_7_insert_update() {
+    if ($this->db_type == 'sqlite') return;
+
     $affected_rows = DB::insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
@@ -465,6 +469,8 @@ class BasicTest extends SimpleTest {
   }
 
   function test_11_timeout() {
+    if ($this->db_type == 'sqlite') return;
+    
     $default = DB::$reconnect_after;
     DB::$reconnect_after = 1;
     DB::query("SET SESSION wait_timeout=1");

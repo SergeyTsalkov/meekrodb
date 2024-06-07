@@ -41,14 +41,14 @@ error_reporting(E_ALL | E_STRICT);
 require_once __DIR__ . '/../db.class.php';
 require_once __DIR__ . '/test_setup.php'; //test config values go here
 // WARNING: ALL tables in the database will be dropped before the tests, including non-test related tables. 
-$db_type = 'mysql';
-DB::$user = $set_db_user;
-DB::$password = $set_password;
-DB::$dbName = $set_db;
-DB::$host = $set_host;
+// $db_type = 'mysql';
+// DB::$user = $set_db_user;
+// DB::$password = $set_password;
+// DB::$dbName = $set_db;
+// DB::$host = $set_host;
 
-// $db_type = 'sqlite';
-// DB::$dsn = 'sqlite:';
+$db_type = 'sqlite';
+DB::$dsn = 'sqlite:';
 
 DB::get(); //connect to mysql
 

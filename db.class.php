@@ -449,9 +449,16 @@ class MeekroDB {
   }
   
   // TODO: get this working for sqlite 3.35+
-  protected function insertOrReplace($which, $table, $datas, $options=array()) {
-    if ($which != 'INSERT' && $which != 'INSERT IGNORE' && $which != 'REPLACE') {
-      throw new MeekroDBException('insertOrReplace() must be called with one of: INSERT, INSERT IGNORE, REPLACE');
+  protected function insertOrReplace($mode, $table, $datas, $options=array()) {
+    if ($mode == 'insert') {
+      $action = 'INSERT';
+    } else if ($mode == 'ignore') {
+      if ($this->db_type == 'sqlite') $action = 'INSERT';
+      else $action = 'INSERT IGNORE';
+    } else if ($mode == 'replace') {
+      $action = 'REPLACE';
+    } else {
+      throw new MeekroDBException("insertOrReplace() mode must be: insert, ignore, replace");
     }
 
     $datas = unserialize(serialize($datas)); // break references within array
@@ -464,21 +471,22 @@ class MeekroDB {
         $values[] = array_values($datum);  
       }
 
-      $ParsedQuery = $this->_parse('%l INTO %b %lc VALUES %ll?', $which, $table, $keys, $values);
+      $ParsedQuery = $this->_parse('%l INTO %b %lc VALUES %ll?', $action, $table, $keys, $values);
     }
     else {
       $keys = array_keys($datas);
       $values = array_values($datas);
 
-      $ParsedQuery = $this->_parse('%l INTO %b %lc VALUES %l?', $which, $table, $keys, $values);
+      $ParsedQuery = $this->_parse('%l INTO %b %lc VALUES %l?', $action, $table, $keys, $values);
     }
 
-    $do_update = isset($options['update']) 
-      && is_array($options['update']) 
-      && $options['update'] 
-      && $which == 'INSERT';
+    $do_update = $mode == 'insert' && isset($options['update']) 
+      && is_array($options['update']) && $options['update'];
 
-    if ($do_update) {
+    if ($mode == 'ignore' && $this->db_type == 'sqlite') {
+      $ParsedQuery->add(' ON CONFLICT DO NOTHING');
+    }
+    else if ($do_update) {
       if ($this->db_type == 'sqlite') $on_duplicate = 'ON CONFLICT DO UPDATE SET';
       else $on_duplicate = 'ON DUPLICATE KEY UPDATE';
       $ParsedQuery->add(" {$on_duplicate} ");
@@ -494,13 +502,12 @@ class MeekroDB {
       $ParsedQuery->add($Update);
     }
 
-    // return $ParsedQuery;
     return $this->query($ParsedQuery);
   }
   
-  public function insert($table, $data) { return $this->insertOrReplace('INSERT', $table, $data); }
-  public function insertIgnore($table, $data) { return $this->insertOrReplace('INSERT IGNORE', $table, $data); }
-  public function replace($table, $data) { return $this->insertOrReplace('REPLACE', $table, $data); }
+  public function insert($table, $data) { return $this->insertOrReplace('insert', $table, $data); }
+  public function insertIgnore($table, $data) { return $this->insertOrReplace('ignore', $table, $data); }
+  public function replace($table, $data) { return $this->insertOrReplace('replace', $table, $data); }
   
   public function insertUpdate() {
     $args = func_get_args();
@@ -518,7 +525,7 @@ class MeekroDB {
     if (is_array($args[0])) $update = $args[0];
     else $update = $args;
     
-    return $this->insertOrReplace('INSERT', $table, $data, array('update' => $update)); 
+    return $this->insertOrReplace('insert', $table, $data, array('update' => $update)); 
   }
   
   public function sqleval() {
@@ -1009,7 +1016,6 @@ class MeekroDB {
     if ($result && !$got_result_set) $this->affected_rows = $result->rowCount();
     else $this->affected_rows = false;
 
-    // TODO: make sure hooks get query and args
     $hookHash = array(
       'query' => $query,
       'params' => $params,
@@ -1037,8 +1043,12 @@ class MeekroDB {
         $infos = array();
         for ($i = 0; $i < $result->columnCount(); $i++) {
           $info = $result->getColumnMeta($i);
-          if (strlen($info['table'])) $infos[$i] = $info['table'] . '.' . $info['name'];
-          else $infos[$i] = $info['name'];
+          if (isset($info['table']) && strlen($info['table'])) {
+            $infos[$i] = $info['table'] . '.' . $info['name'];
+          }
+          else {
+            $infos[$i] = $info['name'];
+          }
         }
       }
 
