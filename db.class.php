@@ -141,7 +141,6 @@ class MeekroDB {
   // internal
   public $internal_pdo = null;
   public $db_type = 'mysql';
-  public $insert_id = 0;
   public $affected_rows = 0;
   public $nested_transactions_count = 0;
   public $last_query;
@@ -338,7 +337,7 @@ class MeekroDB {
 
   public function serverVersion() { return $this->get()->getAttribute(PDO::ATTR_SERVER_VERSION); }
   public function transactionDepth() { return $this->nested_transactions_count; }
-  public function insertId() { return $this->insert_id; }
+  public function insertId() { return $this->get()->lastInsertId(); }
   public function affectedRows() { return $this->affected_rows; }
   
   public function lastQuery() { return $this->last_query; }
@@ -1032,7 +1031,6 @@ class MeekroDB {
     $runtime = microtime(true) - $starttime;
     $runtime = sprintf('%f', $runtime * 1000);
     
-    $this->insert_id = $pdo->lastInsertId();
     $got_result_set = ($result && $result->columnCount() > 0);
     if ($result && !$got_result_set) $this->affected_rows = $result->rowCount();
     else $this->affected_rows = false;
