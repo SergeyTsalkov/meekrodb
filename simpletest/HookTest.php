@@ -279,10 +279,4 @@ class HookTest extends SimpleTest {
     $this->assert($error_worked);
   }
 
-
-
-
-
 }
-
-?>

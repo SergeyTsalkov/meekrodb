@@ -74,7 +74,7 @@ class DB {
   public static $port = 3306; //hhvm complains if this is null
   public static $socket = null;
   public static $encoding = 'latin1';
-  public static $connect_options = array(PDO::ATTR_TIMEOUT => 30);
+  public static $connect_options = array(PDO::ATTR_TIMEOUT => 30, PDO::ATTR_STRINGIFY_FETCHES => true);
   public static $dsn = null;
   
   // configure workings
@@ -86,20 +86,21 @@ class DB {
   
   // internal
   protected static $mdb = null;
-  public static $connection_variables = array('dbName', 'user', 'password', 'host', 'port', 'socket', 'encoding', 'connect_options', 'dsn');
-  public static $variables_to_sync = array('param_char', 'named_param_seperator', 'nested_transactions', 'reconnect_after', 'logfile');
+  public static $variables_to_sync = array(
+    // connection variables
+    'dbName', 'user', 'password', 'host', 'port', 'socket', 'encoding', 'connect_options', 'dsn',
+    // usage variables
+    'param_char', 'named_param_seperator', 'nested_transactions', 'reconnect_after', 'logfile'
+  );
   
   public static function getMDB() {
-    $mdb = DB::$mdb;
-
-    if ($mdb === null) {
-      $mdb = DB::$mdb = new MeekroDB();
+    if (DB::$mdb === null) {
+      DB::$mdb = new MeekroDB();
     }
 
     // Sync everytime because settings might have changed. It's fast.
-    $mdb->sync_config(); 
-    
-    return $mdb;
+    DB::$mdb->sync_config(); 
+    return DB::$mdb;
   }
 
   public static function __callStatic($name, $args) {
@@ -128,7 +129,7 @@ class MeekroDB {
   public $port = 3306;
   public $socket = null;
   public $encoding = 'latin1';
-  public $connect_options = array(PDO::ATTR_TIMEOUT => 30);
+  public $connect_options = array(PDO::ATTR_TIMEOUT => 30, PDO::ATTR_STRINGIFY_FETCHES => true);
   public $dsn = '';
   
   // configure workings
@@ -154,16 +155,12 @@ class MeekroDB {
   );
 
   public function __construct($dsn='', $user='', $password='', $opts=array()) {
-    foreach (DB::$connection_variables as $variable) {
-      $this->$variable = DB::$$variable;
-    }
+    $this->sync_config();
 
     if ($dsn) $this->dsn = $dsn;
     if ($user) $this->user = $user;
     if ($password) $this->password = $password;
     if ($opts) $this->connect_options = $opts;
-
-    $this->sync_config();
   }
 
   /**
@@ -1363,5 +1360,3 @@ class MeekroDBParsedQuery {
     return array_merge(array($this->query), $this->params);
   }
 };
-
-?>

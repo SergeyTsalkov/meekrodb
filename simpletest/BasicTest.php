@@ -8,28 +8,9 @@ class BasicTest extends SimpleTest {
   
   
   function test_1_create_table() {
-    $types = $this->sql_types();
-
-    DB::query("CREATE TABLE `accounts` (
-      `id` {$types['int_primary_auto']},
-      `profile_id` {$types['int_not_null']} DEFAULT 0,
-      `username` VARCHAR( 255 ) NOT NULL DEFAULT '',
-      `password` VARCHAR( 255 ) NULL ,
-      `user.age` INT NOT NULL DEFAULT '10',
-      `height` DOUBLE NOT NULL DEFAULT '10.0',
-      `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
-      `birthday` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00'
-    )");
-
-    DB::query("CREATE TABLE `profile` (
-      `id` {$types['int_primary_auto']},
-      `signature` VARCHAR( 255 ) NULL DEFAULT 'donewriting'
-    )");
-
-    DB::query("CREATE TABLE `fake%s_table` (
-      `id` {$types['int_primary_auto']},
-      `name` VARCHAR( 255 ) NULL DEFAULT 'blah'
-    )");
+    DB::query($this->get_sql('create_accounts'));
+    DB::query($this->get_sql('create_profile'));
+    DB::query($this->get_sql('create_faketable'));
   }
   
   function test_1_5_empty_table() {
@@ -302,12 +283,7 @@ class BasicTest extends SimpleTest {
   
   
   function test_5_insert_blobs() {
-    $types = $this->sql_types();
-
-    DB::query("CREATE TABLE `store data` (
-      `id` {$types['int_primary_auto']},
-      `picture` BLOB
-    )");
+    DB::query($this->get_sql('create_store'));
 
     $columns = DB::columnList('store data');
     $this->assert(count($columns) === 2);
@@ -483,10 +459,5 @@ class BasicTest extends SimpleTest {
     DB::query("SELECT * FROM accounts");
     DB::$reconnect_after = $default;
   }
-
-
-
+  
 }
-
-
-?>

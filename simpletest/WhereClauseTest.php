@@ -79,5 +79,3 @@ class WhereClauseTest extends SimpleTest {
   
 
 }
-
-?>

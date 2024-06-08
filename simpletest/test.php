@@ -1,22 +1,11 @@
 #!/usr/bin/php
 <?php
+// WARNING: ALL tables in the database will be dropped
+// do not give the test script access to your valuable databases
+
 class SimpleTest {
   public $db_type = 'mysql';
-
-  public $sql_types = array(
-    'mysql' => array(
-      'int_primary_auto' => 'INT NOT NULL AUTO_INCREMENT PRIMARY KEY',
-      'int_not_null' => 'INT NOT NULL',
-    ),
-    'sqlite' => array(
-      'int_primary_auto' => 'INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT',
-      'int_not_null' => 'INTEGER NOT NULL',
-    ),
-  );
-
-  public function sql_types() {
-    return $this->sql_types[$this->db_type];
-  }
+  public $data = null;
 
   public function assert($boolean) {
     if (! $boolean) $this->fail();
@@ -29,6 +18,56 @@ class SimpleTest {
       if (substr_count($haystack, $needle)) return true;
     }
     return false;
+  }
+
+  protected function init_sqlstore() {
+    $file = file_get_contents(__DIR__ . '/statements.sql');
+    $lines = explode("\n", $file);
+
+    $data = array();
+    $args = array();
+    $contents = array();
+    foreach ($lines as $line) {
+      if (substr($line, 0, 2) == '--') {
+        if ($args) {
+          $data[] = array_merge($args, array('contents' => trim(implode("\n", $contents))));
+          $contents = array();
+        }
+        $args = array();
+
+        preg_match_all('/(\S+)\s*:\s*(\S+)/', $line, $matches, PREG_SET_ORDER);
+        foreach ($matches as $match) {
+          $args[$match[1]] = $match[2];
+        }
+
+        continue;
+      }
+
+      if ($args) {
+        $contents[] = $line;
+      }
+    }
+
+    if ($args) {
+      $data[] = array_merge($args, array('contents' => trim(implode("\n", $contents))));
+    }
+    $this->data = $data;
+  }
+
+  function get_sql($name) {
+    if (is_null($this->data)) $this->init_sqlstore();
+
+    $search = array('name' => $name, 'db' => $this->db_type);
+    foreach ($this->data as $entry) {
+      foreach ($search as $key => $value) {
+        if (! array_key_exists($key, $entry)) continue 2;
+        if ($entry[$key] != $value) continue 2;
+      }
+
+      return $entry['contents'];
+    }
+
+    throw new Exception("Unable to find sql");
   }
 
   protected function fail($msg = '') {
@@ -48,18 +87,9 @@ ini_set('date.timezone', 'America/Los_Angeles');
 
 error_reporting(E_ALL | E_STRICT);
 require_once __DIR__ . '/../db.class.php';
+
+$contexts = array();
 require_once __DIR__ . '/test_setup.php'; //test config values go here
-// WARNING: ALL tables in the database will be dropped before the tests, including non-test related tables. 
-// $db_type = 'mysql';
-// DB::$user = $set_db_user;
-// DB::$password = $set_password;
-// DB::$dbName = $set_db;
-// DB::$host = $set_host;
-
-$db_type = 'sqlite';
-DB::$dsn = 'sqlite:';
-
-DB::get(); //connect to mysql
 
 require_once __DIR__ . '/BasicTest.php';
 require_once __DIR__ . '/WalkTest.php';
@@ -81,21 +111,25 @@ $classes_to_test = array(
   'TransactionTest_55',
 );
 
-$time_start = microtime_float();
-foreach ($classes_to_test as $class) {
-  $object = new $class();
-  $object->db_type = $db_type;
-  
-  foreach (get_class_methods($object) as $method) {
-    if (substr($method, 0, 4) != 'test') continue;
-    echo "Running $class::$method..\n";
-    $object->$method();
+foreach ($contexts as $name => $fn) {
+  echo "Starting context: $name ..\n";
+  DB::disconnect();
+  $fn();
+  DB::get(); // connect
+
+  $time_start = microtime_float();
+  foreach ($classes_to_test as $class) {
+    $object = new $class();
+    $object->db_type = DB::db_type();
+    
+    foreach (get_class_methods($object) as $method) {
+      if (substr($method, 0, 4) != 'test') continue;
+      echo "Running $class::$method..\n";
+      $object->$method();
+    }
   }
+  $time_end = microtime_float();
+  $time = round($time_end - $time_start, 2);
+
+  echo "Completed in $time seconds\n\n";
 }
-$time_end = microtime_float();
-$time = round($time_end - $time_start, 2);
-
-echo "Completed in $time seconds\n";
-
-
-?>

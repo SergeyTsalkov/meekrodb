@@ -19,4 +19,3 @@ class TransactionTest extends SimpleTest {
   }
   
 }
-?>
