@@ -420,7 +420,11 @@ class BasicTest extends SimpleTest {
     ));
     DB::query("UPDATE accounts SET profile_id=1 WHERE id=2");
 
-    $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 FROM accounts
+
+    $as_str = '';
+    if ($this->db_type == 'pgsql') $as_str = 'AS "1+1"';
+
+    $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 {$as_str} FROM accounts
       INNER JOIN profile ON accounts.profile_id=profile.id");
 
     $this->assert($affected_rows === 1);
@@ -454,7 +458,7 @@ class BasicTest extends SimpleTest {
   }
 
   function test_11_timeout() {
-    if ($this->db_type == 'sqlite') return;
+    if ($this->db_type != 'mysql') return;
     
     $default = DB::$reconnect_after;
     DB::$reconnect_after = 1;

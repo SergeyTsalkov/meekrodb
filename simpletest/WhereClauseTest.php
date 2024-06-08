@@ -14,8 +14,8 @@ class WhereClauseTest extends SimpleTest {
     $where = new WhereClause('and');
     $where->add('password=%s', 'hello');
     $subclause = $where->addClause('or');
-    $subclause->add('`user.age`=%i', 15);
-    $subclause->add('`user.age`=%i', 14);
+    $subclause->add('%c=%i', 'user.age', 15);
+    $subclause->add('%c=%i', 'user.age', 14);
     
     $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
     $this->assert(count($result) === 1);

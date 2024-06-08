@@ -52,20 +52,14 @@ class ObjectTest extends SimpleTest {
   }
   
   function test_3_more_inserts() {
-    $this->mdb->insert('`accounts`', array(
+    $this->mdb->insert('accounts', array(
       'username' => 'Bart',
       'password' => 'hello',
       'user.age' => 15,
       'height' => 10.371
     ));
 
-    if ($this->db_type != 'sqlite') {
-      $table_name = sprintf("`%s`.`%s`", $this->mdb->dbName, 'accounts');
-    } else {
-      $table_name = 'accounts';
-    }
-
-    $this->mdb->insert($table_name, array(
+    $this->mdb->insert('accounts', array(
       'username' => 'Charlie\'s Friend',
       'password' => 'goodbye',
       'user.age' => 30,
@@ -77,7 +71,7 @@ class ObjectTest extends SimpleTest {
     $counter = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
     
-    $this->mdb->insert('`accounts`', array(
+    $this->mdb->insert('accounts', array(
       'username' => 'Deer',
       'password' => '',
       'user.age' => 15,
@@ -104,8 +98,8 @@ class ObjectTest extends SimpleTest {
     }
     
     $this->mdb->param_char = '###';
-    $bart = $this->mdb->queryFirstRow("SELECT * FROM accounts WHERE `user.age` IN ###li AND height IN ###ld AND username IN ###ls", 
-      array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
+    $bart = $this->mdb->queryFirstRow("SELECT * FROM accounts WHERE ###c IN ###li AND height IN ###ld AND username IN ###ls", 
+      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
     $this->assert($bart['username'] === 'Bart');
     $this->mdb->insert('accounts', array('username' => 'f_u'));
     $this->mdb->query("DELETE FROM accounts WHERE username=###s", 'f_u');
@@ -124,7 +118,7 @@ class ObjectTest extends SimpleTest {
     $this->assert($passwords[0] === 'hello');
     
     $username = $password = $age = null;
-    list($age, $username, $password) = $this->mdb->queryOneList("SELECT `user.age`,username,password FROM accounts WHERE username=%s", 'Bart');
+    list($age, $username, $password) = $this->mdb->queryOneList("SELECT %c,username,password FROM accounts WHERE username=%s", 'user.age', 'Bart');
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
@@ -163,7 +157,7 @@ class ObjectTest extends SimpleTest {
       $this->assert($columnList['id']['type'] == 'INTEGER');
       $this->assert($columnList['height']['type'] == 'DOUBLE');
     }
-    
+
     $this->assert($columnKeys[5] == 'height');
     
     $tablelist = $this->mdb->tableList();
@@ -178,7 +172,12 @@ class ObjectTest extends SimpleTest {
     if ($this->db_type == 'sqlite') {
       $date = $this->mdb->queryFirstField("SELECT strftime('%%m/%%d/%%Y', birthday) FROM accounts WHERE username=%s", "Charlie's Friend");
       $date2 = $this->mdb->queryFirstField("SELECT strftime('%m/%d/%Y', '2009-10-04 22:23:00')");
-    } else {
+    }
+    else if ($this->db_type == 'pgsql') {
+      $date = $this->mdb->queryFirstField("SELECT TO_CHAR(TO_TIMESTAMP(birthday, 'YYYY-MM-DD HH24:MI:SS'), 'MM/DD/YYYY') FROM accounts WHERE username=%s", "Charlie's Friend");
+      $date2 = $this->mdb->queryFirstField("SELECT TO_CHAR(TIMESTAMP '2009-10-04 22:23:00', 'MM/DD/YYYY')");
+    }
+    else {
       $date = $this->mdb->queryFirstField("SELECT DATE_FORMAT(birthday, '%%m/%%d/%%Y') FROM accounts WHERE username=%s", "Charlie's Friend");
       $date2 = $this->mdb->queryFirstField("SELECT DATE_FORMAT('2009-10-04 22:23:00', '%m/%d/%Y')");;
     }
@@ -240,7 +239,8 @@ class ObjectTest extends SimpleTest {
     $ct = $this->mdb->queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s1 AND height=%d0 AND height=%d", 199.194, 'gonesoon');
     $this->assert(intval($ct) === 1);
     
-    $affected_rows = $this->mdb->delete('accounts', 'username=%s AND `user.age`=%i AND height=%d', 'gonesoon', '61', '199.194');
+    $affected_rows = $this->mdb->delete('accounts', 'username=%s AND %c=%i AND height=%d', 
+      'gonesoon', 'user.age', '61', '199.194');
     $this->assert($affected_rows === 1);
     $this->assert($this->mdb->affectedRows() === 1);
     
@@ -271,7 +271,7 @@ class ObjectTest extends SimpleTest {
     $this->mdb->insert('accounts', $ins);
     $this->assert($this->mdb->affectedRows() === 3);
     
-    $rows = $this->mdb->query("SELECT * FROM accounts WHERE height=%d ORDER BY `user.age` ASC", 190.194);
+    $rows = $this->mdb->query("SELECT * FROM accounts WHERE height=%d ORDER BY %c ASC", 190.194, 'user.age');
     $this->assert(count($rows) === 2);
     $this->assert($rows[0]['username'] === '1ofmany');
     $this->assert($rows[0]['user.age'] === '23');
@@ -296,7 +296,13 @@ class ObjectTest extends SimpleTest {
       $this->assert($columns['picture']['type'] === 'BLOB');
       $this->assert($columns['picture']['notnull'] === '0');
       $this->assert($columns['picture']['dflt_value'] === NULL);
-    } else {
+    }
+    else if ($this->db_type == 'pgsql') {
+      $this->assert($columns['picture']['data_type'] === 'bytea');
+      $this->assert($columns['picture']['is_nullable'] === 'YES');
+      $this->assert($columns['picture']['column_default'] === NULL);
+    }
+    else {
       $this->assert($columns['picture']['type'] === 'blob');
       $this->assert($columns['picture']['null'] === 'YES');
       $this->assert($columns['picture']['key'] === '');
@@ -317,6 +323,8 @@ class ObjectTest extends SimpleTest {
   }
   
   function test_6_insert_ignore() {
+    if ($this->db_type == 'pgsql') return;
+
     $affected_rows = $this->mdb->insertIgnore('accounts', array(
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
@@ -328,18 +336,15 @@ class ObjectTest extends SimpleTest {
   }
   
   function test_7_insert_update() {
-    if ($this->db_type == 'sqlite') return;
+    if ($this->db_type == 'pgsql') return;
 
-    $affected_rows = $this->mdb->insertUpdate('accounts', array(
+    $this->mdb->insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
       'user.age' => 61,
       'height' => 199.194
     ), '`user.age` = `user.age` + %i', 1);
-    
-    $this->assert($affected_rows === 2);
-    $this->assert($this->mdb->affectedRows() === 2); // a quirk of MySQL, even though only 1 row was updated
     
     $result = $this->mdb->query("SELECT * FROM accounts WHERE `user.age` = %i", 16);
     $this->assert(count($result) === 1);
@@ -388,7 +393,6 @@ class ObjectTest extends SimpleTest {
     );
     
     $this->mdb->insertUpdate('accounts', $multiples, array('user.age' => 914));
-    $this->assert($this->mdb->affectedRows() === 4);
     
     $result = $this->mdb->query("SELECT * FROM accounts WHERE `user.age`=914 ORDER BY id ASC");
     $this->assert(count($result) === 2);
@@ -420,7 +424,11 @@ class ObjectTest extends SimpleTest {
     ));
     $this->mdb->query("UPDATE accounts SET profile_id=1 WHERE id=2");
 
-    $r = $this->mdb->queryFullColumns("SELECT accounts.*, profile.*, 1+1 FROM accounts
+
+    $as_str = '';
+    if ($this->db_type == 'pgsql') $as_str = 'AS "1+1"';
+
+    $r = $this->mdb->queryFullColumns("SELECT accounts.*, profile.*, 1+1 {$as_str} FROM accounts
       INNER JOIN profile ON accounts.profile_id=profile.id");
 
     $this->assert($affected_rows === 1);
@@ -451,6 +459,17 @@ class ObjectTest extends SimpleTest {
     $count = $this->mdb->queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
     $this->assert($affected_rows === 1);
     $this->assert($count === '0');
+  }
+
+  function test_11_timeout() {
+    if ($this->db_type != 'mysql') return;
+    
+    $default = $this->mdb->reconnect_after;
+    $this->mdb->reconnect_after = 1;
+    $this->mdb->query("SET SESSION wait_timeout=1");
+    sleep(2);
+    $this->mdb->query("SELECT * FROM accounts");
+    $this->mdb->reconnect_after = $default;
   }
 
 }

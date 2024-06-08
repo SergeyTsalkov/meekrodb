@@ -2,7 +2,7 @@
 
 class WalkTest extends SimpleTest {
   function test_1_walk() {
-    $Walk = DB::queryWalk("SELECT * FROM accounts");
+    $Walk = DB::queryWalk("SELECT * FROM accounts ORDER BY id");
 
     $results = array();
     while ($row = $Walk->next()) {
@@ -47,9 +47,10 @@ class WalkTest extends SimpleTest {
   }
 
   function test_5_walk_error() {
-    // sqlite driver seems to always buffer results
-    if ($this->db_type == 'sqlite') return;
+    // drivers other than mysql seem to buffer results whenever they want to
+    if ($this->db_type != 'mysql') return;
 
+    $exception_was_caught = 0;
     $Walk = DB::queryWalk("SELECT * FROM accounts");
     $Walk->next();
     
@@ -57,7 +58,7 @@ class WalkTest extends SimpleTest {
       // this will produce an out of sync error
       DB::query("SELECT * FROM accounts");
     } catch (MeekroDBException $e) {
-      if (substr_count($e->getMessage(), 'out of sync') || substr_count($e->getMessage(), 'unbuffered queries')) {
+      if ($this->match_set($e->getMessage(), array('out of sync', 'unbuffered queries'))) {
         $exception_was_caught = 1;
       }
     }
