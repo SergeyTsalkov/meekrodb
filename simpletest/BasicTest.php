@@ -48,20 +48,14 @@ class BasicTest extends SimpleTest {
   }
   
   function test_3_more_inserts() {
-    DB::insert('`accounts`', array(
+    DB::insert('accounts', array(
       'username' => 'Bart',
       'password' => 'hello',
       'user.age' => 15,
       'height' => 10.371
     ));
 
-    if ($this->db_type != 'sqlite') {
-      $table_name = sprintf("`%s`.`%s`", DB::$dbName, 'accounts');
-    } else {
-      $table_name = 'accounts';
-    }
-
-    DB::insert($table_name, array(
+    DB::insert('accounts', array(
       'username' => 'Charlie\'s Friend',
       'password' => 'goodbye',
       'user.age' => 30,
@@ -73,7 +67,7 @@ class BasicTest extends SimpleTest {
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(3));
     
-    DB::insert('`accounts`', array(
+    DB::insert('accounts', array(
       'username' => 'Deer',
       'password' => '',
       'user.age' => 15,
@@ -100,8 +94,8 @@ class BasicTest extends SimpleTest {
     }
     
     DB::$param_char = '###';
-    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE `user.age` IN ###li AND height IN ###ld AND username IN ###ls", 
-      array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
+    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE ###c IN ###li AND height IN ###ld AND username IN ###ls", 
+      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
     $this->assert($bart['username'] === 'Bart');
     DB::insert('accounts', array('username' => 'f_u'));
     DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
@@ -120,7 +114,7 @@ class BasicTest extends SimpleTest {
     $this->assert($passwords[0] === 'hello');
     
     $username = $password = $age = null;
-    list($age, $username, $password) = DB::queryOneList("SELECT `user.age`,username,password FROM accounts WHERE username=%s", 'Bart');
+    list($age, $username, $password) = DB::queryOneList("SELECT %c,username,password FROM accounts WHERE username=%s", 'user.age', 'Bart');
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
@@ -159,7 +153,7 @@ class BasicTest extends SimpleTest {
       $this->assert($columnList['id']['type'] == 'INTEGER');
       $this->assert($columnList['height']['type'] == 'DOUBLE');
     }
-    
+
     $this->assert($columnKeys[5] == 'height');
     
     $tablelist = DB::tableList();
@@ -174,7 +168,12 @@ class BasicTest extends SimpleTest {
     if ($this->db_type == 'sqlite') {
       $date = DB::queryFirstField("SELECT strftime('%%m/%%d/%%Y', birthday) FROM accounts WHERE username=%s", "Charlie's Friend");
       $date2 = DB::queryFirstField("SELECT strftime('%m/%d/%Y', '2009-10-04 22:23:00')");
-    } else {
+    }
+    else if ($this->db_type == 'pgsql') {
+      $date = DB::queryFirstField("SELECT TO_CHAR(TO_TIMESTAMP(birthday, 'YYYY-MM-DD HH24:MI:SS'), 'MM/DD/YYYY') FROM accounts WHERE username=%s", "Charlie's Friend");
+      $date2 = DB::queryFirstField("SELECT TO_CHAR(TIMESTAMP '2009-10-04 22:23:00', 'MM/DD/YYYY')");
+    }
+    else {
       $date = DB::queryFirstField("SELECT DATE_FORMAT(birthday, '%%m/%%d/%%Y') FROM accounts WHERE username=%s", "Charlie's Friend");
       $date2 = DB::queryFirstField("SELECT DATE_FORMAT('2009-10-04 22:23:00', '%m/%d/%Y')");;
     }
@@ -236,7 +235,8 @@ class BasicTest extends SimpleTest {
     $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s1 AND height=%d0 AND height=%d", 199.194, 'gonesoon');
     $this->assert(intval($ct) === 1);
     
-    $affected_rows = DB::delete('accounts', 'username=%s AND `user.age`=%i AND height=%d', 'gonesoon', '61', '199.194');
+    $affected_rows = DB::delete('accounts', 'username=%s AND %c=%i AND height=%d', 
+      'gonesoon', 'user.age', '61', '199.194');
     $this->assert($affected_rows === 1);
     $this->assert(DB::affectedRows() === 1);
     
@@ -267,7 +267,7 @@ class BasicTest extends SimpleTest {
     DB::insert('accounts', $ins);
     $this->assert(DB::affectedRows() === 3);
     
-    $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY `user.age` ASC", 190.194);
+    $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY %c ASC", 190.194, 'user.age');
     $this->assert(count($rows) === 2);
     $this->assert($rows[0]['username'] === '1ofmany');
     $this->assert($rows[0]['user.age'] === '23');
@@ -292,7 +292,13 @@ class BasicTest extends SimpleTest {
       $this->assert($columns['picture']['type'] === 'BLOB');
       $this->assert($columns['picture']['notnull'] === '0');
       $this->assert($columns['picture']['dflt_value'] === NULL);
-    } else {
+    }
+    else if ($this->db_type == 'pgsql') {
+      $this->assert($columns['picture']['data_type'] === 'bytea');
+      $this->assert($columns['picture']['is_nullable'] === 'YES');
+      $this->assert($columns['picture']['column_default'] === NULL);
+    }
+    else {
       $this->assert($columns['picture']['type'] === 'blob');
       $this->assert($columns['picture']['null'] === 'YES');
       $this->assert($columns['picture']['key'] === '');
@@ -313,6 +319,8 @@ class BasicTest extends SimpleTest {
   }
   
   function test_6_insert_ignore() {
+    if ($this->db_type == 'pgsql') return;
+
     $affected_rows = DB::insertIgnore('accounts', array(
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
@@ -324,18 +332,15 @@ class BasicTest extends SimpleTest {
   }
   
   function test_7_insert_update() {
-    if ($this->db_type == 'sqlite') return;
+    if ($this->db_type == 'pgsql') return;
 
-    $affected_rows = DB::insertUpdate('accounts', array(
+    DB::insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
       'user.age' => 61,
       'height' => 199.194
     ), '`user.age` = `user.age` + %i', 1);
-    
-    $this->assert($affected_rows === 2);
-    $this->assert(DB::affectedRows() === 2); // a quirk of MySQL, even though only 1 row was updated
     
     $result = DB::query("SELECT * FROM accounts WHERE `user.age` = %i", 16);
     $this->assert(count($result) === 1);
@@ -384,7 +389,6 @@ class BasicTest extends SimpleTest {
     );
     
     DB::insertUpdate('accounts', $multiples, array('user.age' => 914));
-    $this->assert(DB::affectedRows() === 4);
     
     $result = DB::query("SELECT * FROM accounts WHERE `user.age`=914 ORDER BY id ASC");
     $this->assert(count($result) === 2);

@@ -390,13 +390,16 @@ class MeekroDB {
   }
   
   protected function formatBackticks($name, $split_dots=true) {
-    $name = trim($name, '`');
+    $char = '`';
+    if ($this->db_type() == 'pgsql') $char = '"';
+
+    $name = trim($name, $char);
     
     if ($split_dots && strpos($name, '.')) {
       return implode('.', array_map(array($this, 'formatBackticks'), explode('.', $name)));
     }
     
-    return '`' . str_replace('`', '``', $name) . '`'; 
+    return $char . str_replace($char, $char . $char, $name) . $char; 
   }
 
   /**
@@ -458,11 +461,20 @@ class MeekroDB {
   }
   
   protected function insertOrReplace($mode, $table, $datas, $options=array()) {
+    $db_type = $this->db_type();
+
     if ($mode == 'insert') {
       $action = 'INSERT';
     } else if ($mode == 'ignore') {
-      if ($this->db_type() == 'sqlite') $action = 'INSERT';
-      else $action = 'INSERT IGNORE';
+      if ($db_type == 'sqlite') {
+        $action = 'INSERT';
+      }
+      else if ($db_type == 'pgsql') {
+        throw new MeekroDBException("postgres does not support insertIgnore()");
+      }
+      else {
+        $action = 'INSERT IGNORE';
+      }
     } else if ($mode == 'replace') {
       $action = 'REPLACE';
     } else {
@@ -491,17 +503,20 @@ class MeekroDB {
     $do_update = $mode == 'insert' && isset($options['update']) 
       && is_array($options['update']) && $options['update'];
 
-    if ($mode == 'ignore' && $this->db_type() == 'sqlite') {
+    if ($mode == 'ignore' && $db_type == 'sqlite') {
       $ParsedQuery->add(' ON CONFLICT DO NOTHING');
     }
     else if ($do_update) {
-      if ($this->db_type() == 'sqlite') {
+      if ($db_type == 'sqlite') {
         $on_duplicate = 'ON CONFLICT DO UPDATE SET';
         
         $sqlite_version = $this->serverVersion();
         if ($sqlite_version < '3.35') {
-          throw new MeekroDBException("sqlite {$sqlite_version} does not support insertUpdate()");
+          throw new MeekroDBException("sqlite {$sqlite_version} does not support insertUpdate(), please upgrade");
         }
+      }
+      else if ($db_type == 'pgsql') {
+        throw new MeekroDBException("postgres does not support insertUpdate()");
       }
       else {
         $on_duplicate = 'ON DUPLICATE KEY UPDATE';
@@ -551,9 +566,17 @@ class MeekroDB {
   }
   
   public function columnList($table) {
-    if ($this->db_type() == 'sqlite') {
+    $db_type = $this->db_type();
+
+    if ($db_type == 'sqlite') {
       $query = 'PRAGMA table_info(%b)';
       $primary = 'name';
+    }
+    else if ($db_type == 'pgsql') {
+      $query = 'SELECT column_name, data_type, is_nullable, column_default 
+        FROM information_schema.columns WHERE table_name=%s
+        ORDER BY ordinal_position';
+      $primary = 'column_name';
     }
     else {
       $query = 'SHOW COLUMNS FROM %b';
@@ -582,6 +605,12 @@ class MeekroDB {
 
       $result = $this->queryFirstColumn("SELECT name FROM %b 
         WHERE type='table' AND name NOT LIKE 'sqlite_%'", $tbl);
+    }
+    else if ($this->db_type() == 'pgsql') {
+      $result = $this->queryFirstColumn("SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema='public'
+        ORDER BY table_name");
     }
     else {
       if ($db) {
@@ -1005,15 +1034,33 @@ class MeekroDB {
     $starttime = microtime(true);
     $pdo = $this->get();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    if ($this->db_type() == 'mysql') {
+
+    $db_type = $this->db_type();
+    if ($db_type == 'mysql') {
       $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
+    }
+    else if ($db_type == 'pgsql') {
+      $pdo->setAttribute(PDO::PGSQL_ATTR_DISABLE_PREPARES, 1);
     }
     
     $result = $Exception = null;
     try {
       if ($params) {
         $result = $pdo->prepare($query);
-        $result->execute($params);
+        foreach ($params as $i => $param) {
+          if (is_int($param)) {
+            $data_type = PDO::PARAM_INT;
+          }
+          else if (is_string($param) && $db_type == 'pgsql' && !mb_check_encoding($param)) {
+            $data_type = PDO::PARAM_LOB;
+          }
+          else {
+            $data_type = PDO::PARAM_STR;
+          }
+          $result->bindValue($i+1, $param, $data_type);
+        }
+
+        $result->execute();
       }
       else {
         $result = $pdo->query($query);
