@@ -155,7 +155,7 @@ class HookTest extends SimpleTest {
     };
     $fn2 = function($args) { 
       $query = str_replace('SELET', 'SELECT', $args['query']);
-      return array($query, $args['params']);
+      return $query;
     };
     $fn3 = function($args) use (&$callback_worked) { 
       $callback_worked = true;

@@ -263,12 +263,14 @@ class MeekroDB {
 
       foreach ($this->hooks[$type] as $hook) {
         $result = call_user_func($hook, array('query' => $query, 'params' => $params));
-        if (!is_null($result)) {
-          if (is_array($result) && count($result) == 2) {
-            list($query, $params) = $result;
-          } else {
-            throw new MeekroDBException("pre_run hook must return a [query, params] array");
-          }
+        if (is_string($result)) {
+          $query = $result;
+        }
+        else if (is_array($result) && count($result) == 2) {
+          list($query, $params) = $result;
+        }
+        else if (!is_null($result)) {
+          throw new MeekroDBException("pre_run hook must return a query string or [query, params] array");
         }
       }
 
