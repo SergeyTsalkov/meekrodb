@@ -349,7 +349,7 @@ class MeekroDB {
       throw new MeekroDBException("Database switching not supported by {$db_type}.");
     }
 
-    $this->query("USE %c", $dbName);
+    $this->_query("USE :c", $dbName);
   }
   
   public function startTransaction() {
@@ -410,10 +410,10 @@ class MeekroDB {
     if (! is_array($params)) {
       throw new MeekroDBException("update(): second argument must be assoc array");
     }
-    $ParsedQuery = $this->_parse('UPDATE %b SET %hc WHERE ', $table, $params);
+    $ParsedQuery = $this->_parse('UPDATE :b SET :hc WHERE ', $table, $params);
 
     if (is_array($args[0])) {
-      $Where = $this->_parse('%ha', $args[0]);
+      $Where = $this->_parse(':ha', $args[0]);
     } else {
       // we don't know if they used named or numbered args, so the where clause
       // must be run through the parser separately
@@ -431,10 +431,10 @@ class MeekroDB {
     }
 
     $table = array_shift($args);
-    $ParsedQuery = $this->_parse('DELETE FROM %b WHERE ', $table);
+    $ParsedQuery = $this->_parse('DELETE FROM :b WHERE ', $table);
 
     if (is_array($args[0])) {
-      $Where = $this->_parse('%ha', $args[0]);
+      $Where = $this->_parse(':ha', $args[0]);
     } else {
       $Where = call_user_func_array(array($this, 'parse'), $args);
     }
@@ -474,13 +474,13 @@ class MeekroDB {
         $values[] = array_values($datum);  
       }
 
-      $ParsedQuery = $this->_parse('%l INTO %b %lc VALUES %ll?', $action, $table, $keys, $values);
+      $ParsedQuery = $this->_parse(':l INTO :b :lc VALUES :ll?', $action, $table, $keys, $values);
     }
     else {
       $keys = array_keys($datas);
       $values = array_values($datas);
 
-      $ParsedQuery = $this->_parse('%l INTO %b %lc VALUES %l?', $action, $table, $keys, $values);
+      $ParsedQuery = $this->_parse(':l INTO :b :lc VALUES :l?', $action, $table, $keys, $values);
     }
 
     $do_update = $mode == 'insert' && isset($options['update']) 
@@ -507,7 +507,7 @@ class MeekroDB {
       $ParsedQuery->add(" {$on_duplicate} ");
 
       if (array_values($options['update']) !== $options['update']) {
-        $Update = $this->_parse('%hc', $options['update']);
+        $Update = $this->_parse(':hc', $options['update']);
       }
       else {
         $update_str = array_shift($options['update']);
@@ -552,17 +552,17 @@ class MeekroDB {
     $db_type = $this->db_type();
 
     if ($db_type == 'sqlite') {
-      $query = 'PRAGMA table_info(%b)';
+      $query = 'PRAGMA table_info(:b)';
       $primary = 'name';
     }
     else if ($db_type == 'pgsql') {
       $query = 'SELECT column_name, data_type, is_nullable, column_default 
-        FROM information_schema.columns WHERE table_name=%s
+        FROM information_schema.columns WHERE table_name=:s
         ORDER BY ordinal_position';
       $primary = 'column_name';
     }
     else {
-      $query = 'SHOW COLUMNS FROM %b';
+      $query = 'SHOW COLUMNS FROM :b';
       $primary = 'Field';
     }
 
@@ -586,24 +586,28 @@ class MeekroDB {
       if ($db) $tbl = "{$db}.sqlite_master";
       else $tbl = "sqlite_master";
 
-      $result = $this->queryFirstColumn("SELECT name FROM %b 
+      $result = $this->_query("SELECT name FROM :b 
         WHERE type='table' AND name NOT LIKE 'sqlite_%'", $tbl);
     }
     else if ($this->db_type() == 'pgsql') {
-      $result = $this->queryFirstColumn("SELECT table_name
+      $result = $this->_query("SELECT table_name
         FROM information_schema.tables
         WHERE table_schema='public'
         ORDER BY table_name");
     }
     else {
       if ($db) {
-        $result = $this->queryFirstColumn('SHOW TABLES FROM %c', $db);
+        $result = $this->_query('SHOW TABLES FROM :c', $db);
       } else {
-        $result = $this->queryFirstColumn('SHOW TABLES');
+        $result = $this->_query('SHOW TABLES');
       }
     }
 
-    return $result;
+    $column = array();
+    foreach ($result as $row) {
+      $column[] = reset($row);
+    }
+    return $column;
   }
 
   protected function paramsMap() {
@@ -983,7 +987,7 @@ class MeekroDB {
 
   protected function _query() {
     $param_char = $this->param_char;
-    $this->param_char = '%';
+    $this->param_char = ':';
 
     try {
       return call_user_func_array(array($this, 'query'), func_get_args());
@@ -993,7 +997,7 @@ class MeekroDB {
   }
   protected function _parse() {
     $param_char = $this->param_char;
-    $this->param_char = '%';
+    $this->param_char = ':';
 
     try {
       return call_user_func_array(array($this, 'parse'), func_get_args());
