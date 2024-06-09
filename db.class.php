@@ -339,8 +339,16 @@ class MeekroDB {
   
   public function lastQuery() { return $this->last_query; }
   
-  public function useDB() { return call_user_func_array(array($this, 'setDB'), func_get_args()); }
-  public function setDB($dbName) { $this->query("USE %c", $dbName); }
+  public function useDB() { return call_user_func_array(array($this, 'use'), func_get_args()); }
+  public function setDB() { return call_user_func_array(array($this, 'use'), func_get_args()); }
+  public function use($dbName) { 
+    $db_type = $this->db_type();
+    if (in_array($db_type, array('pgsql', 'sqlite'))) {
+      throw new MeekroDBException("Database switching not supported by {$db_type}.");
+    }
+
+    $this->query("USE %c", $dbName);
+  }
   
   public function startTransaction() {
     $start_transaction = 'START TRANSACTION';
@@ -387,33 +395,6 @@ class MeekroDB {
     }
     
     return $this->nested_transactions_count;
-  }
-  
-  protected function formatBackticks($name, $split_dots=true) {
-    $char = '`';
-    if ($this->db_type() == 'pgsql') $char = '"';
-
-    $name = trim($name, $char);
-    
-    if ($split_dots && strpos($name, '.')) {
-      return implode('.', array_map(array($this, 'formatBackticks'), explode('.', $name)));
-    }
-    
-    return $char . str_replace($char, $char . $char, $name) . $char; 
-  }
-
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function formatTableName($table) {
-    return $this->formatBackticks($table, true);
-  }
-
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function formatColumnName($column) {
-    return $this->formatBackticks($column, false);
   }
   
   public function update() {
@@ -614,7 +595,7 @@ class MeekroDB {
     }
     else {
       if ($db) {
-        $result = $this->queryFirstColumn('SHOW TABLES FROM %b', $db);
+        $result = $this->queryFirstColumn('SHOW TABLES FROM %c', $db);
       } else {
         $result = $this->queryFirstColumn('SHOW TABLES');
       }
@@ -654,10 +635,10 @@ class MeekroDB {
         return new MeekroDBParsedQuery('?', array(doubleval($arg)));
       },
       'b' => function($arg) use ($t) { 
-        return new MeekroDBParsedQuery($t->formatTableName($arg));
+        return new MeekroDBParsedQuery($t->formatName($arg, true));
       },
       'c' => function($arg) use ($t) {
-        return new MeekroDBParsedQuery($t->formatColumnName($arg));
+        return new MeekroDBParsedQuery($t->formatName($arg));
       },
       'l' => function($arg) use ($t) { 
         return new MeekroDBParsedQuery(strval($arg));
@@ -681,8 +662,12 @@ class MeekroDB {
         $arg = array_map('doubleval', $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
+      'lb' => function($arg) use ($t) { 
+        $str = '('. implode(',', array_map(array($t, 'formatName'), $arg)) . ')';
+        return new MeekroDBParsedQuery($str);
+      },
       'lc' => function($arg) use ($t) { 
-        $str = '('. implode(',', array_map(array($t, 'formatColumnName'), $arg)) . ')';
+        $str = '('. implode(',', array_map(array($t, 'formatName'), $arg)) . ')';
         return new MeekroDBParsedQuery($str);
       },
       'lt' => function($arg) use ($t, $placeholders) { 
@@ -723,7 +708,7 @@ class MeekroDB {
       'hc' => function($arg) use ($t, $join) {
         $Queries = array();
         foreach ($arg as $key => $value) {
-          $key = $t->formatColumnName($key);
+          $key = $t->formatName($key);
           $Query = $t->sanitize($value);
           $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
         }
@@ -732,7 +717,7 @@ class MeekroDB {
       'ha' => function($arg) use ($t, $join) {
         $Queries = array();
         foreach ($arg as $key => $value) {
-          $key = $t->formatColumnName($key);
+          $key = $t->formatName($key);
           $Query = $t->sanitize($value);
           $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
         }
@@ -741,7 +726,7 @@ class MeekroDB {
       'ho' => function($arg) use ($t, $join) {
         $Queries = array();
         foreach ($arg as $key => $value) {
-          $key = $t->formatColumnName($key);
+          $key = $t->formatName($key);
           $Query = $t->sanitize($value);
           $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
         }
@@ -756,6 +741,63 @@ class MeekroDB {
 
   protected function paramsMapArrayTypes() {
     return array('ls', 'li', 'ld', 'lb', 'lc', 'll', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
+  }
+  protected function paramsMapOptArrayTypes() {
+    return array('b', 'c');
+  }
+
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function sanitizeTS($ts) {
+    if (is_string($ts)) {
+      return date('Y-m-d H:i:s', strtotime($ts));
+    }
+    else if ($ts instanceof DateTime) {
+      return $ts->format('Y-m-d H:i:s');
+    }
+    return '';
+  }
+
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function sanitize($input) {
+    if (is_object($input)) {
+      if ($input instanceof DateTime) {
+        return new MeekroDBParsedQuery('?', array($input->format('Y-m-d H:i:s')));
+      }
+      if ($input instanceof MeekroDBParsedQuery) {
+        return $input;
+      }
+      return new MeekroDBParsedQuery('?', array(strval($input)));
+    }
+
+    if (is_null($input)) return new MeekroDBParsedQuery('NULL');
+    else if (is_bool($input)) return new MeekroDBParsedQuery('?', array($input ? 1 : 0));
+    else if (is_array($input)) return new MeekroDBParsedQuery('');
+    return new MeekroDBParsedQuery('?', array($input));
+  }
+
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function formatName($name, $can_join=false) {
+    if (is_array($name)) {
+      if ($can_join) return implode('.', array_map(array($this, 'formatName'), $name));
+      throw new MeekroDBException("Invalid column/table name");
+    }
+    $char = '`';
+    if ($this->db_type() == 'pgsql') $char = '"';
+    return $char . str_replace($char, $char . $char, $name) . $char; 
+  }
+  
+  /**
+   * @internal has to be public for PHP 5.3 compatability
+   */
+  public function intval($var) {
+    if (PHP_INT_SIZE == 8) return intval($var);
+    return floor(doubleval($var));
   }
 
   protected function nextQueryParam($query) {
@@ -888,6 +930,7 @@ class MeekroDB {
 
     $Map = $this->paramsMap();
     $array_types = $this->paramsMapArrayTypes();
+    $opt_array_types = $this->paramsMapOptArrayTypes();
     foreach ($this->preParse($query, $args) as $Part) {
       if (is_string($Part)) {
         $ParsedQuery->add($Part);
@@ -896,19 +939,21 @@ class MeekroDB {
 
       $fn = $Map[$Part['type']];
       $is_array_type = in_array($Part['type'], $array_types, true);
+      $is_opt_array_type = in_array($Part['type'], $opt_array_types, true);
 
       $key = is_null($Part['named_arg']) ? $Part['arg'] : $Part['named_arg'];
       $val = $Part['val'];
+
       if ($is_array_type && !is_array($val)) {
         throw new MeekroDBException("Expected an array for arg $key but didn't get one!");
       }
-      if ($is_array_type && count($val) == 0) {
-        throw new MeekroDBException("Arg {$key} array can't be empty!");
-      }
-      if (!$is_array_type && is_array($val)) {
+      if (!$is_array_type && !$is_opt_array_type && is_array($val)) {
         $val = '';
       }
-
+      if (is_array($val) && count($val) == 0) {
+        throw new MeekroDBException("Arg {$key} array can't be empty!");
+      }
+      
       if ($val instanceof WhereClause) {
         if ($Part['type'] != 'l') {
           throw new MeekroDBException("WhereClause must be used with l arg, you used {$Part['type']} instead!");
@@ -932,47 +977,6 @@ class MeekroDB {
     }
 
     return $ParsedQuery;
-  }
-  
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function sanitizeTS($ts) {
-    if (is_string($ts)) {
-      return date('Y-m-d H:i:s', strtotime($ts));
-    }
-    else if ($ts instanceof DateTime) {
-      return $ts->format('Y-m-d H:i:s');
-    }
-    return '';
-  }
-
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function sanitize($input) {
-    if (is_object($input)) {
-      if ($input instanceof DateTime) {
-        return new MeekroDBParsedQuery('?', array($input->format('Y-m-d H:i:s')));
-      }
-      if ($input instanceof MeekroDBParsedQuery) {
-        return $input;
-      }
-      return new MeekroDBParsedQuery('?', array(strval($input)));
-    }
-
-    if (is_null($input)) return new MeekroDBParsedQuery('NULL');
-    else if (is_bool($input)) return new MeekroDBParsedQuery('?', array($input ? 1 : 0));
-    else if (is_array($input)) return new MeekroDBParsedQuery('');
-    return new MeekroDBParsedQuery('?', array($input));
-  }
-  
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function intval($var) {
-    if (PHP_INT_SIZE == 8) return intval($var);
-    return floor(doubleval($var));
   }
 
   protected function _query() {

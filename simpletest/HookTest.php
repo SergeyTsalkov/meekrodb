@@ -55,10 +55,6 @@ class HookTest extends SimpleTest {
   }
   
   function test_2_exception_catch() {
-    // TODO: test with multiple databases in sqlite?
-    $dbname = DB::$dbName;
-    $tblname = $dbname ? "`$dbname`.`accounts`" : 'accounts';
-
     try {
       DB::query("SELET * FROM accounts");
     } catch(MeekroDBException $e) {
@@ -70,7 +66,7 @@ class HookTest extends SimpleTest {
     $this->assert(DB::lastQuery() === 'SELET * FROM accounts');
     
     try {
-      DB::insert($tblname, array(
+      DB::insert('accounts', array(
         'id' => 2,
         'username' => 'Another Dude\'s \'Mom"',
         'password' => 'asdfsdse',

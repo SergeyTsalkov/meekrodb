@@ -88,3 +88,9 @@ CREATE TABLE "store data" (
   id SERIAL PRIMARY KEY,
   picture BYTEA
 )
+
+-- name: mini_table ; db: mysql
+CREATE TABLE `accounts` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `myname` varchar(255) not null
+)

@@ -6,12 +6,16 @@
 class SimpleTest {
   public $db_type = 'mysql';
   public $data = null;
+  public $db = null;
+  public $db2 = null;
 
-  public function assert($boolean) {
+  public function skip() { return false; }
+
+  protected function assert($boolean) {
     if (! $boolean) $this->fail();
   }
 
-  public function match_set($haystack, array $needles) {
+  protected function match_set($haystack, array $needles) {
     $haystack = strtolower($haystack);
     foreach ($needles as $needle) {
       $needle = strtolower($needle);
@@ -54,7 +58,7 @@ class SimpleTest {
     $this->data = $data;
   }
 
-  function get_sql($name) {
+  protected function get_sql($name) {
     if (is_null($this->data)) $this->init_sqlstore();
 
     $search = array('name' => $name, 'db' => $this->db_type);
@@ -92,6 +96,7 @@ $contexts = array();
 require_once __DIR__ . '/test_setup.php'; //test config values go here
 
 require_once __DIR__ . '/BasicTest.php';
+require_once __DIR__ . '/MultiDbTest.php';
 require_once __DIR__ . '/WalkTest.php';
 require_once __DIR__ . '/CallTest.php';
 require_once __DIR__ . '/ObjectTest.php';
@@ -101,6 +106,7 @@ require_once __DIR__ . '/TransactionTest.php';
 
 $classes_to_test = array(
   'BasicTest',
+  'MultiDbTest',
   'WalkTest',
   'CallTest',
   'WhereClauseTest',
@@ -112,13 +118,21 @@ $classes_to_test = array(
 foreach ($contexts as $name => $fn) {
   echo "Starting context: $name ..\n";
   DB::disconnect();
-  $fn();
+  $data = $fn();
+  if (!$data) $data = array();
   DB::get(); // connect
 
   $time_start = microtime_float();
   foreach ($classes_to_test as $class) {
     $object = new $class();
     $object->db_type = DB::db_type();
+    foreach ($data as $key => $value) {
+      $object->$key = $value;
+    }
+    if (($reason = $object->skip()) && is_string($reason)) {
+      echo "Skipping $class: $reason..\n";
+      continue;
+    }
     
     foreach (get_class_methods($object) as $method) {
       if (substr($method, 0, 4) != 'test') continue;
