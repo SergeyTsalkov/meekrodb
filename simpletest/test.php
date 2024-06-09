@@ -8,6 +8,7 @@ class SimpleTest {
   public $data = null;
   public $db = null;
   public $db2 = null;
+  public $fast = false;
 
   public function skip() { return false; }
 

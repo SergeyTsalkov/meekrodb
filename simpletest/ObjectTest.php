@@ -463,6 +463,7 @@ class ObjectTest extends SimpleTest {
 
   function test_11_timeout() {
     if ($this->db_type != 'mysql') return;
+    if ($this->fast) return;
     
     $default = $this->mdb->reconnect_after;
     $this->mdb->reconnect_after = 1;

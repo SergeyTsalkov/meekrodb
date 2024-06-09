@@ -7,13 +7,13 @@ class BasicTest extends SimpleTest {
   }
   
   
-  function test_1_create_table() {
+  function test_01_create_table() {
     DB::query($this->get_sql('create_accounts'));
     DB::query($this->get_sql('create_profile'));
     DB::query($this->get_sql('create_faketable'));
   }
   
-  function test_1_5_empty_table() {
+  function test_02_empty_table() {
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
     $this->assert($counter === strval(0));
     $this->assert(DB::lastQuery() === 'SELECT COUNT(*) FROM accounts');
@@ -34,7 +34,7 @@ class BasicTest extends SimpleTest {
     $this->assert(is_array($column) && count($column) === 0);
   }
   
-  function test_2_insert_row() {
+  function test_03_insert_row() {
     $affected_rows = DB::insert('accounts', array(
       'username' => 'Abe',
       'password' => 'hello'
@@ -47,7 +47,7 @@ class BasicTest extends SimpleTest {
     $this->assert($counter === strval(1));
   }
   
-  function test_3_more_inserts() {
+  function test_04_more_inserts() {
     DB::insert('accounts', array(
       'username' => 'Bart',
       'password' => 'hello',
@@ -92,15 +92,11 @@ class BasicTest extends SimpleTest {
         throw $e;
       }
     }
-    
-    DB::$param_char = '###';
-    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE ###c IN ###li AND height IN ###ld AND username IN ###ls", 
-      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
-    $this->assert($bart['username'] === 'Bart');
-    DB::insert('accounts', array('username' => 'f_u'));
-    DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
-    DB::$param_char = '%';
-    
+  }
+
+  // * basic test of:
+  //   queryFirstField(), queryOneField(), queryFirstColumn(), queryOneList(), queryRaw()
+  function test_05_query() {
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
     $this->assert($charlie_password === 'goodbye');
@@ -126,8 +122,49 @@ class BasicTest extends SimpleTest {
     $this->assert($row['password'] === 'goodbye');
     $this->assert($row2 === false);
   }
+
+  // * alternative param_char and named_param_seperator separate will work
+  // * can access both named and numbered args
+  // * numbered args can be accessed both with and without named_param_seperator
+  // * param_char of strlen>1 will work
+  function test_06_alt_param_chars() {
+    DB::$param_char = ':';
+    DB::$named_param_seperator = ':';
+    $bart = DB::queryFirstRow(
+      "SELECT * FROM accounts WHERE :c IN :li AND height IN :ld AND username IN :ls",
+      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts')
+    );
+    $this->assert($bart['username'] === 'Bart');
+
+    $bart = DB::queryFirstRow(
+      "SELECT * FROM accounts WHERE :c:userage IN :li:ages AND height IN :ld:heights AND username IN :ls:names", array(
+          'userage' => 'user.age', 
+          'ages' => array(15, 25), 
+          'heights' => array(10.371, 150.123),
+          'names' => array('Bart', 'Barts'),
+        )
+    );
+    $this->assert($bart['username'] === 'Bart');
+
+    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c0=:i1 AND height=:i1", 'user.age', 10);
+    $this->assert($row['id'] === '1');
+    $this->assert($row['username'] === 'Abe');
+
+    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c:0=:i:1 AND height=:i:1", array('user.age', 10));
+    $this->assert($row['id'] === '1');
+    $this->assert($row['username'] === 'Abe');
+
+    DB::$param_char = '###';
+    DB::$named_param_seperator = '_';
+    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE ###c IN ###li AND height IN ###ld AND username IN ###ls", 
+      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
+    $this->assert($bart['username'] === 'Bart');
+    DB::insert('accounts', array('username' => 'f_u'));
+    DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
+    DB::$param_char = '%';
+  }
   
-  function test_4_query() {
+  function test_07_query() {
     $affected_rows = DB::update('accounts', array(
       'birthday' => new DateTime('10 September 2000 13:13:13')
     ), 'username=%s', 'Charlie\'s Friend');
@@ -181,7 +218,7 @@ class BasicTest extends SimpleTest {
     $this->assert($date2 === '10/04/2009');
   }
   
-  function test_4_1_query() {
+  function test_08_query() {
     DB::insert('accounts', array(
       'username' => 'newguy',
       'password' => DB::sqleval("SUBSTR('abcdefgh', %i)", '3'),
@@ -221,7 +258,7 @@ class BasicTest extends SimpleTest {
     $this->assert(DB::affectedRows() === 1);
   }
   
-  function test_4_2_delete() {
+  function test_09_delete() {
     DB::insert('accounts', array(
       'username' => 'gonesoon',
       'password' => 'something',
@@ -244,7 +281,7 @@ class BasicTest extends SimpleTest {
     $this->assert(intval($ct) === 0);
   }
   
-  function test_4_3_insertmany() {
+  function test_10_insertmany() {
     $ins[] = array(
       'username' => '1ofmany',
       'password' => 'something',
@@ -280,9 +317,7 @@ class BasicTest extends SimpleTest {
     $this->assert($nullrow['user.age'] === '15');
   }
   
-  
-  
-  function test_5_insert_blobs() {
+  function test_11_insert_blobs() {
     DB::query($this->get_sql('create_store'));
 
     $columns = DB::columnList('store data');
@@ -318,7 +353,7 @@ class BasicTest extends SimpleTest {
     $this->assert($smile === $getsmile2);
   }
   
-  function test_6_insert_ignore() {
+  function test_12_insert_ignore() {
     if ($this->db_type == 'pgsql') return;
 
     $affected_rows = DB::insertIgnore('accounts', array(
@@ -331,7 +366,7 @@ class BasicTest extends SimpleTest {
     $this->assert($affected_rows === 0);
   }
   
-  function test_7_insert_update() {
+  function test_13_insert_update() {
     if ($this->db_type == 'pgsql') return;
 
     DB::insertUpdate('accounts', array(
@@ -400,7 +435,7 @@ class BasicTest extends SimpleTest {
     $this->assert(DB::affectedRows() === 1);
   }
   
-  function test_8_lb() {
+  function test_14_lb() {
     $data = array(
       'username' => 'vookoo',
       'password' => 'dookoo',
@@ -413,7 +448,7 @@ class BasicTest extends SimpleTest {
     $this->assert($result[0]['password'] === 'dookoo');
   }
 
-  function test_9_fullcolumns() {
+  function test_15_fullcolumns() {
     $affected_rows = DB::insert('profile', array(
       'id' => 1,
       'signature' => 'u_suck'
@@ -435,7 +470,7 @@ class BasicTest extends SimpleTest {
     $this->assert($r[0]['1+1'] === '2');
   }
 
-  function test_901_updatewithspecialchar() {
+  function test_16_updatewithspecialchar() {
     $data = 'www.mysite.com/product?s=t-%s-%%3d%%3d%i&RCAID=24322';
     DB::update('profile', array('signature' => $data), 'id=%i', 1);
     $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
@@ -446,7 +481,7 @@ class BasicTest extends SimpleTest {
     $this->assert($signature === "%li ");
   }
 
-  function test_902_faketable() {
+  function test_17_faketable() {
     DB::insert('fake%s_table', array('name' => 'karen'));
     $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
     $this->assert($count === '1');
@@ -457,8 +492,9 @@ class BasicTest extends SimpleTest {
     $this->assert($count === '0');
   }
 
-  function test_11_timeout() {
+  function test_18_timeout() {
     if ($this->db_type != 'mysql') return;
+    if ($this->fast) return;
     
     $default = DB::$reconnect_after;
     DB::$reconnect_after = 1;
