@@ -1229,60 +1229,6 @@ class MeekroDB {
     return $this->queryHelper(array('raw' => true, 'unbuf' => true, 'name' => 'queryRawUnbuf'), func_get_args());
   }
 
-  /**
-   * @deprecated
-   */
-  public function queryOneList() { 
-    return $this->queryFirstList(...func_get_args());
-  }
-
-  /**
-   * @deprecated
-   */
-  public function queryOneRow() { 
-    return $this->queryFirstRow(...func_get_args());
-  }
-
-  /**
-   * @deprecated
-   */
-  public function queryOneField() {
-    $args = func_get_args();
-    $column = array_shift($args);
-    
-    $row = $this->queryOneRow(...$args);
-    if ($row == null) { 
-      return null;
-    } else if ($column === null) {
-      $keys = array_keys($row);
-      $column = $keys[0];
-    }  
-    
-    return $row[$column];
-  }
-
-  /**
-   * @deprecated
-   */
-  public function queryOneColumn() {
-    $args = func_get_args();
-    $column = array_shift($args);
-    $results = $this->query(...$args);
-    $ret = array();
-    
-    if (!count($results) || !count($results[0])) return $ret;
-    if ($column === null) {
-      $keys = array_keys($results[0]);
-      $column = $keys[0];
-    }
-    
-    foreach ($results as $row) {
-      $ret[] = $row[$column];
-    }
-    
-    return $ret;
-  }
-
 }
 
 class MeekroDBWalk {

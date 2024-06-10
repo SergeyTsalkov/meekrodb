@@ -30,16 +30,8 @@ class BasicTest extends SimpleTest {
     $field = DB::queryFirstField("SELECT * FROM accounts");
     $this->assert($field === null);
     
-    $field = DB::queryOneField('nothere', "SELECT * FROM accounts");
-    // $this->assert($this->last_func === 'queryOneField');
-    $this->assert($field === null);
-    
     $column = DB::queryFirstColumn("SELECT * FROM accounts");
     $this->assert($this->last_func === 'queryFirstColumn');
-    $this->assert(is_array($column) && count($column) === 0);
-    
-    $column = DB::queryOneColumn('nothere', "SELECT * FROM accounts");
-    // $this->assert($this->last_func === 'queryOneColumn');
     $this->assert(is_array($column) && count($column) === 0);
   }
   
@@ -106,26 +98,15 @@ class BasicTest extends SimpleTest {
   }
 
   // * basic test of:
-  //   queryFirstField(), queryOneField(), queryFirstColumn(), queryOneList(), queryRaw()
+  //   queryFirstField(), queryFirstColumn(), queryRaw()
   function test_05_query() {
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
-      array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
-    $this->assert($charlie_password === 'goodbye');
-    
-    $charlie_password = DB::queryOneField('password', "SELECT * FROM accounts WHERE username IN %ls AND username = %s", 
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
     $this->assert($charlie_password === 'goodbye');
     
     $passwords = DB::queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Bart');
     $this->assert(count($passwords) === 1);
     $this->assert($passwords[0] === 'hello');
-    
-    $username = $password = $age = null;
-    list($age, $username, $password) = DB::queryOneList("SELECT %c,username,password FROM accounts WHERE username=%s", 'user.age', 'Bart');
-    // $this->assert($this->last_func === 'queryOneList');
-    $this->assert($username === 'Bart');
-    $this->assert($password === 'hello');
-    $this->assert($age == 15);
     
     $statement = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
     $this->assert($this->last_func === 'queryRaw');
@@ -242,20 +223,10 @@ class BasicTest extends SimpleTest {
       'height' => 111.15
     ));
     
-    $row = DB::queryOneRow("SELECT * FROM accounts WHERE password=%s", 'cdefgh');
-    $this->assert($row['username'] === 'newguy');
-    $this->assert($row['user.age'] === '172');
-    
     $affected_rows = DB::update('accounts', array(
       'password' => DB::sqleval("SUBSTR('abcdefgh', %i)", 4),
       'favorite_word' => null,
       ), 'username=%s_name', array('name' => 'newguy'));
-    
-    $row = null;
-    $row = DB::queryOneRow("SELECT * FROM accounts WHERE username=%s", 'newguy');
-    $this->assert($affected_rows === 1);
-    $this->assert($row['password'] === 'defgh');
-    $this->assert($row['favorite_word'] === null);
     
     $row = DB::query("SELECT * FROM accounts WHERE password=%s_mypass AND (password=%s_mypass) AND username=%s_myuser", 
       array('myuser' => 'newguy', 'mypass' => 'defgh')
@@ -329,10 +300,6 @@ class BasicTest extends SimpleTest {
     $this->assert($rows[1]['user.age'] === '25');
     $this->assert($rows[1]['password'] === 'somethingelse');
     $this->assert($rows[1]['username'] === '2ofmany');
-    
-    $nullrow = DB::queryOneRow("SELECT * FROM accounts WHERE username LIKE %ss", '3ofman');
-    $this->assert($nullrow['password'] === NULL);
-    $this->assert($nullrow['user.age'] === '15');
   }
   
   function test_12_insert_ignore() {
