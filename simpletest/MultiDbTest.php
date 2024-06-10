@@ -1,7 +1,16 @@
 <?php
 class MultiDbTest extends SimpleTest {
+  public $last_func;
+
   function skip() {
     if (! $this->db2) return "no support for multiple databases";
+  }
+
+  function __construct() {
+    DB::removeHooks('pre_run');
+    DB::addHook('pre_run', function($hash) {
+      $this->last_func = $hash['func_name'];
+    });
   }
 
   // * can tableList() tables in foreign database
@@ -14,9 +23,11 @@ class MultiDbTest extends SimpleTest {
   // * can switch dbs with useDB()/setDB()
   function test_02_create_table() {
     DB::useDB($this->db2);
+    $this->assert($this->last_func === 'useDB');
+
     DB::query($this->get_sql('mini_table'));
     DB::setDB($this->db);
-
+    $this->assert($this->last_func === 'useDB');
     $table = array($this->db2, 'accounts');
     $columns = DB::columnList($table);
   }
@@ -42,6 +53,7 @@ class MultiDbTest extends SimpleTest {
     $this->assert($id === '1');
 
     DB::replace($table, array('id' => 1, 'myname' => 'Jamie'));
+    $this->assert($this->last_func === 'replace');
     $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", $table);
     $this->assert($count === '1');
     $name = DB::queryFirstField("SELECT myname FROM %b WHERE id=%i", $table, 1);

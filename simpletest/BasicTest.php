@@ -7,6 +7,7 @@ class BasicTest extends SimpleTest {
       DB::query("DROP TABLE %b", $table);
     }
 
+    DB::removeHooks('pre_run');
     DB::addHook('pre_run', function($hash) {
       $this->last_func = $hash['func_name'];
     });
@@ -98,7 +99,7 @@ class BasicTest extends SimpleTest {
   }
 
   // * basic test of:
-  //   queryFirstField(), queryFirstColumn(), queryRaw()
+  //   queryFirstField(), queryFirstColumn(), queryFirstList(), queryRaw()
   function test_05_query() {
     $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
       array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
@@ -107,6 +108,11 @@ class BasicTest extends SimpleTest {
     $passwords = DB::queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Bart');
     $this->assert(count($passwords) === 1);
     $this->assert($passwords[0] === 'hello');
+
+    list($username, $password) = DB::queryFirstList("SELECT username, password FROM accounts WHERE id=%i", 1);
+    $this->assert($this->last_func === 'queryFirstList');
+    $this->assert($username === 'Abe');
+    $this->assert($password === 'hello');
     
     $statement = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
     $this->assert($this->last_func === 'queryRaw');
@@ -163,9 +169,10 @@ class BasicTest extends SimpleTest {
     $affected_rows = DB::update('accounts', array(
       'birthday' => new DateTime('10 September 2000 13:13:13')
     ), 'username=%s', 'Charlie\'s Friend');
-    
-    $results = DB::query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
     $this->assert($affected_rows === 1);
+    $this->assert($this->last_func == 'update');
+
+    $results = DB::query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
     $this->assert(count($results) === 1);
     $this->assert($results[0]['user.age'] === '30' && $results[0]['password'] === 'goodbye');
     $this->assert($results[0]['birthday'] == '2000-09-10 13:13:13');
@@ -261,6 +268,7 @@ class BasicTest extends SimpleTest {
     
     $affected_rows = DB::delete('accounts', 'username=%s AND %c=%i AND height=%d', 
       'gonesoon', 'user.age', '61', '199.194');
+    $this->assert($this->last_func === 'delete');
     $this->assert($affected_rows === 1);
     $this->assert(DB::affectedRows() === 1);
     
@@ -312,6 +320,7 @@ class BasicTest extends SimpleTest {
       'user.age' => 61,
       'height' => 199.194
     ));
+    $this->assert($this->last_func === 'insertIgnore');
     $this->assert($affected_rows === 0);
   }
   
@@ -415,6 +424,7 @@ class BasicTest extends SimpleTest {
     $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 {$as_str} FROM accounts
       INNER JOIN profile ON accounts.profile_id=profile.id");
 
+    $this->assert($this->last_func === 'queryFullColumns');
     $this->assert(count($r) === 1);
     $this->assert($r[0]['accounts.id'] === '2');
     $this->assert($r[0]['profile.id'] === '1');

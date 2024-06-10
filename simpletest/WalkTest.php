@@ -1,6 +1,15 @@
 <?php
 
 class WalkTest extends SimpleTest {
+  public $last_func;
+
+  function __construct() {
+    DB::removeHooks('pre_run');
+    DB::addHook('pre_run', function($hash) {
+      $this->last_func = $hash['func_name'];
+    });
+  }
+
   function test_1_walk() {
     $Walk = DB::queryWalk("SELECT * FROM accounts ORDER BY id");
 
@@ -9,6 +18,7 @@ class WalkTest extends SimpleTest {
       $results[] = $row;
     }
 
+    $this->assert($this->last_func === 'queryWalk');
     $this->assert(count($results) == 8);
     $this->assert($results[7]['username'] == 'vookoo');
   }
