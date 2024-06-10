@@ -112,7 +112,9 @@ class DB {
     return call_user_func_array($fn, $args);
   }
 
-  // --- begin deprecated methods (kept for backwards compatability)
+  /**
+   * @deprecated
+   */
   static function debugMode($enable=true) {
     if ($enable) self::$logfile = fopen('php://output', 'w');
     else self::$logfile = null;
@@ -218,122 +220,6 @@ class MeekroDB {
     $this->internal_pdo = null;
   }
 
-  function addHook($type, $fn) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
-
-    if (! is_callable($fn)) {
-      throw new MeekroDBException("Second arg to addHook() must be callable");
-    }
-
-    $this->hooks[$type][] = $fn;
-    end($this->hooks[$type]);
-    return key($this->hooks[$type]);
-  }
-
-  function removeHook($type, $index) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
-
-    if (! array_key_exists($index, $this->hooks[$type])) {
-      throw new MeekroDBException("That hook does not exist");
-    }
-
-    unset($this->hooks[$type][$index]);
-  }
-
-  function removeHooks($type) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
-
-    $this->hooks[$type] = array();
-  }
-
-  protected function runHook($type, $args=array()) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
-
-    if ($type == 'pre_run') {
-      $query = $args['query'];
-      $params = $args['params'];
-
-      foreach ($this->hooks[$type] as $hook) {
-        $result = call_user_func($hook, array('query' => $query, 'params' => $params));
-        if (is_string($result)) {
-          $query = $result;
-        }
-        else if (is_array($result) && count($result) == 2) {
-          list($query, $params) = $result;
-        }
-        else if (!is_null($result)) {
-          throw new MeekroDBException("pre_run hook must return a query string or [query, params] array");
-        }
-      }
-
-      return array($query, $params);
-    }
-    else if ($type == 'post_run') {
-
-      foreach ($this->hooks[$type] as $hook) {
-        call_user_func($hook, $args);
-      }
-    }
-    else if ($type == 'run_success') {
-      
-      foreach ($this->hooks[$type] as $hook) {
-        call_user_func($hook, $args);
-      }
-    }
-    else if ($type == 'run_failed') {
-      
-      foreach ($this->hooks[$type] as $hook) {
-        $result = call_user_func($hook, $args);
-        if ($result === false) return false;
-      }
-    }
-    else {
-      throw new MeekroDBException("runHook() type $type not recognized");
-    }
-  }
-
-  protected function defaultRunHook($args) {
-    if (! $this->logfile) return;
-
-    $query = $args['query'];
-    $query = preg_replace('/\s+/', ' ', $query);
-
-    $results[] = sprintf('[%s]', date('Y-m-d H:i:s'));
-    $results[] = sprintf('QUERY: %s', $query);
-
-    if ($params = $args['params']) {
-      $results[] = sprintf('PARAMS: %s', implode(', ', $params));
-    }
-
-    $results[] = sprintf('RUNTIME: %s ms', $args['runtime']);
-
-    if ($args['affected']) {
-      $results[] = sprintf('AFFECTED ROWS: %s', $args['affected']);
-    }
-    if ($args['rows']) {
-      $results[] = sprintf('RETURNED ROWS: %s', $args['rows']);
-    }
-    if ($args['error']) {
-      $results[] = 'ERROR: ' . $args['error'];
-    }
-    
-    $results = implode("\n", $results) . "\n\n";
-
-    if (is_resource($this->logfile)) {
-      fwrite($this->logfile, $results);
-    } else {
-      file_put_contents($this->logfile, $results, FILE_APPEND);
-    }
-  }
-
   public function serverVersion() { return $this->get()->getAttribute(PDO::ATTR_SERVER_VERSION); }
   public function transactionDepth() { return $this->nested_transactions_count; }
   public function insertId() { return $this->get()->lastInsertId(); }
@@ -341,14 +227,14 @@ class MeekroDB {
   
   public function lastQuery() { return $this->last_query; }
   
-  public function setDB() { return call_user_func_array(array($this, 'useDB'), func_get_args()); }
+  public function setDB() { return $this->useDB(...func_get_args()); }
   public function useDB($dbName) { 
     $db_type = $this->db_type();
     if (in_array($db_type, array('pgsql', 'sqlite'))) {
       throw new MeekroDBException("Database switching not supported by {$db_type}.");
     }
 
-    $this->_query("USE :c", $dbName);
+    $this->_query('useDB', "USE :c", $dbName);
   }
   
   public function startTransaction() {
@@ -358,10 +244,10 @@ class MeekroDB {
     }
 
     if ($this->nested_transactions && $this->nested_transactions_count > 0) {
-      $this->query("SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->_query('startTransaction', "SAVEPOINT LEVEL{$this->nested_transactions_count}");
       $this->nested_transactions_count++;
     } else {
-      $this->query($start_transaction);
+      $this->_query('startTransaction', $start_transaction);
       $this->nested_transactions_count = 1;
     }
 
@@ -375,9 +261,9 @@ class MeekroDB {
     }
 
     if ($this->nested_transactions_count > 0) {
-      $this->query("RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->_query('commit', "RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
     } else {
-      $this->query('COMMIT');
+      $this->_query('commit', 'COMMIT');
     }
     
     return $this->nested_transactions_count;
@@ -390,12 +276,60 @@ class MeekroDB {
     }
 
     if ($this->nested_transactions_count > 0) {
-      $this->query("ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->_query('rollback', "ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
     } else {
-      $this->query('ROLLBACK');
+      $this->_query('rollback', 'ROLLBACK');
     }
     
     return $this->nested_transactions_count;
+  }
+
+  public function query() {
+    return $this->queryHelper(['assoc' => true, 'name' => 'query'], func_get_args());
+  }
+
+  public function queryFullColumns() {
+    return $this->queryHelper(['fullcols' => true, 'name' => 'queryFullColumns'], func_get_args());
+  }
+
+  public function queryWalk() {
+    return $this->queryHelper(['walk' => true, 'name' => 'queryWalk'], func_get_args());
+  }
+
+  public function queryFirstRow() {
+    $result = $this->queryHelper(['assoc' => true, 'name' => 'queryFirstRow'], func_get_args());
+    if (!$result || !is_array($result)) return null;
+    return reset($result);
+  }
+
+  public function queryAllLists() { 
+    return $this->queryHelper(['name' => 'queryAllLists'], func_get_args()); 
+  }
+  
+  public function queryFirstList() {
+    $result = $this->queryHelper(['name' => 'queryFirstList'], func_get_args()); 
+    if (!$result || !is_array($result)) return null;
+    return reset($result);
+  }
+  
+  public function queryFirstColumn() { 
+    $results = $this->queryHelper(['name' => 'queryFirstColumn'], func_get_args()); 
+    $ret = [];
+    if (!count($results) || !count($results[0])) return $ret;
+    
+    foreach ($results as $row) {
+      $ret[] = $row[0];
+    }
+    
+    return $ret;
+  }
+  
+  public function queryFirstField() {
+    $results = $this->queryHelper(['name' => 'queryFirstField'], func_get_args());
+    if (!is_array($results) || !$results) return null;
+    $row = $results[0];
+    if (!is_array($row) || !$row) return null;
+    return $row[0];
   }
   
   public function update() {
@@ -416,11 +350,11 @@ class MeekroDB {
     } else {
       // we don't know if they used named or numbered args, so the where clause
       // must be run through the parser separately
-      $Where = call_user_func_array(array($this, 'parse'), $args);
+      $Where = $this->parse(...$args);
     }
     
     $ParsedQuery->add($Where);
-    return $this->query($ParsedQuery);
+    return $this->_query('update', $ParsedQuery);
   }
 
   public function delete() {
@@ -435,19 +369,21 @@ class MeekroDB {
     if (is_array($args[0])) {
       $Where = $this->_parse(':ha', $args[0]);
     } else {
-      $Where = call_user_func_array(array($this, 'parse'), $args);
+      $Where = $this->parse(...$args);
     }
 
     $ParsedQuery->add($Where);
-    return $this->query($ParsedQuery);
+    return $this->_query('delete', $ParsedQuery);
   }
   
   protected function insertOrReplace($mode, $table, $datas, $options=array()) {
     $db_type = $this->db_type();
+    $fn_name = 'insert';
 
     if ($mode == 'insert') {
       $action = 'INSERT';
     } else if ($mode == 'ignore') {
+      $fn_name = 'insertIgnore';
       if ($db_type == 'sqlite') {
         $action = 'INSERT';
       }
@@ -458,6 +394,7 @@ class MeekroDB {
         $action = 'INSERT IGNORE';
       }
     } else if ($mode == 'replace') {
+      $fn_name = 'replace';
       $action = 'REPLACE';
     } else {
       throw new MeekroDBException("insertOrReplace() mode must be: insert, ignore, replace");
@@ -489,6 +426,7 @@ class MeekroDB {
       $ParsedQuery->add(' ON CONFLICT DO NOTHING');
     }
     else if ($do_update) {
+      $fn_name = 'insertUpdate';
       if ($db_type == 'sqlite') {
         $on_duplicate = 'ON CONFLICT DO UPDATE SET';
         
@@ -510,13 +448,13 @@ class MeekroDB {
       }
       else {
         $update_str = array_shift($options['update']);
-        $Update = call_user_func_array(array($this, 'parse'), array_merge(array($update_str), $options['update']));
+        $Update = $this->parse($update_str, ...$options['update']);
       }
 
       $ParsedQuery->add($Update);
     }
 
-    return $this->query($ParsedQuery);
+    return $this->_query($fn_name, $ParsedQuery);
   }
   
   public function insert($table, $data) { return $this->insertOrReplace('insert', $table, $data); }
@@ -543,8 +481,7 @@ class MeekroDB {
   }
   
   public function sqleval() {
-    $args = func_get_args();
-    return call_user_func_array(array($this, 'parse'), $args);
+    return $this->parse(...func_get_args());
   }
   
   public function columnList($table) {
@@ -565,7 +502,7 @@ class MeekroDB {
       $primary = 'Field';
     }
 
-    $data = $this->_query($query, $table);
+    $data = $this->_query('columnList', $query, $table);
     $columns = array();
     foreach ($data as $row) {
       $key = $row[$primary];
@@ -585,20 +522,20 @@ class MeekroDB {
       if ($db) $tbl = "{$db}.sqlite_master";
       else $tbl = "sqlite_master";
 
-      $result = $this->_query("SELECT name FROM :b 
+      $result = $this->_query('tableList', "SELECT name FROM :b 
         WHERE type='table' AND name NOT LIKE 'sqlite_%'", $tbl);
     }
     else if ($this->db_type() == 'pgsql') {
-      $result = $this->_query("SELECT table_name
+      $result = $this->_query('tableList', "SELECT table_name
         FROM information_schema.tables
         WHERE table_schema='public'
         ORDER BY table_name");
     }
     else {
       if ($db) {
-        $result = $this->_query('SHOW TABLES FROM :c', $db);
+        $result = $this->_query('tableList', 'SHOW TABLES FROM :c', $db);
       } else {
-        $result = $this->_query('SHOW TABLES');
+        $result = $this->_query('tableList', 'SHOW TABLES');
       }
     }
 
@@ -609,6 +546,8 @@ class MeekroDB {
     return $column;
   }
 
+
+  // *************** PARSER AND QUERY RUNNER
   protected function paramsMap() {
     $t = $this;
 
@@ -965,10 +904,7 @@ class MeekroDB {
         }
 
         list($clause_sql, $clause_args) = $val->textAndArgs();
-        $ParsedSubQuery = call_user_func_array(
-          array($this, 'parse'), 
-          array_merge(array($clause_sql), $clause_args)
-        );
+        $ParsedSubQuery = $this->parse($clause_sql, ...$clause_args);
         $ParsedQuery->add($ParsedSubQuery);
       }
       else {
@@ -988,8 +924,11 @@ class MeekroDB {
     $param_char = $this->param_char;
     $this->param_char = ':';
 
+    $args = func_get_args();
+    $func_name = array_shift($args);
+
     try {
-      return call_user_func_array(array($this, 'query'), func_get_args());
+      return $this->queryHelper(array('assoc' => true, 'name' => $func_name), $args);
     } finally {
       $this->param_char = $param_char;
     }
@@ -999,27 +938,22 @@ class MeekroDB {
     $this->param_char = ':';
 
     try {
-      return call_user_func_array(array($this, 'parse'), func_get_args());
+      return $this->parse(...func_get_args());
     } finally {
       $this->param_char = $param_char;
     }
   }
-
-  public function query() { return $this->queryHelper(array('assoc' => true), func_get_args()); }
-
-  /**
-   * @deprecated
-   */
-  public function queryAllLists() { return $this->queryHelper(array(), func_get_args()); }  
-  public function queryFullColumns() { return $this->queryHelper(array('fullcols' => true), func_get_args()); }
-  public function queryWalk() { return $this->queryHelper(array('walk' => true), func_get_args()); }
   
   protected function queryHelper($opts, $args) {
+    if (!isset($opts['name'])) {
+      throw new MeekroDBException("queryHelper() must get source function name");
+    }
     $opts_fullcols = (isset($opts['fullcols']) && $opts['fullcols']);
     $opts_raw = (isset($opts['raw']) && $opts['raw']);
     $opts_unbuf = (isset($opts['unbuf']) && $opts['unbuf']);
     $opts_assoc = (isset($opts['assoc']) && $opts['assoc']);
     $opts_walk = (isset($opts['walk']) && $opts['walk']);
+    $func_name = $opts['name'];
     $is_buffered = !($opts_unbuf || $opts_walk);
 
     if ($this->reconnect_after > 0 && time() - $this->last_query_at >= $this->reconnect_after) {
@@ -1030,12 +964,16 @@ class MeekroDB {
     if ($query instanceof MeekroDBParsedQuery) {
       $ParsedQuery = $query;
     } else {
-      $ParsedQuery = call_user_func_array(array($this, 'parse'), array_merge(array($query), $args));
+      $ParsedQuery = $this->parse($query, ...$args);
     }
     $query = $ParsedQuery->query;
     $params = $ParsedQuery->params;
 
-    list($query, $params) = $this->runHook('pre_run', array('query' => $query, 'params' => $params));
+    list($query, $params) = $this->runHook('pre_run', array(
+      'query' => $query,
+      'params' => $params,
+      'func_name' => $func_name,
+    ));
     $query = trim($query);
     $this->last_query = $query;
     $this->last_query_at = time();
@@ -1092,6 +1030,7 @@ class MeekroDB {
       'query' => $query,
       'params' => $params,
       'runtime' => $runtime,
+      'func_name' => $func_name,
       'exception' => null,
       'error' => null,
       'rows' => null,
@@ -1153,44 +1092,127 @@ class MeekroDB {
     return $this->affected_rows;
   }
 
-  
-  public function queryFirstRow() {
-    $args = func_get_args();
-    $result = call_user_func_array(array($this, 'query'), $args);
-    if (!$result || !is_array($result)) return null;
-    return reset($result);
+  // *************** HOOKS
+  function addHook($type, $fn) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    if (! is_callable($fn)) {
+      throw new MeekroDBException("Second arg to addHook() must be callable");
+    }
+
+    $this->hooks[$type][] = $fn;
+    end($this->hooks[$type]);
+    return key($this->hooks[$type]);
   }
 
-  
-  public function queryFirstList() {
-    $args = func_get_args();
-    $result = call_user_func_array(array($this, 'queryAllLists'), $args);
-    if (!$result || !is_array($result)) return null;
-    return reset($result);
+  function removeHook($type, $index) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    if (! array_key_exists($index, $this->hooks[$type])) {
+      throw new MeekroDBException("That hook does not exist");
+    }
+
+    unset($this->hooks[$type][$index]);
   }
-  
-  public function queryFirstColumn() { 
-    $args = func_get_args();
-    $results = call_user_func_array(array($this, 'queryAllLists'), $args);
-    $ret = array();
-    
-    if (!count($results) || !count($results[0])) return $ret;
-    
-    foreach ($results as $row) {
-      $ret[] = $row[0];
+
+  function removeHooks($type) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    $this->hooks[$type] = array();
+  }
+
+  protected function runHook($type, $args=array()) {
+    if (! array_key_exists($type, $this->hooks)) {
+      throw new MeekroDBException("Hook type $type is not recognized");
+    }
+
+    if ($type == 'pre_run') {
+      $query = $args['query'];
+      $params = $args['params'];
+
+      foreach ($this->hooks[$type] as $hook) {
+        $result = call_user_func($hook, array('query' => $query, 'params' => $params));
+        if (is_string($result)) {
+          $query = $result;
+        }
+        else if (is_array($result) && count($result) == 2) {
+          list($query, $params) = $result;
+        }
+        else if (!is_null($result)) {
+          throw new MeekroDBException("pre_run hook must return a query string or [query, params] array");
+        }
+      }
+
+      return array($query, $params);
+    }
+    else if ($type == 'post_run') {
+
+      foreach ($this->hooks[$type] as $hook) {
+        call_user_func($hook, $args);
+      }
+    }
+    else if ($type == 'run_success') {
+      
+      foreach ($this->hooks[$type] as $hook) {
+        call_user_func($hook, $args);
+      }
+    }
+    else if ($type == 'run_failed') {
+      
+      foreach ($this->hooks[$type] as $hook) {
+        $result = call_user_func($hook, $args);
+        if ($result === false) return false;
+      }
+    }
+    else {
+      throw new MeekroDBException("runHook() type $type not recognized");
+    }
+  }
+
+  protected function defaultRunHook($args) {
+    if (! $this->logfile) return;
+
+    $query = $args['query'];
+    $query = preg_replace('/\s+/', ' ', $query);
+
+    $results[] = sprintf('[%s]', date('Y-m-d H:i:s'));
+    $results[] = sprintf('QUERY: %s', $query);
+
+    if ($params = $args['params']) {
+      $results[] = sprintf('PARAMS: %s', implode(', ', $params));
+    }
+
+    $results[] = sprintf('RUNTIME: %s ms', $args['runtime']);
+
+    if ($args['affected']) {
+      $results[] = sprintf('AFFECTED ROWS: %s', $args['affected']);
+    }
+    if ($args['rows']) {
+      $results[] = sprintf('RETURNED ROWS: %s', $args['rows']);
+    }
+    if ($args['error']) {
+      $results[] = 'ERROR: ' . $args['error'];
     }
     
-    return $ret;
-  }
-  
-  public function queryFirstField() { 
-    $args = func_get_args();
-    $row = call_user_func_array(array($this, 'queryFirstList'), $args);
-    if ($row == null) return null;    
-    return $row[0];
+    $results = implode("\n", $results) . "\n\n";
+
+    if (is_resource($this->logfile)) {
+      fwrite($this->logfile, $results);
+    } else {
+      file_put_contents($this->logfile, $results, FILE_APPEND);
+    }
   }
 
-  // --- begin deprecated methods (kept for backwards compatability)
+  // *************** DEPRECATED METHODS
+  /**
+   * @deprecated
+   */
   public function debugMode($enable=true) {
     if ($enable) $this->logfile = fopen('php://output', 'w');
     else $this->logfile = null;
@@ -1200,28 +1222,28 @@ class MeekroDB {
    * @deprecated
    */
   public function queryRaw() { 
-    return $this->queryHelper(array('raw' => true), func_get_args());
+    return $this->queryHelper(array('raw' => true, 'name' => 'queryRaw'), func_get_args());
   }
 
   /**
    * @deprecated
    */
   public function queryRawUnbuf() { 
-    return $this->queryHelper(array('raw' => true, 'unbuf' => true), func_get_args());
+    return $this->queryHelper(array('raw' => true, 'unbuf' => true, 'name' => 'queryRawUnbuf'), func_get_args());
   }
 
   /**
    * @deprecated
    */
   public function queryOneList() { 
-    return call_user_func_array(array($this, 'queryFirstList'), func_get_args());
+    return $this->queryFirstList(...func_get_args());
   }
 
   /**
    * @deprecated
    */
   public function queryOneRow() { 
-    return call_user_func_array(array($this, 'queryFirstRow'), func_get_args());
+    return $this->queryFirstRow(...func_get_args());
   }
 
   /**
@@ -1231,7 +1253,7 @@ class MeekroDB {
     $args = func_get_args();
     $column = array_shift($args);
     
-    $row = call_user_func_array(array($this, 'queryOneRow'), $args);
+    $row = $this->queryOneRow(...$args);
     if ($row == null) { 
       return null;
     } else if ($column === null) {
@@ -1248,7 +1270,7 @@ class MeekroDB {
   public function queryOneColumn() {
     $args = func_get_args();
     $column = array_shift($args);
-    $results = call_user_func_array(array($this, 'query'), $args);
+    $results = $this->query(...$args);
     $ret = array();
     
     if (!count($results) || !count($results[0])) return $ret;
