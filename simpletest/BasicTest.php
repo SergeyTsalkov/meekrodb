@@ -449,12 +449,16 @@ class BasicTest extends SimpleTest {
   }
 
   function test_15_fullcolumns() {
+    // old pgsql pdo driver doesn't support getColumnMeta()['table']
+    if ($this->db_type == 'pgsql' && phpversion() < '7.0') return;
+
     $affected_rows = DB::insert('profile', array(
       'id' => 1,
       'signature' => 'u_suck'
     ));
-    DB::query("UPDATE accounts SET profile_id=1 WHERE id=2");
+    $this->assert($affected_rows === 1);
 
+    DB::query("UPDATE accounts SET profile_id=1 WHERE id=2");
 
     $as_str = '';
     if ($this->db_type == 'pgsql') $as_str = 'AS "1+1"';
@@ -462,7 +466,6 @@ class BasicTest extends SimpleTest {
     $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 {$as_str} FROM accounts
       INNER JOIN profile ON accounts.profile_id=profile.id");
 
-    $this->assert($affected_rows === 1);
     $this->assert(count($r) === 1);
     $this->assert($r[0]['accounts.id'] === '2');
     $this->assert($r[0]['profile.id'] === '1');
@@ -471,6 +474,12 @@ class BasicTest extends SimpleTest {
   }
 
   function test_16_updatewithspecialchar() {
+    DB::query("DELETE FROM profile");
+    DB::insert('profile', array(
+      'id' => 1,
+      'signature' => 'u_suck'
+    ));
+
     $data = 'www.mysite.com/product?s=t-%s-%%3d%%3d%i&RCAID=24322';
     DB::update('profile', array('signature' => $data), 'id=%i', 1);
     $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);

@@ -11,11 +11,11 @@ class MultiDbTest extends SimpleTest {
     }
   }
 
-  // * can switch dbs with use()
+  // * can switch dbs with useDB()/setDB()
   function test_02_create_table() {
-    DB::use($this->db2);
+    DB::useDB($this->db2);
     DB::query($this->get_sql('mini_table'));
-    DB::use($this->db);
+    DB::setDB($this->db);
 
     $table = array($this->db2, 'accounts');
     $columns = DB::columnList($table);

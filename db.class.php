@@ -341,9 +341,8 @@ class MeekroDB {
   
   public function lastQuery() { return $this->last_query; }
   
-  public function useDB() { return call_user_func_array(array($this, 'use'), func_get_args()); }
-  public function setDB() { return call_user_func_array(array($this, 'use'), func_get_args()); }
-  public function use($dbName) { 
+  public function setDB() { return call_user_func_array(array($this, 'useDB'), func_get_args()); }
+  public function useDB($dbName) { 
     $db_type = $this->db_type();
     if (in_array($db_type, array('pgsql', 'sqlite'))) {
       throw new MeekroDBException("Database switching not supported by {$db_type}.");

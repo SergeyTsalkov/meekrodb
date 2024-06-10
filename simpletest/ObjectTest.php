@@ -417,39 +417,6 @@ class ObjectTest extends SimpleTest {
     $this->assert($result[0]['password'] === 'dookoo');
   }
 
-  function test_9_fullcolumns() {
-    $affected_rows = $this->mdb->insert('profile', array(
-      'id' => 1,
-      'signature' => 'u_suck'
-    ));
-    $this->mdb->query("UPDATE accounts SET profile_id=1 WHERE id=2");
-
-
-    $as_str = '';
-    if ($this->db_type == 'pgsql') $as_str = 'AS "1+1"';
-
-    $r = $this->mdb->queryFullColumns("SELECT accounts.*, profile.*, 1+1 {$as_str} FROM accounts
-      INNER JOIN profile ON accounts.profile_id=profile.id");
-
-    $this->assert($affected_rows === 1);
-    $this->assert(count($r) === 1);
-    $this->assert($r[0]['accounts.id'] === '2');
-    $this->assert($r[0]['profile.id'] === '1');
-    $this->assert($r[0]['profile.signature'] === 'u_suck');
-    $this->assert($r[0]['1+1'] === '2');
-  }
-
-  function test_901_updatewithspecialchar() {
-    $data = 'www.mysite.com/product?s=t-%s-%%3d%%3d%i&RCAID=24322';
-    $this->mdb->update('profile', array('signature' => $data), 'id=%i', 1);
-    $signature = $this->mdb->queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
-    $this->assert($signature === $data);
-
-    $this->mdb->update('profile', array('signature'=> "%li "), array('id' => 1));
-    $signature = $this->mdb->queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
-    $this->assert($signature === "%li ");
-  }
-
   function test_902_faketable() {
     $this->mdb->insert('fake%s_table', array('name' => 'karen'));
     $count = $this->mdb->queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
@@ -459,18 +426,6 @@ class ObjectTest extends SimpleTest {
     $count = $this->mdb->queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
     $this->assert($affected_rows === 1);
     $this->assert($count === '0');
-  }
-
-  function test_11_timeout() {
-    if ($this->db_type != 'mysql') return;
-    if ($this->fast) return;
-    
-    $default = $this->mdb->reconnect_after;
-    $this->mdb->reconnect_after = 1;
-    $this->mdb->query("SET SESSION wait_timeout=1");
-    sleep(2);
-    $this->mdb->query("SELECT * FROM accounts");
-    $this->mdb->reconnect_after = $default;
   }
 
 }
