@@ -53,24 +53,6 @@ CREATE TABLE profile (
   signature VARCHAR( 255 ) NULL DEFAULT 'donewriting'
 )
 
--- name: create_faketable ; db: mysql
-CREATE TABLE `fake%s_table` (
-  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR( 255 ) NULL DEFAULT 'blah'
-)
-
--- name: create_faketable ; db: sqlite
-CREATE TABLE `fake%s_table` (
-  `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-  `name` VARCHAR( 255 ) NULL DEFAULT 'blah'
-)
-
--- name: create_faketable ; db: pgsql
-CREATE TABLE "fake%s_table" (
-  id SERIAL PRIMARY KEY,
-  name VARCHAR( 255 ) NULL DEFAULT 'blah'
-)
-
 -- name: create_store ; db: mysql
 CREATE TABLE `store data` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -93,4 +75,22 @@ CREATE TABLE "store data" (
 CREATE TABLE `accounts` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `myname` varchar(255) not null
+)
+
+-- name: create_faketable ; db: mysql
+CREATE TABLE `fake%s:s_``"table` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `my.data` VARCHAR( 1024 ) NULL DEFAULT ''
+)
+
+-- name: create_faketable ; db: sqlite
+CREATE TABLE `fake%s:s_``"table` (
+  `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  `my.data` VARCHAR( 1024 ) NULL DEFAULT ''
+)
+
+-- name: create_faketable ; db: pgsql
+CREATE TABLE "fake%s:s_`""table" (
+  "id" SERIAL PRIMARY KEY,
+  "my.data" VARCHAR( 1024 ) NULL DEFAULT ''
 )

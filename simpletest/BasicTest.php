@@ -1,36 +1,45 @@
 <?php
 class BasicTest extends SimpleTest {
+  public $last_func;
+
   function __construct() {
     foreach (DB::tableList() as $table) {
       DB::query("DROP TABLE %b", $table);
     }
+
+    DB::addHook('pre_run', function($hash) {
+      $this->last_func = $hash['func_name'];
+    });
   }
-  
   
   function test_01_create_table() {
     DB::query($this->get_sql('create_accounts'));
     DB::query($this->get_sql('create_profile'));
-    DB::query($this->get_sql('create_faketable'));
   }
   
   function test_02_empty_table() {
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
+    $this->assert($this->last_func === 'queryFirstField');
     $this->assert($counter === strval(0));
     $this->assert(DB::lastQuery() === 'SELECT COUNT(*) FROM accounts');
     
     $row = DB::queryFirstRow("SELECT * FROM accounts");
+    $this->assert($this->last_func === 'queryFirstRow');
     $this->assert($row === null);
     
     $field = DB::queryFirstField("SELECT * FROM accounts");
     $this->assert($field === null);
     
     $field = DB::queryOneField('nothere', "SELECT * FROM accounts");
+    // $this->assert($this->last_func === 'queryOneField');
     $this->assert($field === null);
     
     $column = DB::queryFirstColumn("SELECT * FROM accounts");
+    $this->assert($this->last_func === 'queryFirstColumn');
     $this->assert(is_array($column) && count($column) === 0);
     
     $column = DB::queryOneColumn('nothere', "SELECT * FROM accounts");
+    // $this->assert($this->last_func === 'queryOneColumn');
     $this->assert(is_array($column) && count($column) === 0);
   }
   
@@ -40,11 +49,12 @@ class BasicTest extends SimpleTest {
       'password' => 'hello'
     ));
     
+    $this->assert($this->last_func === 'insert');
     $this->assert($affected_rows === 1);
     $this->assert(DB::affectedRows() === 1);
     
     $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
-    $this->assert($counter === strval(1));
+    $this->assert($counter === '1');
   }
   
   function test_04_more_inserts() {
@@ -85,6 +95,7 @@ class BasicTest extends SimpleTest {
         'id' => 3,
         'favorite_word' => null,
       ));
+      $this->assert($this->last_func === 'insertUpdate');
     } catch (MeekroDBException $e) {
       if (substr_count($e->getMessage(), 'does not support')) {
         echo "Safe error, skipping test: " . $e->getMessage() . "\n";
@@ -111,11 +122,13 @@ class BasicTest extends SimpleTest {
     
     $username = $password = $age = null;
     list($age, $username, $password) = DB::queryOneList("SELECT %c,username,password FROM accounts WHERE username=%s", 'user.age', 'Bart');
+    // $this->assert($this->last_func === 'queryOneList');
     $this->assert($username === 'Bart');
     $this->assert($password === 'hello');
     $this->assert($age == 15);
     
     $statement = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
+    $this->assert($this->last_func === 'queryRaw');
     $this->assert($statement instanceof PDOStatement);
     $row = $statement->fetch(PDO::FETCH_ASSOC);
     $row2 = $statement->fetch(PDO::FETCH_ASSOC);
@@ -161,6 +174,7 @@ class BasicTest extends SimpleTest {
     $this->assert($bart['username'] === 'Bart');
     DB::insert('accounts', array('username' => 'f_u'));
     DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
+    $this->assert($this->last_func === 'query');
     DB::$param_char = '%';
   }
   
@@ -180,6 +194,7 @@ class BasicTest extends SimpleTest {
     
     $columnList = DB::columnList('accounts');
     $columnKeys = array_keys($columnList);
+    $this->assert($this->last_func === 'columnList');
     $this->assert(count($columnList) === 8);
 
     if ($this->db_type == 'mysql') {
@@ -194,12 +209,13 @@ class BasicTest extends SimpleTest {
     $this->assert($columnKeys[5] == 'height');
     
     $tablelist = DB::tableList();
-    $this->assert(count($tablelist) === 3);
+    $this->assert($this->last_func === 'tableList');
+    $this->assert(count($tablelist) === 2);
     $this->assert($tablelist[0] === 'accounts');
     
     $tablelist = null;
     $tablelist = DB::tableList(DB::$dbName);
-    $this->assert(count($tablelist) === 3);
+    $this->assert(count($tablelist) === 2);
     $this->assert($tablelist[0] === 'accounts');
 
     if ($this->db_type == 'sqlite') {
@@ -281,6 +297,7 @@ class BasicTest extends SimpleTest {
     $this->assert(intval($ct) === 0);
   }
   
+  // * insert() multiple rows at once, read them back
   function test_10_insertmany() {
     $ins[] = array(
       'username' => '1ofmany',
@@ -301,7 +318,8 @@ class BasicTest extends SimpleTest {
       'height' => 111.951
     ); 
     
-    DB::insert('accounts', $ins);
+    $affected_rows = DB::insert('accounts', $ins);
+    $this->assert($affected_rows === 3);
     $this->assert(DB::affectedRows() === 3);
     
     $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY %c ASC", 190.194, 'user.age');
@@ -315,42 +333,6 @@ class BasicTest extends SimpleTest {
     $nullrow = DB::queryOneRow("SELECT * FROM accounts WHERE username LIKE %ss", '3ofman');
     $this->assert($nullrow['password'] === NULL);
     $this->assert($nullrow['user.age'] === '15');
-  }
-  
-  function test_11_insert_blobs() {
-    DB::query($this->get_sql('create_store'));
-
-    $columns = DB::columnList('store data');
-    $this->assert(count($columns) === 2);
-
-    if ($this->db_type == 'sqlite') {
-      $this->assert($columns['picture']['type'] === 'BLOB');
-      $this->assert($columns['picture']['notnull'] === '0');
-      $this->assert($columns['picture']['dflt_value'] === NULL);
-    }
-    else if ($this->db_type == 'pgsql') {
-      $this->assert($columns['picture']['data_type'] === 'bytea');
-      $this->assert($columns['picture']['is_nullable'] === 'YES');
-      $this->assert($columns['picture']['column_default'] === NULL);
-    }
-    else {
-      $this->assert($columns['picture']['type'] === 'blob');
-      $this->assert($columns['picture']['null'] === 'YES');
-      $this->assert($columns['picture']['key'] === '');
-      $this->assert($columns['picture']['default'] === NULL);
-      $this->assert($columns['picture']['extra'] === '');
-    }
-    
-    $smile = file_get_contents(__DIR__ . '/smile1.jpg');
-    DB::insert('store data', array(
-      'picture' => $smile,
-    ));
-    DB::query("INSERT INTO %b (picture) VALUES (%s)", 'store data', $smile);
-    
-    $getsmile = DB::queryFirstField("SELECT picture FROM %b WHERE id=1", 'store data');
-    $getsmile2 = DB::queryFirstField("SELECT picture FROM %b WHERE id=2", 'store data');
-    $this->assert($smile === $getsmile);
-    $this->assert($smile === $getsmile2);
   }
   
   function test_12_insert_ignore() {
@@ -435,7 +417,7 @@ class BasicTest extends SimpleTest {
     $this->assert(DB::affectedRows() === 1);
   }
   
-  function test_14_lb() {
+  function test_13_lb() {
     $data = array(
       'username' => 'vookoo',
       'password' => 'dookoo',
@@ -448,7 +430,7 @@ class BasicTest extends SimpleTest {
     $this->assert($result[0]['password'] === 'dookoo');
   }
 
-  function test_15_fullcolumns() {
+  function test_14_fullcolumns() {
     // old pgsql pdo driver doesn't support getColumnMeta()['table']
     if ($this->db_type == 'pgsql' && phpversion() < '7.0') return;
 
@@ -473,35 +455,7 @@ class BasicTest extends SimpleTest {
     $this->assert($r[0]['1+1'] === '2');
   }
 
-  function test_16_updatewithspecialchar() {
-    DB::query("DELETE FROM profile");
-    DB::insert('profile', array(
-      'id' => 1,
-      'signature' => 'u_suck'
-    ));
-
-    $data = 'www.mysite.com/product?s=t-%s-%%3d%%3d%i&RCAID=24322';
-    DB::update('profile', array('signature' => $data), 'id=%i', 1);
-    $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
-    $this->assert($signature === $data);
-
-    DB::update('profile', array('signature'=> "%li "), array('id' => 1));
-    $signature = DB::queryFirstField("SELECT signature FROM profile WHERE id=%i", 1);
-    $this->assert($signature === "%li ");
-  }
-
-  function test_17_faketable() {
-    DB::insert('fake%s_table', array('name' => 'karen'));
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
-    $this->assert($count === '1');
-    DB::update('fake%s_table', array('name' => 'haren%s'), 'name=%s_name', array('name' => 'karen'));
-    $affected_rows = DB::delete('fake%s_table', array('name' => 'haren%s'));
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", 'fake%s_table');
-    $this->assert($affected_rows === 1);
-    $this->assert($count === '0');
-  }
-
-  function test_18_timeout() {
+  function test_15_timeout() {
     if ($this->db_type != 'mysql') return;
     if ($this->fast) return;
     

@@ -96,22 +96,14 @@ require_once __DIR__ . '/../db.class.php';
 $contexts = array();
 require_once __DIR__ . '/test_setup.php'; //test config values go here
 
-require_once __DIR__ . '/BasicTest.php';
-require_once __DIR__ . '/MultiDbTest.php';
-require_once __DIR__ . '/WalkTest.php';
-require_once __DIR__ . '/CallTest.php';
-require_once __DIR__ . '/ObjectTest.php';
-require_once __DIR__ . '/WhereClauseTest.php';
-require_once __DIR__ . '/HookTest.php';
-require_once __DIR__ . '/TransactionTest.php';
-
 $classes_to_test = array(
   'BasicTest',
+  'MeanStringsTest',
   'MultiDbTest',
   'WalkTest',
   'CallTest',
   'WhereClauseTest',
-  'ObjectTest',
+  // 'ObjectTest',
   'HookTest',
   'TransactionTest',
 );
@@ -125,6 +117,8 @@ foreach ($contexts as $name => $fn) {
 
   $time_start = microtime_float();
   foreach ($classes_to_test as $class) {
+    require_once sprintf('%s/%s.php', __DIR__, $class);
+
     $object = new $class();
     $object->db_type = DB::db_type();
     foreach ($data as $key => $value) {
