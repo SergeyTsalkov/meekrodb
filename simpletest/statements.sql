@@ -5,7 +5,7 @@ CREATE TABLE `accounts` (
   `profile_id` INT NOT NULL DEFAULT 0,
   `username` VARCHAR( 255 ) NOT NULL DEFAULT '',
   `password` VARCHAR( 255 ) NULL ,
-  `user.age` INT NOT NULL DEFAULT '10',
+  `age` INT NOT NULL DEFAULT '10',
   `height` DOUBLE NOT NULL DEFAULT '10.0',
   `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
   `birthday` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00'
@@ -17,7 +17,7 @@ CREATE TABLE `accounts` (
   `profile_id` INTEGER NOT NULL DEFAULT 0,
   `username` VARCHAR( 255 ) NOT NULL DEFAULT '',
   `password` VARCHAR( 255 ) NULL ,
-  `user.age` INT NOT NULL DEFAULT '10',
+  `age` INT NOT NULL DEFAULT '10',
   `height` DOUBLE NOT NULL DEFAULT '10.0',
   `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
   `birthday` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00'
@@ -29,7 +29,7 @@ CREATE TABLE accounts (
   profile_id INT NOT NULL DEFAULT 0,
   username VARCHAR( 255 ) NOT NULL DEFAULT '',
   password VARCHAR( 255 ) NULL ,
-  "user.age" INT NOT NULL DEFAULT '10',
+  age INT NOT NULL DEFAULT '10',
   height DOUBLE PRECISION NOT NULL DEFAULT 10.0,
   favorite_word VARCHAR( 255 ) NULL DEFAULT 'hi',
   birthday VARCHAR( 255 ) NOT NULL DEFAULT '0000-00-00 00:00:00'

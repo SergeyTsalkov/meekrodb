@@ -54,14 +54,14 @@ class BasicTest extends SimpleTest {
     DB::insert('accounts', array(
       'username' => 'Bart',
       'password' => 'hello',
-      'user.age' => 15,
+      'age' => 15,
       'height' => 10.371
     ));
 
     DB::insert('accounts', array(
       'username' => 'Charlie\'s Friend',
       'password' => 'goodbye',
-      'user.age' => 30,
+      'age' => 30,
       'height' => 155.23,
       'favorite_word' => null,
     ));
@@ -73,7 +73,7 @@ class BasicTest extends SimpleTest {
     DB::insert('accounts', array(
       'username' => 'Deer',
       'password' => '',
-      'user.age' => 15,
+      'age' => 15,
       'height' => 10.371
     ));
 
@@ -131,14 +131,13 @@ class BasicTest extends SimpleTest {
     DB::$param_char = ':';
     DB::$named_param_seperator = ':';
     $bart = DB::queryFirstRow(
-      "SELECT * FROM accounts WHERE :c IN :li AND height IN :ld AND username IN :ls",
-      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts')
+      "SELECT * FROM accounts WHERE age IN :li AND height IN :ld AND username IN :ls",
+      array(15, 25), array(10.371, 150.123), array('Bart', 'Barts')
     );
     $this->assert($bart['username'] === 'Bart');
 
     $bart = DB::queryFirstRow(
-      "SELECT * FROM accounts WHERE :c:userage IN :li:ages AND height IN :ld:heights AND username IN :ls:names", array(
-          'userage' => 'user.age', 
+      "SELECT * FROM accounts WHERE age IN :li:ages AND height IN :ld:heights AND username IN :ls:names", array(
           'ages' => array(15, 25), 
           'heights' => array(10.371, 150.123),
           'names' => array('Bart', 'Barts'),
@@ -146,18 +145,18 @@ class BasicTest extends SimpleTest {
     );
     $this->assert($bart['username'] === 'Bart');
 
-    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c0=:i1 AND height=:i1", 'user.age', 10);
+    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c0=:i1 AND height=:i1", 'age', 10);
     $this->assert($row['id'] === '1');
     $this->assert($row['username'] === 'Abe');
 
-    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c:0=:i:1 AND height=:i:1", array('user.age', 10));
+    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c:0=:i:1 AND height=:i:1", array('age', 10));
     $this->assert($row['id'] === '1');
     $this->assert($row['username'] === 'Abe');
 
     DB::$param_char = '###';
     DB::$named_param_seperator = '_';
-    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE ###c IN ###li AND height IN ###ld AND username IN ###ls", 
-      'user.age', array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
+    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
+      array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
     $this->assert($bart['username'] === 'Bart');
     DB::insert('accounts', array('username' => 'f_u'));
     DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
@@ -174,7 +173,7 @@ class BasicTest extends SimpleTest {
 
     $results = DB::query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
     $this->assert(count($results) === 1);
-    $this->assert($results[0]['user.age'] === '30' && $results[0]['password'] === 'goodbye');
+    $this->assert($results[0]['age'] === '30' && $results[0]['password'] === 'goodbye');
     $this->assert($results[0]['birthday'] == '2000-09-10 13:13:13');
     
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
@@ -226,7 +225,7 @@ class BasicTest extends SimpleTest {
     DB::insert('accounts', array(
       'username' => 'newguy',
       'password' => DB::sqleval("SUBSTR('abcdefgh', %i)", '3'),
-      'user.age' => DB::sqleval('171+1'),
+      'age' => DB::sqleval('171+1'),
       'height' => 111.15
     ));
     
@@ -240,12 +239,12 @@ class BasicTest extends SimpleTest {
     );
     $this->assert(count($row) === 1);
     $this->assert($row[0]['username'] === 'newguy');
-    $this->assert($row[0]['user.age'] === '172');
+    $this->assert($row[0]['age'] === '172');
 
     $row = DB::query("SELECT * FROM accounts WHERE password IN %ls AND password IN %ls0 AND username=%s", array('defgh'), 'newguy');
     $this->assert(count($row) === 1);
     $this->assert($row[0]['username'] === 'newguy');
-    $this->assert($row[0]['user.age'] === '172');
+    $this->assert($row[0]['age'] === '172');
     
     $affected_rows = DB::query("DELETE FROM accounts WHERE password=%s", 'defgh');
     $this->assert($affected_rows === 1);
@@ -256,7 +255,7 @@ class BasicTest extends SimpleTest {
     DB::insert('accounts', array(
       'username' => 'gonesoon',
       'password' => 'something',
-      'user.age' => 61,
+      'age' => 61,
       'height' => 199.194
     ));
     
@@ -266,8 +265,8 @@ class BasicTest extends SimpleTest {
     $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s1 AND height=%d0 AND height=%d", 199.194, 'gonesoon');
     $this->assert(intval($ct) === 1);
     
-    $affected_rows = DB::delete('accounts', 'username=%s AND %c=%i AND height=%d', 
-      'gonesoon', 'user.age', '61', '199.194');
+    $affected_rows = DB::delete('accounts', 'username=%s AND age=%i AND height=%d', 
+      'gonesoon', '61', '199.194');
     $this->assert($this->last_func === 'delete');
     $this->assert($affected_rows === 1);
     $this->assert(DB::affectedRows() === 1);
@@ -281,19 +280,19 @@ class BasicTest extends SimpleTest {
     $ins[] = array(
       'username' => '1ofmany',
       'password' => 'something',
-      'user.age' => 23,
+      'age' => 23,
       'height' => 190.194
     );
     $ins[] = array(
       'password' => 'somethingelse',
       'username' => '2ofmany',
-      'user.age' => 25,
+      'age' => 25,
       'height' => 190.194
     );
     $ins[] = array(
       'password' => NULL,
       'username' => '3ofmany',
-      'user.age' => 15,
+      'age' => 15,
       'height' => 111.951
     ); 
     
@@ -301,11 +300,11 @@ class BasicTest extends SimpleTest {
     $this->assert($affected_rows === 3);
     $this->assert(DB::affectedRows() === 3);
     
-    $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY %c ASC", 190.194, 'user.age');
+    $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY %c ASC", 190.194, 'age');
     $this->assert(count($rows) === 2);
     $this->assert($rows[0]['username'] === '1ofmany');
-    $this->assert($rows[0]['user.age'] === '23');
-    $this->assert($rows[1]['user.age'] === '25');
+    $this->assert($rows[0]['age'] === '23');
+    $this->assert($rows[1]['age'] === '25');
     $this->assert($rows[1]['password'] === 'somethingelse');
     $this->assert($rows[1]['username'] === '2ofmany');
   }
@@ -317,7 +316,7 @@ class BasicTest extends SimpleTest {
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'user.age' => 61,
+      'age' => 61,
       'height' => 199.194
     ));
     $this->assert($this->last_func === 'insertIgnore');
@@ -331,22 +330,22 @@ class BasicTest extends SimpleTest {
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'user.age' => 61,
+      'age' => 61,
       'height' => 199.194
-    ), '`user.age` = `user.age` + %i', 1);
+    ), 'age = age + %i', 1);
     
-    $result = DB::query("SELECT * FROM accounts WHERE `user.age` = %i", 16);
+    $result = DB::query("SELECT * FROM accounts WHERE age = %i", 16);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['height'] === '10.371');
     
     DB::insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'blahblahdude',
-      'user.age' => 233,
+      'age' => 233,
       'height' => 199.194
     ));
     
-    $result = DB::query("SELECT * FROM accounts WHERE `user.age` = %i", 233);
+    $result = DB::query("SELECT * FROM accounts WHERE `age` = %i", 233);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['height'] === '199.194');
     $this->assert($result[0]['username'] === 'blahblahdude');
@@ -355,13 +354,13 @@ class BasicTest extends SimpleTest {
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'user.age' => 61,
+      'age' => 61,
       'height' => 199.194
     ), array(
-      'user.age' => 74,
+      'age' => 74,
     ));
     
-    $result = DB::query("SELECT * FROM accounts WHERE `user.age` = %i", 74);
+    $result = DB::query("SELECT * FROM accounts WHERE `age` = %i", 74);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['height'] === '199.194');
     $this->assert($result[0]['username'] === 'blahblahdude');
@@ -370,25 +369,25 @@ class BasicTest extends SimpleTest {
       'id' => 3, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'user.age' => 61,
+      'age' => 61,
       'height' => 199.194
     );
     $multiples[] = array(
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
       'password' => 'something',
-      'user.age' => 61,
+      'age' => 61,
       'height' => 199.194
     );
     
-    DB::insertUpdate('accounts', $multiples, array('user.age' => 914));
+    DB::insertUpdate('accounts', $multiples, array('age' => 914));
     
-    $result = DB::query("SELECT * FROM accounts WHERE `user.age`=914 ORDER BY id ASC");
+    $result = DB::query("SELECT * FROM accounts WHERE `age`=914 ORDER BY id ASC");
     $this->assert(count($result) === 2);
     $this->assert($result[0]['username'] === 'Abe');
     $this->assert($result[1]['username'] === 'Charlie\'s Friend');
     
-    $affected_rows = DB::query("UPDATE accounts SET `user.age`=15, username='Bart' WHERE `user.age`=%i", 74);
+    $affected_rows = DB::query("UPDATE accounts SET `age`=15, username='Bart' WHERE `age`=%i", 74);
     $this->assert($affected_rows === 1);
     $this->assert(DB::affectedRows() === 1);
   }
