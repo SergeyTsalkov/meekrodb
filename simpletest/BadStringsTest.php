@@ -1,5 +1,5 @@
 <?php
-class MeanStringsTest extends SimpleTest {
+class BadStringsTest extends SimpleTest {
   // * create a table with a space in the table name for storing binary blobs
   // * columnList() info about that table
   // * insert() a binary blob (not valid utf8)
@@ -58,11 +58,11 @@ class MeanStringsTest extends SimpleTest {
     $this->assert($count === '1');
   }
 
-  // * insert() lines one by one from meanstrings.json, then queryFirstField() them back
+  // * insert() lines one by one from badstrings.json, then queryFirstField() them back
   function test_3_mean_strings() {
     $table = 'fake%s:s_`"table';
 
-    $strings = json_decode(file_get_contents(__DIR__ . '/meanstrings.json'), true);
+    $strings = json_decode(file_get_contents(__DIR__ . '/badstrings.json'), true);
     foreach ($strings as $string) {
       DB::query("DELETE FROM %b", $table);
       DB::insert($table, ['my.data' => $string]);

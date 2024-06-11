@@ -98,7 +98,7 @@ require_once __DIR__ . '/test_setup.php'; //test config values go here
 
 $classes_to_test = array(
   'BasicTest',
-  'MeanStringsTest',
+  'BadStringsTest',
   'MultiDbTest',
   'WalkTest',
   'CallTest',
