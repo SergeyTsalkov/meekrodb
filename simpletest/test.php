@@ -104,7 +104,7 @@ $classes_to_test = array(
   'WalkTest',
   'CallTest',
   'WhereClauseTest',
-  // 'ObjectTest',
+  'ObjectTest',
   'HookTest',
   'TransactionTest',
 );
