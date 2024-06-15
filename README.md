@@ -7,7 +7,7 @@ MeekroDB is:
 * A PHP MySQL library that lets you **get more done with fewer lines of code**, and **makes SQL injection 100% impossible**.
 * Google's #1 search result for "php mysql library" since 2013, with **thousands of deployments worldwide**.
 * A library with a **perfect security track record**. No bugs relating to security or SQL injection have ever been discovered.
-* Backwards and forwards-compatible, supporting all PHP versions **from PHP 5.3** all the way through the latest release of **PHP 8**.
+* Backwards and forwards-compatible, supporting all PHP versions **from PHP 5.6** all the way through the latest release of **PHP 8**.
 
 Installation
 ========
@@ -18,9 +18,9 @@ Include the `db.class.php` file into your project and set it up like this:
 
 ```php
 require_once 'db.class.php';
+DB::$dsn = 'mysql:host=localhost;dbname=meekrodb';
 DB::$user = 'my_database_user';
 DB::$password = 'my_database_password';
-DB::$dbName = 'my_database_name';
 ```
 
 ### Composer
@@ -164,5 +164,4 @@ My Other Projects
 A little shameless self-promotion!
 
   * [Ark Server Hosting](https://arkservers.io) -- Ark: Survival Evolved server hosting by ArkServers.io!
-  * [Best Minecraft Server Hosting](https://bestminecraft.org) -- Ranking and recommendations for minecraft server hosting!
   * [brooce](https://github.com/SergeyTsalkov/brooce) - Language-agnostic job queue written in Go! Write your jobs in any language, schedule them from any language, run them anywhere!
