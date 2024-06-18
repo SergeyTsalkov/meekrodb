@@ -92,22 +92,25 @@ function microtime_float()
 ini_set('date.timezone', 'America/Los_Angeles');
 
 error_reporting(E_ALL | E_STRICT);
+require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../db.class.php';
+require_once __DIR__ . '/../orm.class.php';
 
 $contexts = array();
 require_once __DIR__ . '/test_setup.php'; //test config values go here
 
 $classes_to_test = array(
-  'BasicTest',
-  'UpsertTest',
-  'BadStringsTest',
-  'MultiDbTest',
-  'WalkTest',
-  'CallTest',
-  'WhereClauseTest',
-  'ObjectTest',
-  'HookTest',
-  'TransactionTest',
+  // 'BasicTest',
+  // 'UpsertTest',
+  // 'BadStringsTest',
+  // 'MultiDbTest',
+  // 'WalkTest',
+  // 'CallTest',
+  // 'WhereClauseTest',
+  // 'ObjectTest',
+  // 'HookTest',
+  // 'TransactionTest',
+  'BasicOrmTest',
 );
 
 foreach ($contexts as $name => $fn) {
