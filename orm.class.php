@@ -25,6 +25,9 @@ abstract class MeekroORM {
   protected static $_orm_tablestruct = array(); // cache tablestruct
   protected static $_orm_associations = array();
 
+  static $_orm_columns = array();
+  static $_orm_scopes = array();
+
 
   // -------------- INFER TABLE STRUCTURE
   public static function _orm_infer_tablestruct() {
@@ -188,9 +191,10 @@ abstract class MeekroORM {
 
   public static function _orm_run_marshal($data, $column) {
     $type = static::_orm_coltype($column);
-    $fn = array(get_called_class(), "_orm_typemarshal_{$type}");
-    if (is_callable($fn)) {
-      $data = call_user_func($fn, $data);
+    $class = get_called_class();
+    $name = "_orm_typemarshal_{$type}";
+    if (method_exists($class, $name)) {
+      $data = $class::$name($data);
     }
 
     $is_null = static::_orm_colnull($column);
@@ -205,9 +209,10 @@ abstract class MeekroORM {
 
   public static function _orm_run_unmarshal($data, $column) {
     $type = static::_orm_coltype($column);
-    $fn = array(get_called_class(), "_orm_typeunmarshal_{$type}");
-    if (is_callable($fn)) {
-      $data = call_user_func($fn, $data);
+    $class = get_called_class();
+    $name = "_orm_typeunmarshal_{$type}";
+    if (method_exists($class, $name)) {
+      $data = $class::$name($data);
     }
     return $data;
   }
@@ -389,6 +394,43 @@ abstract class MeekroORM {
     }
   }
 
+  static function _orm_scopes() {
+    return [];
+  }
+
+  static function _orm_runscope($scope) {
+    $scopes = static::_orm_scopes();
+    if (! is_array($scopes)) {
+      throw new MeekroORMException("No scopes available");
+    }
+    if (! array_key_exists($scope, $scopes)) {
+      throw new MeekroORMException("Scope not available: $scope");
+    }
+
+    $scope = $scopes[$scope];
+    if (! is_callable($scope)) {
+      throw new MeekroORMException("Invalid scope: must be anonymous function");
+    }
+
+    $Scope = $scope();
+    if (! ($Scope instanceof MeekroORMScope)) {
+      throw new MeekroORMException("Invalid scope: must use ClassName::Where()");
+    }
+    return $Scope;
+  }
+
+  static function where(...$args) {
+    $Scope = new MeekroORMScope(get_called_class());
+    $Scope->where(...$args);
+    return $Scope;
+  }
+
+  static function scope(...$scopes) {
+    $Scope = new MeekroORMScope(get_called_class());
+    $Scope->scope(...$scopes);
+    return $Scope;
+  }
+
   public function save($run_callbacks=true) {
     $is_fresh = $this->_orm_is_fresh();
     $have_committed = false;
@@ -527,9 +569,98 @@ abstract class MeekroORM {
     return static::_orm_meekrodb()->query("DELETE FROM %b WHERE id=%i", 
       static::_orm_tablename_params(), $this->_orm_primary_key_value());
   }
-  
-  
+}
 
+class MeekroORMScope implements ArrayAccess, Iterator {
+  private $class_name;
+  private $Where;
+  private $Objects;
+  private $position=0;
+
+  function __construct($class_name) {
+    $this->class_name = $class_name;
+    $this->Where = new WhereClause('and');
+  }
+
+  function where(...$args) {
+    $this->Objects = null;
+    $this->position = 0;
+
+    $this->Where->add(...$args);
+  }
+
+  function scope(...$scopes) {
+    $this->Objects = null;
+    $this->position = 0;
+
+    foreach ($scopes as $scope) {
+      $Scope = $this->class_name::_orm_runscope($scope);
+      $this->Where->add($Scope->Where);
+    }
+  }
+
+  function run() {
+    $table_name = $this->class_name::_orm_tablename();
+    $this->Objects = $this->class_name::SearchMany("SELECT * FROM %b WHERE %l", $table_name, $this->Where);
+    return $this->Objects;
+  }
+
+  function run_if_missing() {
+    if (is_array($this->Objects)) return;
+    return $this->run();
+  }
+
+  function count() {
+    $this->run_if_missing();
+    return count($this->Objects);
+  }
+
+  // ***** Iterator
+  #[\ReturnTypeWillChange]
+  function current() {
+    $this->run_if_missing();
+    return $this->valid() ? $this->Objects[$this->position] : null;
+  }
+  #[\ReturnTypeWillChange]
+  function key() {
+    $this->run_if_missing();
+    return $this->position;
+  }
+  #[\ReturnTypeWillChange]
+  function next() {
+    $this->run_if_missing();
+    $this->position++;
+  }
+  #[\ReturnTypeWillChange]
+  function rewind() {
+    $this->run_if_missing();
+    $this->position = 0;
+  }
+  #[\ReturnTypeWillChange]
+  function valid() {
+    $this->run_if_missing();
+    return array_key_exists($this->position, $this->Objects);
+  }
+
+  // ***** ArrayAccess
+  #[\ReturnTypeWillChange]
+  function offsetExists($offset) {
+    $this->run_if_missing();
+    return array_key_exists($offset, $this->Objects);
+  }
+  #[\ReturnTypeWillChange]
+  function offsetGet($offset) {
+    $this->run_if_missing();
+    return $this->Objects[$offset];
+  }
+  #[\ReturnTypeWillChange]
+  function offsetSet($offset, $value) {
+    throw new MeekroORMException("Unable to edit scoped result set");
+  }
+  #[\ReturnTypeWillChange]
+  function offsetUnset($offset) {
+    throw new MeekroORMException("Unable to edit scoped result set");
+  }
 }
 
 class MeekroORMException extends Exception { }

@@ -3,10 +3,15 @@ use Carbon\Carbon;
 
 class Person extends MeekroORM {
   static $_orm_tablename = 'persons';
+  static $_orm_columns = [
+    'is_alive' => ['type' => 'bool'],
+  ];
 
-  static $_orm_columns = array(
-    'is_alive' => array('type' => 'bool'),
-  );
+  static function _orm_scopes() {
+    return [
+      'living' => function() { return self::where('is_alive=1'); },
+    ];
+  }
 }
 
 // TODO: setting properties that don't correspond to a database field still works in php8+
@@ -105,6 +110,13 @@ class BasicOrmTest extends SimpleTest {
     $Person->name = 'Nick';
     $Person->age = 23;
     $Person->Save();
+  }
+
+  function test_5_scope() {
+    $Living = Person::scope('living');
+    foreach($Living as $Person) {
+      echo $Person->name . "\n";
+    }
   }
 
 }
