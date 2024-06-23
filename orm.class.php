@@ -193,15 +193,18 @@ abstract class MeekroORM {
     $type = static::_orm_coltype($column);
     $class = get_called_class();
     $name = "_orm_typemarshal_{$type}";
+    $is_nullable = static::_orm_colnull($column);
+
+    $default = '';
+    if ($type == 'int' || $type == 'double') $default = 0;
+    else if ($type == 'datetime') $default = '0000-00-00 00:00:00';
+
     if (method_exists($class, $name)) {
       $data = $class::$name($data);
     }
 
-    $is_null = static::_orm_colnull($column);
-    if (!$is_null && is_null($data)) {
-      if ($type == 'int' || $type == 'double') $data = 0;
-      else if ($type == 'datetime') $data = '0000-00-00 00:00:00';
-      else $data = '';
+    if (is_null($data) && !$is_nullable) {
+      $data = $default;
     }
 
     return $data;
@@ -217,17 +220,31 @@ abstract class MeekroORM {
     return $data;
   }
 
-  public static function _orm_typemarshal_bool($data) { return $data ? 1 : 0; }
-  public static function _orm_typeunmarshal_bool($data) { return !!$data; }
+  public static function _orm_typemarshal_bool($data) {
+    if (is_null($data)) return null;
+    return $data ? 1 : 0;
+  }
+  public static function _orm_typeunmarshal_bool($data) {
+    if (is_null($data)) return null;
+    return !!$data;
+  }
 
-  public static function _orm_typeunmarshal_int($data) { return intval($data); }
-  public static function _orm_typeunmarshal_double($data) { return doubleval($data); }
+  public static function _orm_typeunmarshal_int($data) {
+    if (is_null($data)) return null;
+    return intval($data);
+  }
+  public static function _orm_typeunmarshal_double($data) {
+    if (is_null($data)) return null;
+    return doubleval($data);
+  }
 
   public static function _orm_typemarshal_datetime($data) {
+    if (is_null($data)) return null;
     if ($data instanceof \DateTime) return $data->format('Y-m-d H:i:s');
     return $data;
   }
   public static function _orm_typeunmarshal_datetime($data) {
+    if (is_null($data)) return null;
     if (!$data || !class_exists('Carbon\Carbon')) return $data;
     return new Carbon\Carbon($data);
   }

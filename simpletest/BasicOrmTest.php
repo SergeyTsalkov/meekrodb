@@ -5,11 +5,15 @@ class Person extends MeekroORM {
   static $_orm_tablename = 'persons';
   static $_orm_columns = [
     'is_alive' => ['type' => 'bool'],
+    'is_male' => ['type' => 'bool'],
   ];
 
   static function _orm_scopes() {
     return [
       'living' => function() { return self::where('is_alive=1'); },
+      'male' => function() { return self::where('is_male=1'); },
+      'female' => function() { return self::where('is_male=0'); },
+      'teenager' => function() { return self::where('age<20'); },
     ];
   }
 }
@@ -20,7 +24,9 @@ class Person extends MeekroORM {
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
 // TODO: still works when Carbon is not available
-// TODO: test with mysql strict mode enabled?
+// TODO: test reload()
+// TODO: computed vars?
+// TODO: test toHash()
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -38,40 +44,72 @@ class BasicOrmTest extends SimpleTest {
         `id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
         `name` varchar(255) NOT NULL,
         `age` int unsigned NOT NULL,
-        `friends_name` varchar(255) NULL,
+        `height` double unsigned NOT NULL,
+        `favorite_color` varchar(255) NULL,
+        `favorite_animaniacs` varchar(255) NOT NULL DEFAULT '',
         `last_happy_moment` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-        `is_alive` tinyint(1) NOT NULL DEFAULT 0
+        `is_male` tinyint(1) NOT NULL DEFAULT 0,
+        `is_alive` tinyint(1) NULL
       ) ENGINE = InnoDB
     ");
 
     $Person = new Person();
     $Person->name = 'Nick';
     $Person->age = 23;
+    $Person->height = 1.7;
+    $Person->favorite_color = 'blue';
+    $Person->favorite_animaniacs = 'Yakko';
+    $Person->is_alive = true;
+    $Person->is_male = true;
     $Person->Save();
 
     $Person = new Person();
-    $Person->name = 'Frank';
-    $Person->age = 47;
+    $Person->name = 'Ellie';
+    $Person->age = 17;
+    $Person->height = 1.2;
+    $Person->is_alive = true;
+    $Person->is_male = false;
+    $Person->Save();
+
+    $Person = new Person();
+    $Person->name = 'Gavin';
+    $Person->age = 15;
+    $Person->height = 1.85;
+    $Person->is_alive = true;
+    $Person->is_male = false;
+    $Person->Save();
+
+    $Person = new Person();
+    $Person->name = 'Abigail';
+    $Person->age = 29;
+    $Person->height = 1.2;
+    $Person->is_alive = false;
+    $Person->is_male = false;
     $Person->Save();
 
     $Person = Person::Load(1);
     $this->assert($Person->age === 23);
 
-    $Person = Person::Search(['name' => 'Frank']);
-    $this->assert($Person->age === 47);
+    $Person = Person::Search(['name' => 'Gavin']);
+    $this->assert($Person->age === 15);
   }
 
   // * can search for Person by int value
   // * bool value is marshalled and unmarshalled correctly
   function test_2_bool() {
-    $Person = Person::Search(['age' => 47]);
-    $this->assert($Person->name === 'Frank');
-    $this->assert($Person->is_alive === false);
-    $Person->is_alive = true;
+    $Person = Person::Search(['age' => 17]);
+    $this->assert($Person->name === 'Ellie');
+    $this->assert($Person->is_alive === true);
+    $this->assert($Person->is_male === false);
+    $Person->is_alive = false;
     $Person->Save();
 
-    $Person = Person::Search(['name' => 'Frank']);
-    $this->assert($Person->is_alive === true);
+    $Person = Person::Search(['age' => 17]);
+    $this->assert($Person->name === 'Ellie');
+    $this->assert($Person->is_alive === false);
+    $this->assert($Person->is_male === false);
+    $Person->is_alive = true;
+    $Person->Save();
   }
 
   // * can load and save a Carbon timestamp
@@ -88,27 +126,32 @@ class BasicOrmTest extends SimpleTest {
     $Person->Save();
   }
 
+  // * NULL values can be set to either NULL, or empty string, and those are different
   // * NOT NULL values will be set to empty string (or equivalent) when we try to null them
+  // TODO: test this with int, double
   function test_4_null() {
-    $Person = Person::Load(1);
-    $this->assert($Person->friends_name === null);
-    $Person->friends_name = 'Jason';
+    $Person = Person::Search(['name' => 'Nick']);
+    $this->assert($Person->favorite_color === 'blue');
+    $this->assert($Person->favorite_animaniacs === 'Yakko');
+    $this->assert($Person->is_alive === true);
+    $Person->favorite_color = '';
+    $Person->favorite_animaniacs = '';
+    $Person->is_alive = '';
     $Person->Save();
-
-    $Person = Person::Load(1);
-    $this->assert($Person->friends_name === 'Jason');
-    $Person->friends_name = null;
-    $Person->name = null;
-    $Person->age = null;
+    $Person = Person::Search(['name' => 'Nick']);
+    $this->assert($Person->favorite_color === '');
+    $this->assert($Person->favorite_animaniacs === '');
+    $this->assert($Person->is_alive === false);
+    $Person->favorite_color = null;
+    $Person->favorite_animaniacs = null;
+    $Person->is_alive = null;
     $Person->Save();
-
-    $Person = Person::Load(1);
-    $this->assert($Person->friends_name === null);
-    $this->assert($Person->name === '');
-    $this->assert($Person->age === 0);
-
-    $Person->name = 'Nick';
-    $Person->age = 23;
+    $Person = Person::Search(['name' => 'Nick']);
+    $this->assert($Person->favorite_color === null);
+    $this->assert($Person->favorite_animaniacs === '');
+    $this->assert($Person->is_alive === null);
+    $Person->favorite_color = 'blue';
+    $Person->favorite_animaniacs = 'Yakko';
     $Person->Save();
   }
 
