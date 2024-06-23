@@ -1,0 +1,25 @@
+<?php
+$contexts['mysql'] = function() {
+  DB::$dsn = null;
+  DB::$user = 'meekrodb';
+  DB::$password = 'meekrodb';
+  DB::$dbName = 'meekrodb';
+  DB::$host = 'localhost';
+  return array(
+    'db' => 'meekrodb',
+    'db2' => 'meekrodb2',
+    // 'fast' => true,
+  );
+};
+
+$contexts['sqlite'] = function() {
+  DB::$dsn = 'sqlite:';
+  DB::$user = DB::$password = DB::$dbName = DB::$host = null;
+};
+
+$contexts['pgsql'] = function() {
+  DB::$dsn = 'pgsql:host=localhost;port=5432;dbname=meekrodb';
+  DB::$user = 'meekrodb';
+  DB::$password = 'meekrodb';
+  DB::$dbName = DB::$host = null;
+};
