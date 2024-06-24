@@ -150,6 +150,7 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->favorite_color === null);
     $this->assert($Person->favorite_animaniacs === '');
     $this->assert($Person->is_alive === null);
+    $Person->is_alive = true;
     $Person->favorite_color = 'blue';
     $Person->favorite_animaniacs = 'Yakko';
     $Person->Save();
@@ -157,9 +158,11 @@ class BasicOrmTest extends SimpleTest {
 
   function test_5_scope() {
     $Living = Person::scope('living');
-    foreach($Living as $Person) {
-      echo $Person->name . "\n";
-    }
+    $this->assert(count($Living) === 3);
+
+    $LivingTeens = Person::scope('living', 'teenager');
+    $this->assert(count($LivingTeens) === 2);
+
   }
 
 }
