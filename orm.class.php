@@ -588,7 +588,7 @@ abstract class MeekroORM {
   }
 }
 
-class MeekroORMScope implements ArrayAccess, Iterator {
+class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   private $class_name;
   private $Where;
   private $Objects;
@@ -627,6 +627,7 @@ class MeekroORMScope implements ArrayAccess, Iterator {
     return $this->run();
   }
 
+  #[\ReturnTypeWillChange]
   function count() {
     $this->run_if_missing();
     return count($this->Objects);
