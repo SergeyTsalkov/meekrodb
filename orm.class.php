@@ -589,10 +589,13 @@ abstract class MeekroORM {
 }
 
 class MeekroORMScope implements ArrayAccess, Iterator, Countable {
-  private $class_name;
-  private $Where;
-  private $Objects;
-  private $position=0;
+  protected $class_name;
+  protected $Where;
+  protected $order_by = [];
+  protected $limit_offset;
+  protected $limit_rowcount;
+  protected $Objects;
+  protected $position = 0;
 
   function __construct($class_name) {
     $this->class_name = $class_name;
@@ -604,6 +607,27 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     $this->position = 0;
 
     $this->Where->add(...$args);
+    return $this;
+  }
+
+  function order_by(...$items) {
+    if (is_array($items[0])) {
+      $this->order_by = $items[0];
+    }
+    else {
+      $this->order_by = $items;
+    }
+    return $this;
+  }
+
+  function limit(int $one, int $two=null) {
+    if (is_null($two)) {
+      $this->limit_rowcount = $one;
+    } else {
+      $this->limit_offset = $one;
+      $this->limit_rowcount = $two;
+    }
+    return $this;
   }
 
   function scope(...$scopes) {
@@ -614,15 +638,46 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
       $Scope = $this->class_name::_orm_runscope($scope);
       $this->Where->add($Scope->Where);
     }
+    return $this;
   }
 
-  function run() {
+  protected function run() {
     $table_name = $this->class_name::_orm_tablename();
-    $this->Objects = $this->class_name::SearchMany("SELECT * FROM %b WHERE %l", $table_name, $this->Where);
+
+    $query = 'SELECT * FROM %b WHERE %l';
+    $args = [$table_name, $this->Where];
+
+    if (count($this->order_by) > 0) {
+      // array_is_list
+      if ($this->order_by == array_values($this->order_by)) {
+        $c_string = array_fill(0, count($this->order_by), '%c');
+        $query .= ' ORDER BY ' . implode(',', $c_string);
+        $args = array_merge($args, array_values($this->order_by));
+      }
+      else {
+        $c_string = [];
+        foreach ($this->order_by as $column => $order) {
+          $c_string[] = '%c ' . (strtolower($order) == 'desc' ? 'desc' : 'asc');
+        }
+        $query .= ' ORDER BY ' . implode(',', $c_string);
+        $args = array_merge($args, array_keys($this->order_by));
+      }
+    }
+
+    if (!is_null($this->limit_rowcount)) {
+      if (!is_null($this->limit_offset)) {
+        $query .= sprintf(' LIMIT %u, %u', $this->limit_offset, $this->limit_rowcount);
+      }
+      else {
+        $query .= sprintf(' LIMIT %u', $this->limit_rowcount);
+      }
+    }
+
+    $this->Objects = $this->class_name::SearchMany($query, ...$args);
     return $this->Objects;
   }
 
-  function run_if_missing() {
+  protected function run_if_missing() {
     if (is_array($this->Objects)) return;
     return $this->run();
   }
