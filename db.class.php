@@ -899,13 +899,20 @@ class MeekroDB {
       }
       
       if ($val instanceof WhereClause) {
-        if ($Part['type'] != 'l') {
-          throw new MeekroDBException("WhereClause must be used with l arg, you used {$Part['type']} instead!");
+        if ($Part['type'] != 'l' && $Part['type'] != '?') {
+          throw new MeekroDBException("WhereClause must be used with l or ?, you used {$Part['type']} instead!");
         }
 
         list($clause_sql, $clause_args) = $val->textAndArgs();
         $ParsedSubQuery = $this->parse($clause_sql, ...$clause_args);
         $ParsedQuery->add($ParsedSubQuery);
+      }
+      else if ($val instanceof MeekroDBParsedQuery) {
+        if ($Part['type'] != 'l' && $Part['type'] != '?') {
+          throw new MeekroDBException("a ParsedQuery must be used with l or ?, you used {$Part['type']} instead!");
+        }
+
+        $ParsedQuery->add($val);
       }
       else {
         $ParsedSubQuery = $fn($val);
@@ -1273,7 +1280,11 @@ class WhereClause {
     
     if ($sql instanceof WhereClause) {
       $this->clauses[] = $sql;
-    } else {
+    }
+    else if ($sql instanceof MeekroDBParsedQuery) {
+      $this->clauses[] = array('sql' => '%?', 'args' => [$sql]);
+    }
+    else {
       $this->clauses[] = array('sql' => $sql, 'args' => $args);
     }
   }

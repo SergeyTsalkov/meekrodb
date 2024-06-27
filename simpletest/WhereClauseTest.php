@@ -5,7 +5,7 @@ class WhereClauseTest extends SimpleTest {
     $where->add('username=%s', 'Bart');
     $where->add('password=%s', 'hello');
     
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
+    $result = DB::query("SELECT * FROM accounts WHERE %?", $where);
     $this->assert(count($result) === 1);
     $this->assert($result[0]['age'] === '15');
   }
@@ -68,13 +68,26 @@ class WhereClauseTest extends SimpleTest {
     $this->assert(count($result) === 7);
   }
 
+  // * WhereClause works with OR
+  // * you can add() a parse() output to a WhereClause
   function test_7_or() {
     $where = new WhereClause('or');
     $where->add('username=%s', 'Bart');
-    $where->add('username=%s', 'Abe');
-
+    $where->add(DB::parse('username=%s', 'Abe'));
     $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
     $this->assert(count($result) === 2);
+  }
+
+  // * parse() output can be used as part of a query with %l or %?
+  function test_8_multipart() {
+    $part = DB::parse('WHERE username=%s', 'Bart');
+    $rows = DB::query("SELECT * FROM accounts %l", $part);
+    $this->assert(count($rows) === 1);
+    $this->assert($rows[0]['id'] === '2');
+
+    $rows = DB::query("SELECT * FROM accounts %?", $part);
+    $this->assert(count($rows) === 1);
+    $this->assert($rows[0]['id'] === '2');
   }
   
 
