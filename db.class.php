@@ -1264,7 +1264,7 @@ class MeekroDBWalk {
   }
 }
 
-class WhereClause {
+class WhereClause implements Countable {
   public $type = 'and'; //AND or OR
   public $negate = false;
   public $clauses = array();
@@ -1311,6 +1311,7 @@ class WhereClause {
     return $r;
   }
   
+  #[\ReturnTypeWillChange]
   function count() {
     return count($this->clauses);
   }
@@ -1319,7 +1320,7 @@ class WhereClause {
     $sql = array();
     $args = array();
     
-    if (count($this->clauses) == 0) return array('(1)', $args);
+    if (count($this) == 0) return array('(1)', $args);
     
     foreach ($this->clauses as $clause) {
       if ($clause instanceof WhereClause) { 
@@ -1333,7 +1334,8 @@ class WhereClause {
       $args = array_merge($args, $clause_args);
     }
     
-    if ($this->type == 'and') $sql = sprintf('(%s)', implode(' AND ', $sql));
+    if (count($this) == 1) $sql = $sql[0];
+    else if ($this->type == 'and') $sql = sprintf('(%s)', implode(' AND ', $sql));
     else $sql = sprintf('(%s)', implode(' OR ', $sql));
     
     if ($this->negate) $sql = '(NOT ' . $sql . ')';
