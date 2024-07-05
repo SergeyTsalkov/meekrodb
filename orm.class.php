@@ -636,7 +636,20 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
 
     foreach ($scopes as $scope) {
       $Scope = $this->class_name::_orm_runscope($scope);
-      $this->Where->add($Scope->Where);
+
+      if (count($this->Where) > 0) {
+        $this->Where->add($Scope->Where);
+      } else {
+        $this->Where = $Scope->Where;
+      }
+
+      if (!is_null($Scope->limit_rowcount)) {
+        $this->limit_rowcount = $Scope->limit_rowcount;
+        $this->limit_offset = $Scope->limit_offset;
+      }
+      if ($Scope->order_by) {
+        $this->order_by = $Scope->order_by;
+      }
     }
     return $this;
   }

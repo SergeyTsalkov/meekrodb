@@ -14,6 +14,7 @@ class Person extends MeekroORM {
       'male' => function() { return self::where('is_male=1'); },
       'female' => function() { return self::where('is_male=0'); },
       'teenager' => function() { return self::where('age>12 AND age<20'); },
+      'first_teenager' => function() { return self::scope('teenager')->order_by('id')->limit(1); }
     ];
   }
 }
@@ -164,6 +165,10 @@ class BasicOrmTest extends SimpleTest {
     $this->assert(count($LivingTeens) === 2);
     $this->assert($LivingTeens[0]->name === 'Ellie');
 
+    $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');
+    $this->assert(count($LivingTeens) === 2);
+    $this->assert($LivingTeens[0]->name === 'Ellie');
+
     $LivingTeens = Person::scope('living', 'teenager')->order_by('id')->limit(1);
     $this->assert(count($LivingTeens) === 1);
     $this->assert($LivingTeens[0]->name === 'Ellie');
@@ -171,7 +176,10 @@ class BasicOrmTest extends SimpleTest {
     $LivingTeens = Person::scope('living', 'teenager')->order_by(['id' => 'desc'])->limit(1);
     $this->assert(count($LivingTeens) === 1);
     $this->assert($LivingTeens[0]->name === 'Gavin');
-
+    
+    $FirstTeenager = Person::scope('first_teenager');
+    $this->assert(count($FirstTeenager) === 1);
+    $this->assert($FirstTeenager[0]->name === 'Ellie');
   }
 
 }
