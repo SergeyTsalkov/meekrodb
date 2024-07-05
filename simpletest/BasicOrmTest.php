@@ -7,16 +7,23 @@ class Person extends MeekroORM {
     'is_alive' => ['type' => 'bool'],
     'is_male' => ['type' => 'bool'],
   ];
+  static $_orm_associations = [
+    'House' => ['type' => 'has_many', 'foreign_key' => 'owner_id'],
+  ];
 
   static function _orm_scopes() {
     return [
       'living' => function() { return self::where('is_alive=1'); },
       'male' => function() { return self::where('is_male=1'); },
       'female' => function() { return self::where('is_male=0'); },
-      'teenager' => function() { return self::where('age>12 AND age<20'); },
+      'teenager' => function() { return self::where('age>%i AND age<%i', 12, 20); },
       'first_teenager' => function() { return self::scope('teenager')->order_by('id')->limit(1); }
     ];
   }
+}
+
+class House extends MeekroORM {
+
 }
 
 // TODO: setting properties that don't correspond to a database field still works in php8+
@@ -28,6 +35,7 @@ class Person extends MeekroORM {
 // TODO: test reload()
 // TODO: computed vars?
 // TODO: test toHash()
+// TODO: scopes that accept args
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -40,19 +48,8 @@ class BasicOrmTest extends SimpleTest {
   // * can use ::Load() to look up an object with a simple primary key
   // * can use ::Search() to look up an object by string match
   function test_1_basic() {
-    DB::query("
-      CREATE TABLE persons (
-        `id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-        `name` varchar(255) NOT NULL,
-        `age` int unsigned NOT NULL,
-        `height` double unsigned NOT NULL,
-        `favorite_color` varchar(255) NULL,
-        `favorite_animaniacs` varchar(255) NOT NULL DEFAULT '',
-        `last_happy_moment` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-        `is_male` tinyint(1) NOT NULL DEFAULT 0,
-        `is_alive` tinyint(1) NULL
-      ) ENGINE = InnoDB
-    ");
+    DB::query($this->get_sql('create_persons'));
+    DB::query($this->get_sql('create_houses'));
 
     $Person = new Person();
     $Person->name = 'Nick';
@@ -63,6 +60,12 @@ class BasicOrmTest extends SimpleTest {
     $Person->is_alive = true;
     $Person->is_male = true;
     $Person->Save();
+
+    $House = new House();
+    $House->owner_id = $Person->id;
+    $House->address = '3344 Cedar Road';
+    $House->sqft = 1340;
+    $House->Save();
 
     $Person = new Person();
     $Person->name = 'Ellie';
@@ -180,6 +183,13 @@ class BasicOrmTest extends SimpleTest {
     $FirstTeenager = Person::scope('first_teenager');
     $this->assert(count($FirstTeenager) === 1);
     $this->assert($FirstTeenager[0]->name === 'Ellie');
+  }
+
+  function test_6_assoc() {
+    $Person = Person::Search(['name' => 'Nick']);
+    $this->assert(count($Person->House) === 1);
+    $this->assert($Person->House[0]->sqft === 1340);
+
   }
 
 }

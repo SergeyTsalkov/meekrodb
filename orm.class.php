@@ -13,20 +13,20 @@
 
 abstract class MeekroORM {
   // INTERNAL -- DO NOT TOUCH
-  protected $_orm_row = array();
-  protected $_orm_row_orig = array();
-  protected $_orm_cache = array();
-  protected static $_orm_inferred_tablestruct = array();
+  protected $_orm_row = [];
+  protected $_orm_row_orig = [];
+  protected $_orm_assoc_load = [];
+  protected static $_orm_inferred_tablestruct = [];
 
   // (OPTIONAL) SET IN INHERITING CLASS
   // static so they apply to all instances
   protected static $_orm_tablename = null;
   protected static $_orm_tablename_params = null;
-  protected static $_orm_tablestruct = array(); // cache tablestruct
-  protected static $_orm_associations = array();
+  protected static $_orm_tablestruct = []; // cache tablestruct
+  protected static $_orm_associations = [];
 
-  static $_orm_columns = array();
-  static $_orm_scopes = array();
+  static $_orm_columns = [];
+  static $_orm_scopes = [];
 
 
   // -------------- INFER TABLE STRUCTURE
@@ -45,7 +45,11 @@ abstract class MeekroORM {
   // -------------- SIMPLE HELPER FUNCTIONS
   public static function _orm_tablename() {
     if (static::$_orm_tablename) return static::$_orm_tablename;
-    else return strtolower(get_called_class());
+    
+    $table = strtolower(get_called_class());
+    $last_char = substr($table, strlen($table)-1, 1);
+    if ($last_char != 's') $table .= 's';
+    return $table;
   }
 
   public static function _orm_tablename_params() {
@@ -250,53 +254,57 @@ abstract class MeekroORM {
   }
 
   // -------------- ASSOCIATIONS
-  protected function _cache_set($key, $value) { return $this->_orm_cache[$key] = $value; }
-  protected function _cache_get($key) { return $this->_orm_cache[$key] ?? null; }
-
-  protected static function _is_association($name) { return array_key_exists($name, static::$_orm_associations); }
-
-  protected static function _get_association($name) {
+  public static function is_assoc($name) { return !! static::_orm_assoc($name); }
+  protected static function _orm_assoc($name) {
+    if (! array_key_exists($name, static::$_orm_associations)) return null;
     $assoc = static::$_orm_associations[$name];
-    if (! $assoc) throw new Exception("The association $name doesn't exist!");
 
-    if (! $assoc['class_name']) $assoc['class_name'] = $name;
-    if (! $assoc['foreign_key']) $assoc['foreign_key'] = strtolower($name) . '_id';
-    $assoc['primary_key'] = call_user_func(array($assoc['class_name'], '_orm_primary_key'));
-    $assoc['table_name'] = call_user_func(array($assoc['class_name'], '_orm_tablename'));
-
+    $assoc['class_name'] = $assoc['class_name'] ?? $name;
+    $assoc['foreign_key'] = $assoc['foreign_key'] ?? strtolower($name) . '_id';
     return $assoc;
   }
 
-  protected function _load_association($name) {
-    if ($this->_cache_get($name)) return $this->_cache_get($name);
+  public function assoc($name) {
+    if (! static::is_assoc($name)) return null;
+    if (! isset($this->_orm_assoc_load[$name])) {
+      $this->_orm_assoc_load[$name] = $this->_load_assoc($name);
+    }
+    
+    return $this->_orm_assoc_load[$name];
+  }
 
-    $assoc = static::_get_association($name);
-    $class_name = $assoc['class_name'];
-    $foreign_key = $assoc['foreign_key'];
-
-    if ($assoc['type'] == 'belongs_to') {
-      $result = $class_name::Search(array(
-        $assoc['primary_key'] => $this->$foreign_key,
-      ));
-      $this->_cache_set($name, $result);
-
-    } else if ($assoc['type'] == 'has_one') {
-      $result = $class_name::Search(array(
-        $assoc['foreign_key'] => $this->_orm_primary_key_value(),
-      ));
-      $this->_cache_set($name, $result);
-
-    } else if ($assoc['type'] == 'has_many') {
-      $result = $class_name::SearchMany(array(
-        $assoc['foreign_key'] => $this->_orm_primary_key_value(),
-      ));
-      $this->_cache_set($name, $result);
-
-    } else {
-      throw new Exception("Invalid type for $name association");
+  protected function _load_assoc($name) {
+    $assoc = static::_orm_assoc($name);
+    if (! $assoc) {
+      throw new MeekroORMException("Unknown assocation: $name");
     }
 
-    return $this->_cache_get($name);
+    $class_name = $assoc['class_name'];
+    $foreign_key = $assoc['foreign_key'];
+    $primary_key = $class_name::_orm_primary_key();
+
+    if (! is_subclass_of($class_name, __CLASS__)) {
+      throw new MeekroORMException(sprintf('%s is not a class that inherits from %s', $class_name, get_class()));
+    }
+
+    if ($assoc['type'] == 'belongs_to') {
+      return $class_name::Search([
+        $primary_key => $this->$foreign_key,
+      ]);
+    }
+    else if ($assoc['type'] == 'has_one') {
+      return $class_name::Search([
+        $assoc['foreign_key'] => $this->_orm_primary_key_value(),
+      ]);
+    }
+    else if ($assoc['type'] == 'has_many') {
+      return $class_name::SearchMany([
+        $assoc['foreign_key'] => $this->_orm_primary_key_value(),
+      ]);
+    }
+    else {
+      throw new Exception("Invalid type for $name association");
+    }
   }
 
 
@@ -375,40 +383,35 @@ abstract class MeekroORM {
   public function __set($key, $value) {
     if (!$this->_orm_is_fresh() && $this->_orm_is_primary_key($key)) {
       throw new MeekroORMException("Can't update primary key!");
-    } else if (array_key_exists($key, static::_orm_tablestruct())) {
-      
+    }
+    else if (array_key_exists($key, static::_orm_tablestruct())) {
       $callback = $this->_orm_run_callback("_set_$key", $value);
       if ($callback === false) $this->_attribute_set($key, $value);
-
-    } else {
+    }
+    else {
       $this->$key = $value;
     }
   }
 
   // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
   public function &__get($key) {
-    if ($this->_cache_get($key)) {
-      return $this->_cache_get($key);
-
-    } else if (static::_is_association($key)) {
-      return $this->_load_association($key);
-
-    } else if (array_key_exists($key, static::_orm_tablestruct())) {
-
+    if (static::is_assoc($key)) {
+      // return by reference requires temp var
+      $result = $this->assoc($key);
+      return $result;
+    }
+    if (array_key_exists($key, static::_orm_tablestruct())) {
       $callback = $this->_orm_run_callback("_get_$key");
-      if ($callback !== false) return $callback;
-      else {
-        $result = $this->_attribute_get($key);
-        return $result;
+      if ($callback !== false) {
+        return $callback;
       }
 
-    } else if (is_callable(array($this, $key))) {
-      $result = call_user_func(array($this, $key));
-      return $this->_cache_set($key, $result);
-
-    } else {
-      return $this->$key;
+      // return by reference requires temp var
+      $result = $this->_attribute_get($key);
+      return $result;
     }
+
+    return $this->$key;
   }
 
   static function _orm_scopes() {
@@ -514,7 +517,7 @@ abstract class MeekroORM {
     $new = static::Search(array_combine($primary_keys, $primary_values), ['lock' => $lock]);
     if (! $new) throw new Exception("Unable to reload $this -- missing!");
     $this->_orm_row = $this->_orm_row_orig = $new->_orm_row;
-    $this->_orm_cache = [];
+    $this->_orm_assoc_load = [];
   }
 
   public function lock() { $this->reload(true); }

@@ -35,6 +35,27 @@ CREATE TABLE accounts (
   birthday VARCHAR( 255 ) NOT NULL DEFAULT '0000-00-00 00:00:00'
 )
 
+-- name: create_persons ; db: mysql
+CREATE TABLE persons (
+  `id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` varchar(255) NOT NULL,
+  `age` int unsigned NOT NULL,
+  `height` double unsigned NOT NULL,
+  `favorite_color` varchar(255) NULL,
+  `favorite_animaniacs` varchar(255) NOT NULL DEFAULT '',
+  `last_happy_moment` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `is_male` tinyint(1) NOT NULL DEFAULT 0,
+  `is_alive` tinyint(1) NULL
+) ENGINE = InnoDB
+
+-- name: create_houses ; db: mysql
+CREATE TABLE `houses` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `owner_id` INT NOT NULL DEFAULT 0,
+  `address` VARCHAR(255) NOT NULL DEFAULT '',
+  `sqft` INT NOT NULL DEFAULT 0
+)
+
 -- name: create_profile ; db: mysql
 CREATE TABLE `profile` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
