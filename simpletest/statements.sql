@@ -57,6 +57,13 @@ CREATE TABLE `houses` (
   `price` INT NOT NULL DEFAULT 0
 )
 
+-- name: create_souls ; db: mysql
+CREATE TABLE `souls` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `person_id` INT NOT NULL DEFAULT 0,
+  `heaven_bound` tinyint(1) NOT NULL DEFAULT 0
+)
+
 -- name: create_profile ; db: mysql
 CREATE TABLE `profile` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

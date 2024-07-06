@@ -9,6 +9,7 @@ class Person extends MeekroORM {
   ];
   static $_orm_associations = [
     'House' => ['type' => 'has_many', 'foreign_key' => 'owner_id'],
+    'Soul' => ['type' => 'has_one', 'foreign_key' => 'person_id'],
   ];
 
   static function _orm_scopes() {
@@ -30,8 +31,15 @@ class House extends MeekroORM {
   }
 }
 
+class Soul extends MeekroORM {
+  public $tmp;
+
+  static $_orm_columns = [
+    'heaven_bound' => ['type' => 'bool'],
+  ];
+}
+
 // TODO: setting properties that don't correspond to a database field still works in php8+
-// TODO: do we need ArrayAccess? can it be made to coexist in php7 and php8?
 // TODO: test saving an empty object
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
@@ -39,7 +47,8 @@ class House extends MeekroORM {
 // TODO: test reload()
 // TODO: computed vars?
 // TODO: test toHash()
-// TODO: scopes that accept args
+// TODO: can load() table with multiple primary keys?
+// TODO: consolidate _orm_row access into get()/set(), getraw()/setraw(), has()
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -54,6 +63,7 @@ class BasicOrmTest extends SimpleTest {
   function test_1_basic() {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
+    DB::query($this->get_sql('create_souls'));
 
     $Person = new Person();
     $Person->name = 'Nick';
@@ -78,6 +88,11 @@ class BasicOrmTest extends SimpleTest {
     $House->sqft = 2250;
     $House->price = 1200;
     $House->Save();
+
+    $Soul = new Soul();
+    $Soul->person_id = $Person->id;
+    $Soul->heaven_bound = true;
+    $Soul->Save();
 
     $Person = new Person();
     $Person->name = 'Ellie';
@@ -193,7 +208,9 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($FirstTeenager[0]->name === 'Ellie');
   }
 
-  // * has_many assoc with scoping
+  // * has_many: works with scoping
+  // * has_many: no results means empty scope/array
+  // * has_one: assocs properly loaded only once
   function test_6_assoc() {
     $Person = Person::Search(['name' => 'Nick']);
     $Houses = $Person->House->order_by('price');
@@ -204,6 +221,14 @@ class BasicOrmTest extends SimpleTest {
     $Houses = $Person->House->scope('over', 1000);
     $this->assert(count($Houses) === 1);
     $this->assert($Houses[0]->sqft === 2250);
+
+    $Person2 = Person::Search(['name' => 'Ellie']);
+    $this->assert(count($Person2->House) === 0);
+
+    $this->assert($Person->Soul->heaven_bound === true);
+    
+    $Person->Soul->tmp = true;
+    $this->assert($Person->Soul->tmp === true);
 
   }
 
