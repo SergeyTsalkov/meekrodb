@@ -416,7 +416,7 @@ abstract class MeekroORM {
     return [];
   }
 
-  static function _orm_runscope($scope) {
+  static function _orm_runscope($scope, ...$args) {
     $scopes = static::_orm_scopes();
     if (! is_array($scopes)) {
       throw new MeekroORMException("No scopes available");
@@ -430,7 +430,7 @@ abstract class MeekroORM {
       throw new MeekroORMException("Invalid scope: must be anonymous function");
     }
 
-    $Scope = $scope();
+    $Scope = $scope(...$args);
     if (! ($Scope instanceof MeekroORMScope)) {
       throw new MeekroORMException("Invalid scope: must use ClassName::Where()");
     }
@@ -631,27 +631,26 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     return $this;
   }
 
-  function scope(...$scopes) {
+  function scope($scope, ...$args) {
     $this->Objects = null;
     $this->position = 0;
 
-    foreach ($scopes as $scope) {
-      $Scope = $this->class_name::_orm_runscope($scope);
+    $Scope = $this->class_name::_orm_runscope($scope, ...$args);
 
-      if (count($this->Where) > 0) {
-        $this->Where->add($Scope->Where);
-      } else {
-        $this->Where = $Scope->Where;
-      }
-
-      if (!is_null($Scope->limit_rowcount)) {
-        $this->limit_rowcount = $Scope->limit_rowcount;
-        $this->limit_offset = $Scope->limit_offset;
-      }
-      if ($Scope->order_by) {
-        $this->order_by = $Scope->order_by;
-      }
+    if (count($this->Where) > 0) {
+      $this->Where->add($Scope->Where);
+    } else {
+      $this->Where = $Scope->Where;
     }
+
+    if (!is_null($Scope->limit_rowcount)) {
+      $this->limit_rowcount = $Scope->limit_rowcount;
+      $this->limit_offset = $Scope->limit_offset;
+    }
+    if ($Scope->order_by) {
+      $this->order_by = $Scope->order_by;
+    }
+
     return $this;
   }
 

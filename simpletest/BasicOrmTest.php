@@ -25,7 +25,7 @@ class Person extends MeekroORM {
 class House extends MeekroORM {
   static function _orm_scopes() {
     return [
-      'over_1m' => function() { return self::where('price >= 1000'); },
+      'over' => function($over) { return self::where('price >= %i', $over); },
     ];
   }
 }
@@ -176,19 +176,15 @@ class BasicOrmTest extends SimpleTest {
     $Living = Person::scope('living');
     $this->assert(count($Living) === 3);
 
-    $LivingTeens = Person::scope('living', 'teenager')->order_by('id');
-    $this->assert(count($LivingTeens) === 2);
-    $this->assert($LivingTeens[0]->name === 'Ellie');
-
     $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');
     $this->assert(count($LivingTeens) === 2);
     $this->assert($LivingTeens[0]->name === 'Ellie');
 
-    $LivingTeens = Person::scope('living', 'teenager')->order_by('id')->limit(1);
+    $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id')->limit(1);
     $this->assert(count($LivingTeens) === 1);
     $this->assert($LivingTeens[0]->name === 'Ellie');
 
-    $LivingTeens = Person::scope('living', 'teenager')->order_by(['id' => 'desc'])->limit(1);
+    $LivingTeens = Person::scope('living')->scope('teenager')->order_by(['id' => 'desc'])->limit(1);
     $this->assert(count($LivingTeens) === 1);
     $this->assert($LivingTeens[0]->name === 'Gavin');
     
@@ -205,7 +201,7 @@ class BasicOrmTest extends SimpleTest {
     $this->assert(count($Houses) === 2);
     $this->assert($Houses[0]->sqft === 1340);
 
-    $Houses = $Person->House->scope('over_1m');
+    $Houses = $Person->House->scope('over', 1000);
     $this->assert(count($Houses) === 1);
     $this->assert($Houses[0]->sqft === 2250);
 
