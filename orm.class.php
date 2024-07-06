@@ -298,9 +298,7 @@ abstract class MeekroORM {
       ]);
     }
     else if ($assoc['type'] == 'has_many') {
-      return $class_name::SearchMany([
-        $assoc['foreign_key'] => $this->_orm_primary_key_value(),
-      ]);
+      return $class_name::Where('%c=%?', $assoc['foreign_key'], $this->_orm_primary_key_value());
     }
     else {
       throw new Exception("Invalid type for $name association");

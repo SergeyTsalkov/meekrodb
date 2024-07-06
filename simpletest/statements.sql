@@ -53,7 +53,8 @@ CREATE TABLE `houses` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `owner_id` INT NOT NULL DEFAULT 0,
   `address` VARCHAR(255) NOT NULL DEFAULT '',
-  `sqft` INT NOT NULL DEFAULT 0
+  `sqft` INT NOT NULL DEFAULT 0,
+  `price` INT NOT NULL DEFAULT 0
 )
 
 -- name: create_profile ; db: mysql

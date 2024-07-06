@@ -23,7 +23,11 @@ class Person extends MeekroORM {
 }
 
 class House extends MeekroORM {
-
+  static function _orm_scopes() {
+    return [
+      'over_1m' => function() { return self::where('price >= 1000'); },
+    ];
+  }
 }
 
 // TODO: setting properties that don't correspond to a database field still works in php8+
@@ -65,6 +69,14 @@ class BasicOrmTest extends SimpleTest {
     $House->owner_id = $Person->id;
     $House->address = '3344 Cedar Road';
     $House->sqft = 1340;
+    $House->price = 500;
+    $House->Save();
+
+    $House = new House();
+    $House->owner_id = $Person->id;
+    $House->address = '233 South Wacker Dr';
+    $House->sqft = 2250;
+    $House->price = 1200;
     $House->Save();
 
     $Person = new Person();
@@ -185,10 +197,17 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($FirstTeenager[0]->name === 'Ellie');
   }
 
+  // * has_many assoc with scoping
   function test_6_assoc() {
     $Person = Person::Search(['name' => 'Nick']);
-    $this->assert(count($Person->House) === 1);
-    $this->assert($Person->House[0]->sqft === 1340);
+    $Houses = $Person->House->order_by('price');
+
+    $this->assert(count($Houses) === 2);
+    $this->assert($Houses[0]->sqft === 1340);
+
+    $Houses = $Person->House->scope('over_1m');
+    $this->assert(count($Houses) === 1);
+    $this->assert($Houses[0]->sqft === 2250);
 
   }
 
