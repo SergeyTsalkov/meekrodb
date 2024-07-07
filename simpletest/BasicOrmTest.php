@@ -2,7 +2,6 @@
 use Carbon\Carbon;
 
 class Person extends MeekroORM {
-  static $_orm_tablename = 'persons';
   static $_orm_columns = [
     'is_alive' => ['type' => 'bool'],
     'is_male' => ['type' => 'bool'],
@@ -10,6 +9,7 @@ class Person extends MeekroORM {
   static $_orm_associations = [
     'House' => ['type' => 'has_many', 'foreign_key' => 'owner_id'],
     'Soul' => ['type' => 'has_one', 'foreign_key' => 'person_id'],
+    'Employer' => ['type' => 'belongs_to', 'foreign_key' => 'employer_id', 'class_name' => 'Company'],
   ];
 
   static function _orm_scopes() {
@@ -39,16 +39,22 @@ class Soul extends MeekroORM {
   ];
 }
 
+class Company extends MeekroORM {
+  static $_orm_tablename = 'companies';
+
+}
+
 // TODO: setting properties that don't correspond to a database field still works in php8+
 // TODO: test saving an empty object
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
-// TODO: still works when Carbon is not available
 // TODO: test reload()
 // TODO: computed vars?
 // TODO: test toHash()
 // TODO: can load() table with multiple primary keys?
 // TODO: consolidate _orm_row access into get()/set(), getraw()/setraw(), has()
+// TODO: test _pre_save() returning false, failure to commit
+// TODO: dont have Carbon built-in
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -64,6 +70,7 @@ class BasicOrmTest extends SimpleTest {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
     DB::query($this->get_sql('create_souls'));
+    DB::query($this->get_sql('create_companies'));
 
     $Person = new Person();
     $Person->name = 'Nick';
@@ -94,6 +101,12 @@ class BasicOrmTest extends SimpleTest {
     $Soul->heaven_bound = true;
     $Soul->Save();
 
+    $Company = new Company();
+    $Company->name = 'Acme Shoe Co';
+    $Company->Save();
+    $Person->employer_id = $Company->id;
+    $Person->Save();
+
     $Person = new Person();
     $Person->name = 'Ellie';
     $Person->age = 17;
@@ -117,6 +130,9 @@ class BasicOrmTest extends SimpleTest {
     $Person->is_alive = false;
     $Person->is_male = false;
     $Person->Save();
+
+    // $Person = new Person();
+    // $Person->Save();
 
     $Person = Person::Load(1);
     $this->assert($Person->age === 23);
@@ -211,6 +227,7 @@ class BasicOrmTest extends SimpleTest {
   // * has_many: works with scoping
   // * has_many: no results means empty scope/array
   // * has_one: assocs properly loaded only once
+  // * belongs_to: class_name works
   function test_6_assoc() {
     $Person = Person::Search(['name' => 'Nick']);
     $Houses = $Person->House->order_by('price');
@@ -229,6 +246,8 @@ class BasicOrmTest extends SimpleTest {
     
     $Person->Soul->tmp = true;
     $this->assert($Person->Soul->tmp === true);
+
+    $this->assert($Person->Employer->name === 'Acme Shoe Co');
 
   }
 

@@ -38,9 +38,10 @@ CREATE TABLE accounts (
 -- name: create_persons ; db: mysql
 CREATE TABLE persons (
   `id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `name` varchar(255) NOT NULL,
-  `age` int unsigned NOT NULL,
-  `height` double unsigned NOT NULL,
+  `employer_id` int unsigned NOT NULL DEFAULT 0,
+  `name` varchar(255) NOT NULL DEFAULT '',
+  `age` int unsigned NOT NULL DEFAULT 0,
+  `height` double unsigned NOT NULL DEFAULT 0,
   `favorite_color` varchar(255) NULL,
   `favorite_animaniacs` varchar(255) NOT NULL DEFAULT '',
   `last_happy_moment` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
@@ -62,6 +63,13 @@ CREATE TABLE `souls` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `person_id` INT NOT NULL DEFAULT 0,
   `heaven_bound` tinyint(1) NOT NULL DEFAULT 0
+)
+
+-- name: create_companies ; db: mysql
+CREATE TABLE `companies` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(255) NOT NULL DEFAULT '',
+  `shares` INT NOT NULL DEFAULT 0
 )
 
 -- name: create_profile ; db: mysql
