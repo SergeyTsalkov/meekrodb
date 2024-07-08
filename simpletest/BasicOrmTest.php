@@ -45,7 +45,6 @@ class Company extends MeekroORM {
 }
 
 // TODO: setting properties that don't correspond to a database field still works in php8+
-// TODO: test saving an empty object
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
 // TODO: test reload()
@@ -131,14 +130,17 @@ class BasicOrmTest extends SimpleTest {
     $Person->is_male = false;
     $Person->Save();
 
-    // $Person = new Person();
-    // $Person->Save();
+    $Person = new Person();
+    $Person->Save();
 
     $Person = Person::Load(1);
     $this->assert($Person->age === 23);
 
     $Person = Person::Search(['name' => 'Gavin']);
     $this->assert($Person->age === 15);
+
+    $Person = Person::Search(['name' => '']);
+    $this->assert($Person->age === 0);
   }
 
   // * can search for Person by int value
