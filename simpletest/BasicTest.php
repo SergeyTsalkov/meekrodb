@@ -334,7 +334,16 @@ class BasicTest extends SimpleTest {
     $this->assert($r[0]['1+1'] === '2');
   }
 
-  function test_15_timeout() {
+  // * can insert an empty row
+  function test_15_empty_insert() {
+    DB::insert('accounts', []);
+
+    $count = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=''");
+    $this->assert($count === '1');
+    DB::delete('accounts', ['username' => '']);
+  }
+
+  function test_16_timeout() {
     if ($this->db_type != 'mysql') return;
     if ($this->fast) return;
     

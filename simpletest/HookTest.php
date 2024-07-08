@@ -247,32 +247,4 @@ class HookTest extends SimpleTest {
     $this->assert($error_worked);
   }
 
-  function test_14_arrays_not_empty() {
-    $error_worked = false;
-
-    try {
-      DB::query("SELECT * FROM accounts WHERE id IN %li", array());
-    } catch (MeekroDBException $e) {
-      if ($e->getMessage() == "Arg 0 array can't be empty!") {
-        $error_worked = true;
-      }
-    }
-
-    $this->assert($error_worked);
-  }
-
-  function test_15_named_array_not_empty() {
-    $error_worked = false;
-
-    try {
-      DB::query("SELECT * FROM accounts WHERE id IN %li_ids", array('ids' => array()));
-    } catch (MeekroDBException $e) {
-      if ($e->getMessage() == "Arg ids array can't be empty!") {
-        $error_worked = true;
-      }
-    }
-
-    $this->assert($error_worked);
-  }
-
 }

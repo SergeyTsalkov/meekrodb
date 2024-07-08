@@ -416,7 +416,11 @@ class MeekroDB {
       $keys = array_keys($datas);
       $values = array_values($datas);
 
-      $ParsedQuery = $this->_parse(':l INTO :b :lc VALUES :l?', $action, $table, $keys, $values);
+      if ($db_type == 'mysql' || count($values) > 0)  {
+        $ParsedQuery = $this->_parse(':l INTO :b :lc VALUES :l?', $action, $table, $keys, $values);
+      } else {
+        $ParsedQuery = $this->_parse(':l INTO :b DEFAULT VALUES', $action, $table);
+      }
     }
 
     $do_update = $mode == 'insert' && isset($options['update']) 
@@ -893,9 +897,6 @@ class MeekroDB {
       }
       if (!$is_array_type && !$is_opt_array_type && is_array($val)) {
         $val = '';
-      }
-      if (is_array($val) && count($val) == 0) {
-        throw new MeekroDBException("Arg {$key} array can't be empty!");
       }
       
       if ($val instanceof WhereClause) {

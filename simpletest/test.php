@@ -5,6 +5,7 @@
 
 class SimpleTest {
   public $db_type = 'mysql';
+  public $last_func;
   public $data = null;
   public $db = null;
   public $db2 = null;
