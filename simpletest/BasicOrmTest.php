@@ -5,6 +5,7 @@ class Person extends MeekroORM {
   static $_orm_columns = [
     'is_alive' => ['type' => 'bool'],
     'is_male' => ['type' => 'bool'],
+    'data' => ['type' => 'json'],
   ];
   static $_orm_associations = [
     'House' => ['type' => 'has_many', 'foreign_key' => 'owner_id'],
@@ -59,7 +60,6 @@ class Company extends MeekroORM {
 // TODO: test toHash()
 // TODO: can load() table with multiple primary keys?
 // TODO: test _pre_save() returning false, failure to commit
-// TODO: make & test hash type, be sure to test $Obj->hash[] = $value to add element
 // TODO: cleanup & test update()
 
 class BasicOrmTest extends SimpleTest {
@@ -187,6 +187,22 @@ class BasicOrmTest extends SimpleTest {
 
     $Person->last_happy_moment = null;
     $Person->Save();
+  }
+
+  // * json type can be used/loaded/saved
+  // * json type can be appended to with "var[] = val"
+  function test_31_json() {
+    $Person = Person::Load(1);
+    $Person->data = [1,3,5];
+    $Person->Save();
+
+    $Person = Person::Load(1);
+    $this->assert($Person->data === [1,3,5]);
+    $Person->data[] = 7;
+    $Person->Save();
+
+    $Person = Person::Load(1);
+    $this->assert($Person->data === [1,3,5,7]);
   }
 
   // * NULL values can be set to either NULL, or empty string, and those are different

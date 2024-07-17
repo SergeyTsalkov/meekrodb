@@ -14,7 +14,6 @@
 abstract class MeekroORM {
   // INTERNAL -- DO NOT TOUCH
   private $_orm_row = []; // processed hash
-  private $_orm_row_raw = []; // raw hash (writeable to database)
   private $_orm_row_orig = []; // original raw hash from database
   private $_orm_assoc_load = [];
   private $_orm_is_fresh = true;
@@ -46,13 +45,9 @@ abstract class MeekroORM {
 
   public static function _orm_meekrodb() { return DB::getMDB(); }
 
-  protected function _orm_dirty_fields() {
-    return array_keys($this->_orm_dirtyhash());
-  }
-
-  protected function _orm_dirtyhash() {
+  public function dirtyhash() {
     $hash = [];
-    foreach ($this->_orm_row_raw as $key => $value) {
+    foreach ($this->toRawHash() as $key => $value) {
       if (!array_key_exists($key, $this->_orm_row_orig) || $value !== $this->_orm_row_orig[$key]) {
         $hash[$key] = $value;
       }
@@ -90,28 +85,32 @@ abstract class MeekroORM {
     return !! static::_orm_coltype($key);
   }
 
-  public function get($key) {
+  // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
+  public function &get($key) {
     if (! $this->has($key)) {
       throw new MeekroORMException("$this does not have key $key");
     }
+    if (! array_key_exists($key, $this->_orm_row)) {
+      // only variables can be returned by reference
+      $null = null;
+      return $null;
+    }
 
-    return $this->_orm_row[$key] ?? null;
+    return $this->_orm_row[$key];
   }
 
   public function getraw($key) {
     if (! $this->has($key)) {
       throw new MeekroORMException("$this does not have key $key");
     }
-
-    return $this->_orm_row_raw[$key] ?? null;
+    $value = $this->_orm_row[$key] ?? null;
+    return $this->_marshal($key, $value);
   }
 
   public function set($key, $value) {
     if (! $this->has($key)) {
       throw new MeekroORMException("$this does not have key $key");
     }
-
-    $this->_orm_row_raw[$key] = $this->_marshal($key, $value);
     $this->_orm_row[$key] = $value;
   }
 
@@ -119,8 +118,6 @@ abstract class MeekroORM {
     if (! $this->has($key)) {
       throw new MeekroORMException("$this does not have key $key");
     }
-
-    $this->_orm_row_raw[$key] = $value;
     $this->_orm_row[$key] = $this->_unmarshal($key, $value);
   }
 
@@ -138,10 +135,6 @@ abstract class MeekroORM {
     }
 
     return $value;
-    
-    // $default = '';
-    // if ($type == 'int' || $type == 'double') $default = 0;
-    // else if ($type == 'datetime') $default = '0000-00-00 00:00:00';
   }
 
   public function _unmarshal($key, $value) {
@@ -205,6 +198,14 @@ abstract class MeekroORM {
   public function _unmarshal_type_string($key, $value) {
     if (is_null($value)) return null;
     return strval($value);
+  }
+
+  public function _marshal_type_json($key, $value, $is_nullable) {
+    return json_encode($value);
+  }
+  public function _unmarshal_type_json($key, $value) {
+    if (is_null($value)) return null;
+    return json_decode($value, true);
   }
 
   public static function _orm_colinfo($column, $type) {
@@ -280,7 +281,6 @@ abstract class MeekroORM {
   public function _load_hash(array $row) {
     $this->_orm_is_fresh = false;
     $this->_orm_assoc_load = [];
-    $this->_orm_row_raw = $row;
     $this->_orm_row_orig = $row;
     foreach ($row as $key => $value) {
       $this->_orm_row[$key] = $this->_unmarshal($key, $value);
@@ -369,8 +369,7 @@ abstract class MeekroORM {
       return $result;
     }
     if (static::_orm_struct()->has($key)) {
-      $result = $this->get($key);
-      return $result;
+      return $this->get($key);
     }
 
     return $this->$key;
@@ -422,7 +421,7 @@ abstract class MeekroORM {
 
     try {
       if ($run_callbacks) {
-        $fields = $this->_orm_dirty_fields();
+        $fields = array_keys($this->dirtyhash());
 
         foreach ($fields as $field) {
           $this->_orm_run_callback("_validate_{$field}");
@@ -434,7 +433,7 @@ abstract class MeekroORM {
       }
       
       // dirty fields list might change while running the _pre callbacks
-      $replace = $this->_orm_dirtyhash();
+      $replace = $this->dirtyhash();
       $fields = array_keys($replace);
 
       if ($is_fresh) {
@@ -527,7 +526,11 @@ abstract class MeekroORM {
   }
 
   public function toRawHash() {
-    return $this->_orm_row_raw;
+    $hash = [];
+    foreach ($this->_orm_row as $key => $value) {
+      $hash[$key] = $this->_marshal($key, $value);
+    }
+    return $hash;
   }
 
   public function __toString() {

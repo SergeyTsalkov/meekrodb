@@ -46,7 +46,8 @@ CREATE TABLE persons (
   `favorite_animaniacs` varchar(255) NOT NULL DEFAULT '',
   `last_happy_moment` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
   `is_male` tinyint(1) NOT NULL DEFAULT 0,
-  `is_alive` tinyint(1) NULL
+  `is_alive` tinyint(1) NULL,
+  `data` VARCHAR(255) NOT NULL DEFAULT ''
 ) ENGINE = InnoDB
 
 -- name: create_houses ; db: mysql
