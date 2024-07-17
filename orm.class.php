@@ -471,7 +471,9 @@ abstract class MeekroORM {
   }
 
   public function reload($lock=false) {
-    if ($this->is_fresh()) throw new MeekroORMException("Can't reload unsaved record!");
+    if ($this->is_fresh()) {
+      throw new MeekroORMException("Can't reload unsaved record!");
+    }
 
     $mdb = static::_orm_meekrodb();
     $table = static::_orm_tablename();

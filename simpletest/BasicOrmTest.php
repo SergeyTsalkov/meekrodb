@@ -53,10 +53,8 @@ class Company extends MeekroORM {
 
 }
 
-// TODO: setting properties that don't correspond to a database field still works in php8+
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
-// TODO: test reload()
 // TODO: computed vars?
 // TODO: test toHash()
 // TODO: can load() table with multiple primary keys?
@@ -74,6 +72,7 @@ class BasicOrmTest extends SimpleTest {
   // * can create basic Person objects and save them
   // * can use ::Load() to look up an object with a simple primary key
   // * can use ::Search() to look up an object by string match
+  // * can reload() an object to undo pending changes
   function test_1_basic() {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
@@ -149,6 +148,10 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->age === 15);
 
     $Person = Person::Search(['name' => '']);
+    $this->assert($Person->age === 0);
+    $Person->age = 1;
+    $this->assert($Person->age === 1);
+    $Person->reload();
     $this->assert($Person->age === 0);
   }
 
@@ -261,7 +264,6 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->Soul->tmp === true);
 
     $this->assert($Person->Employer->name === 'Acme Shoe Co');
-
   }
 
 }
