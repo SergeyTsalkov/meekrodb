@@ -21,6 +21,15 @@ class Person extends MeekroORM {
       'first_teenager' => function() { return self::scope('teenager')->order_by('id')->limit(1); }
     ];
   }
+
+  static function tsdiff($t1, $t2) {
+    $interval = $t1->diff($t2);
+    return ($interval->days * 24 * 60 * 60) +
+      ($interval->h * 60 * 60) +
+      ($interval->i * 60) +
+      $interval->s +
+      ($interval->f);
+  }
 }
 
 class House extends MeekroORM {
@@ -51,9 +60,9 @@ class Company extends MeekroORM {
 // TODO: computed vars?
 // TODO: test toHash()
 // TODO: can load() table with multiple primary keys?
-// TODO: consolidate _orm_row access into get()/set(), getraw()/setraw(), has()
 // TODO: test _pre_save() returning false, failure to commit
-// TODO: dont have Carbon built-in
+// TODO: make & test hash type, be sure to test $Obj->hash[] = $value to add element
+// TODO: cleanup & test update()
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -161,15 +170,17 @@ class BasicOrmTest extends SimpleTest {
     $Person->Save();
   }
 
-  // * can load and save a Carbon timestamp
+  // * can load and save a timestamp
   function test_3_timestamp() {
     $Person = Person::Load(1);
-    $Person->last_happy_moment = Carbon::now();
+    $Person->last_happy_moment = new DateTime();
     $Person->Save();
 
     $Person = Person::Load(1);
-    $this->assert($Person->last_happy_moment instanceof Carbon);
-    $this->assert($Person->last_happy_moment->diffInSeconds() <= 1);
+    $this->assert($Person->last_happy_moment instanceof DateTime);
+
+    $diff = Person::tsdiff(new DateTime(), $Person->last_happy_moment);
+    $this->assert($diff <= 1);
 
     $Person->last_happy_moment = null;
     $Person->Save();

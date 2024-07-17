@@ -13,9 +13,11 @@
 
 abstract class MeekroORM {
   // INTERNAL -- DO NOT TOUCH
-  protected $_orm_row = [];
-  protected $_orm_row_orig = [];
-  protected $_orm_assoc_load = [];
+  private $_orm_row = []; // processed hash
+  private $_orm_row_raw = []; // raw hash (writeable to database)
+  private $_orm_row_orig = []; // original raw hash from database
+  private $_orm_assoc_load = [];
+  private $_orm_is_fresh = true;
   private static $_orm_struct = [];
 
   // (OPTIONAL) SET IN INHERITING CLASS
@@ -50,9 +52,9 @@ abstract class MeekroORM {
 
   protected function _orm_dirtyhash() {
     $hash = [];
-    foreach ($this->_orm_row as $key => $value) {
+    foreach ($this->_orm_row_raw as $key => $value) {
       if (!array_key_exists($key, $this->_orm_row_orig) || $value !== $this->_orm_row_orig[$key]) {
-        $hash[$key] = static::_orm_run_marshal($value, $key);
+        $hash[$key] = $value;
       }
     }
 
@@ -64,7 +66,7 @@ abstract class MeekroORM {
     $primary_keys = static::_orm_struct()->primary_keys();
 
     foreach ($primary_keys as $key) {
-      $where->add('%b = %?', $key, $this->_orm_row[$key]);
+      $where->add('%c = %?', $key, $this->getraw($key));
     }
     
     return $where;
@@ -79,9 +81,132 @@ abstract class MeekroORM {
   }
 
 
-  public function _orm_is_fresh() { return !$this->_orm_row_orig; }
+  public function is_fresh() {
+    return $this->_orm_is_fresh;
+  }
 
-  // -------------- TYPES AND MARSHAL / UNMARSHAL
+  // -------------- GET/SET AND MARSHAL / UNMARSHAL
+  public function has($key) {
+    return !! static::_orm_coltype($key);
+  }
+
+  public function get($key) {
+    if (! $this->has($key)) {
+      throw new MeekroORMException("$this does not have key $key");
+    }
+
+    return $this->_orm_row[$key] ?? null;
+  }
+
+  public function getraw($key) {
+    if (! $this->has($key)) {
+      throw new MeekroORMException("$this does not have key $key");
+    }
+
+    return $this->_orm_row_raw[$key] ?? null;
+  }
+
+  public function set($key, $value) {
+    if (! $this->has($key)) {
+      throw new MeekroORMException("$this does not have key $key");
+    }
+
+    $this->_orm_row_raw[$key] = $this->_marshal($key, $value);
+    $this->_orm_row[$key] = $value;
+  }
+
+  public function setraw($key, $value) {
+    if (! $this->has($key)) {
+      throw new MeekroORMException("$this does not have key $key");
+    }
+
+    $this->_orm_row_raw[$key] = $value;
+    $this->_orm_row[$key] = $this->_unmarshal($key, $value);
+  }
+
+  public function _marshal($key, $value) {
+    $type = static::_orm_coltype($key);
+    $is_nullable = static::_orm_struct()->column_nullable($key);
+    
+    $fieldmarshal = "_marshal_field_{$key}";  
+    $typemarshal = "_marshal_type_{$type}";
+    if (method_exists($this, $fieldmarshal)) {
+      $value = $this->$fieldmarshal($key, $value, $is_nullable);
+    }
+    else if (method_exists($this, $typemarshal)) {
+      $value = $this->$typemarshal($key, $value, $is_nullable);
+    }
+
+    return $value;
+    
+    // $default = '';
+    // if ($type == 'int' || $type == 'double') $default = 0;
+    // else if ($type == 'datetime') $default = '0000-00-00 00:00:00';
+  }
+
+  public function _unmarshal($key, $value) {
+    $type = static::_orm_coltype($key);
+    $is_nullable = static::_orm_struct()->column_nullable($key);
+    
+    $fieldmarshal = "_unmarshal_field_{$key}";  
+    $typemarshal = "_unmarshal_type_{$type}";
+    if (method_exists($this, $fieldmarshal)) {
+      $value = $this->$fieldmarshal($key, $value, $is_nullable);
+    }
+    else if (method_exists($this, $typemarshal)) {
+      $value = $this->$typemarshal($key, $value, $is_nullable);
+    }
+
+    return $value;
+  }
+
+  public function _marshal_type_bool($key, $value, $is_nullable) {
+    if ($is_nullable && is_null($value)) return null;
+    return $value ? 1 : 0;
+  }
+  public function _unmarshal_type_bool($key, $value) {
+    if (is_null($value)) return null;
+    return !!$value;
+  }
+
+  public function _marshal_type_int($key, $value, $is_nullable) {
+    if ($is_nullable && is_null($value)) return null;
+    return intval($value);
+  }
+  public function _unmarshal_type_int($key, $value) {
+    if (is_null($value)) return null;
+    return intval($value);
+  }
+
+  public function _marshal_type_double($key, $value, $is_nullable) {
+    if ($is_nullable && is_null($value)) return null;
+    return doubleval($value);
+  }
+  public function _unmarshal_type_double($key, $value) {
+    if (is_null($value)) return null;
+    return doubleval($value);
+  }
+
+  public function _marshal_type_datetime($key, $value, $is_nullable) {
+    if (!$is_nullable && is_null($value)) $value = '0000-00-00 00:00:00';
+    if ($value instanceof \DateTime) return $value->format('Y-m-d H:i:s');
+    return $value;
+  }
+  public function _unmarshal_type_datetime($key, $value) {
+    if (is_null($value)) return null;
+    if ($value) return DateTime::createFromFormat('Y-m-d H:i:s', $value);
+    return $value;
+  }
+
+  public function _marshal_type_string($key, $value, $is_nullable) {
+    if ($is_nullable && is_null($value)) return null;
+    return strval($value);
+  }
+  public function _unmarshal_type_string($key, $value) {
+    if (is_null($value)) return null;
+    return strval($value);
+  }
+
   public static function _orm_colinfo($column, $type) {
     if (! is_array(static::$_orm_columns)) return;
     if (! array_key_exists($column, static::$_orm_columns)) return;
@@ -95,66 +220,6 @@ abstract class MeekroORM {
       return $type;
     }
     return static::_orm_struct()->column_type($column);
-  }
-
-  public static function _orm_run_marshal($data, $column) {
-    $type = static::_orm_coltype($column);
-    $class = get_called_class();
-    $name = "_orm_typemarshal_{$type}";
-    $is_nullable = static::_orm_struct()->column_nullable($column);
-
-    $default = '';
-    if ($type == 'int' || $type == 'double') $default = 0;
-    else if ($type == 'datetime') $default = '0000-00-00 00:00:00';
-
-    if (method_exists($class, $name)) {
-      $data = $class::$name($data);
-    }
-
-    if (is_null($data) && !$is_nullable) {
-      $data = $default;
-    }
-
-    return $data;
-  }
-
-  public static function _orm_run_unmarshal($data, $column) {
-    $type = static::_orm_coltype($column);
-    $class = get_called_class();
-    $name = "_orm_typeunmarshal_{$type}";
-    if (method_exists($class, $name)) {
-      $data = $class::$name($data);
-    }
-    return $data;
-  }
-
-  public static function _orm_typemarshal_bool($data) {
-    if (is_null($data)) return null;
-    return $data ? 1 : 0;
-  }
-  public static function _orm_typeunmarshal_bool($data) {
-    if (is_null($data)) return null;
-    return !!$data;
-  }
-
-  public static function _orm_typeunmarshal_int($data) {
-    if (is_null($data)) return null;
-    return intval($data);
-  }
-  public static function _orm_typeunmarshal_double($data) {
-    if (is_null($data)) return null;
-    return doubleval($data);
-  }
-
-  public static function _orm_typemarshal_datetime($data) {
-    if (is_null($data)) return null;
-    if ($data instanceof \DateTime) return $data->format('Y-m-d H:i:s');
-    return $data;
-  }
-  public static function _orm_typeunmarshal_datetime($data) {
-    if (is_null($data)) return null;
-    if (!$data || !class_exists('Carbon\Carbon')) return $data;
-    return new Carbon\Carbon($data);
   }
 
   // -------------- ASSOCIATIONS
@@ -189,7 +254,7 @@ abstract class MeekroORM {
     $class_name = $assoc['class_name'];
     $foreign_key = $assoc['foreign_key'];
     $primary_key = $class_name::_orm_struct()->primary_key();
-    $primary_value = $this->_orm_row[$primary_key];
+    $primary_value = $this->getraw($primary_key);
 
     if (! is_subclass_of($class_name, __CLASS__)) {
       throw new MeekroORMException(sprintf('%s is not a class that inherits from %s', $class_name, get_class()));
@@ -212,14 +277,20 @@ abstract class MeekroORM {
   }
 
   // -------------- CONSTRUCTORS
-  public static function LoadFromHash(array $row = array()) {
+  public function _load_hash(array $row) {
+    $this->_orm_is_fresh = false;
+    $this->_orm_assoc_load = [];
+    $this->_orm_row_raw = $row;
+    $this->_orm_row_orig = $row;
+    foreach ($row as $key => $value) {
+      $this->_orm_row[$key] = $this->_unmarshal($key, $value);
+    }
+  }
+
+  public static function LoadFromHash(array $row = []) {
     $class_name = get_called_class();
     $Obj = new $class_name();
-    foreach ($row as $key => $value) {
-      $Obj->_orm_row[$key] = static::_orm_run_unmarshal($value, $key);
-    }
-    
-    $Obj->_orm_row_orig = $Obj->_orm_row;
+    $Obj->_load_hash($row);
     return $Obj;
   }
 
@@ -279,12 +350,11 @@ abstract class MeekroORM {
 
   // -------------- DYNAMIC METHODS
   public function __set($key, $value) {
-    if (!$this->_orm_is_fresh() && static::_orm_struct()->is_primary_key($key)) {
+    if (!$this->is_fresh() && static::_orm_struct()->is_primary_key($key)) {
       throw new MeekroORMException("Can't update primary key!");
     }
-    else if (static::_orm_struct()->has($key)) {
-      $callback = $this->_orm_run_callback("_set_$key", $value);
-      if ($callback === false) $this->_orm_row[$key] = $value;
+    else if ($this->has($key)) {
+      $this->set($key, $value);
     }
     else {
       $this->$key = $value;
@@ -293,19 +363,13 @@ abstract class MeekroORM {
 
   // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
   public function &__get($key) {
+    // return by reference requires temp var
     if (static::is_assoc($key)) {
-      // return by reference requires temp var
       $result = $this->assoc($key);
       return $result;
     }
     if (static::_orm_struct()->has($key)) {
-      $callback = $this->_orm_run_callback("_get_$key");
-      if ($callback !== false) {
-        return $callback;
-      }
-
-      // return by reference requires temp var
-      $result = $this->_orm_row[$key];
+      $result = $this->get($key);
       return $result;
     }
 
@@ -350,10 +414,11 @@ abstract class MeekroORM {
   }
 
   public function save($run_callbacks=true) {
-    $is_fresh = $this->_orm_is_fresh();
+    $is_fresh = $this->is_fresh();
     $have_committed = false;
-
-    DB::startTransaction();
+    $table = static::_orm_tablename();
+    $mdb = static::_orm_meekrodb();
+    $mdb->startTransaction();
 
     try {
       if ($run_callbacks) {
@@ -373,29 +438,31 @@ abstract class MeekroORM {
       $fields = array_keys($replace);
 
       if ($is_fresh) {
-        static::_orm_meekrodb()->insert(static::_orm_tablename(), $replace);
+        $mdb->insert($table, $replace);
+        $this->_orm_is_fresh = false;
 
+        // for reload() to work below, we need to know what our auto-increment value is
         if ($aifield = static::_orm_struct()->ai_field()) {
-          $this->_orm_row[$aifield] = static::_orm_meekrodb()->insertId();
+          $this->set($aifield, $mdb->insertId());
         }
-        
-      } else if (count($replace) > 0) {
-        static::_orm_meekrodb()->update(static::_orm_tablename(), $replace, "%l", $this->_where());
+      }
+      else if (count($replace) > 0) {
+        $mdb->update($table, $replace, "%l", $this->_where());
       }
       
-      $this->_orm_row_orig = $this->_orm_row;
-      $this->reload(); // for INSERTs, pick up any default values that MySQL may have set
+      // for INSERTs, pick up any default values
+      $this->reload();
 
       if ($run_callbacks) {
         if ($is_fresh) $this->_orm_run_callback('_post_create', $fields);
         else $this->_orm_run_callback('_post_update', $fields);
         $this->_orm_run_callback('_post_save', $fields);
       }
-      DB::commit();
+      $mdb->commit();
       $have_committed = true;
 
     } finally {
-      if (! $have_committed) DB::rollback();
+      if (! $have_committed) $mdb->rollback();
     }
 
     if ($run_callbacks) {
@@ -404,22 +471,21 @@ abstract class MeekroORM {
   }
 
   public function reload($lock=false) {
-    if ($this->_orm_is_fresh()) throw new MeekroORMException("Can't reload unsaved record!");
+    if ($this->is_fresh()) throw new MeekroORMException("Can't reload unsaved record!");
 
-    $primary_keys = static::_orm_struct()->primary_keys();
-    $primary_values = array();
-    foreach ($primary_keys as $key) {
-      $primary_values[] = $this->_orm_row[$key];
+    $mdb = static::_orm_meekrodb();
+    $table = static::_orm_tablename();
+    $row = $mdb->queryFirstRow("SELECT * FROM %b WHERE %l LIMIT 1", $table, $this->_where());
+
+    if (! $row) {
+      throw new MeekroORMException("Unable to reload(): missing row");
     }
-
-    $new = static::Search(array_combine($primary_keys, $primary_values), ['lock' => $lock]);
-    if (! $new) throw new Exception("Unable to reload $this -- missing!");
-    $this->_orm_row = $this->_orm_row_orig = $new->_orm_row;
-    $this->_orm_assoc_load = [];
+    $this->_load_hash($row);
   }
 
   public function lock() { $this->reload(true); }
 
+  // TODO: cleanup update(), optionally run pre/post functions?
   public function update($key, $value=null) {
     if (is_array($key)) $hash = $key;
     else $hash = array($key => $value);
@@ -427,7 +493,7 @@ abstract class MeekroORM {
 
     $this->_orm_row = array_merge($this->_orm_row, $hash);
 
-    if (! $this->_orm_is_fresh()) {
+    if (! $this->is_fresh()) {
       //$this->_orm_run_callback('_pre_save', $dirty_fields);
       //$this->_orm_run_callback('_pre_update', $dirty_fields);
 
@@ -440,16 +506,17 @@ abstract class MeekroORM {
   }
 
   public function destroy() {
-    DB::startTransaction();
+    $mdb = static::_orm_meekrodb();
+    $mdb->startTransaction();
 
     try {
       $this->_orm_run_callback('_pre_destroy');
-      static::_orm_meekrodb()->query("DELETE FROM %b WHERE %l LIMIT 1", static::_orm_tablename(), $this->_where());
+      $mdb->query("DELETE FROM %b WHERE %l LIMIT 1", static::_orm_tablename(), $this->_where());
       $this->_orm_run_callback('_post_destroy');
-      DB::commit();
+      $mdb->commit();
       $have_committed = true;
     } finally {
-      if (! $have_committed) DB::rollback();
+      if (! $have_committed) $mdb->rollback();
     }
   }
 
@@ -457,8 +524,12 @@ abstract class MeekroORM {
     return $this->_orm_row;
   }
 
+  public function toRawHash() {
+    return $this->_orm_row_raw;
+  }
+
   public function __toString() {
-    return static::_orm_tablename();
+    return get_called_class();
   }
 
 }
