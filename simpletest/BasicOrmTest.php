@@ -56,11 +56,10 @@ class Company extends MeekroORM {
 
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
-// TODO: computed vars?
 // TODO: can load() table with multiple primary keys?
 // TODO: test _pre_save() returning false, failure to commit
 // TODO: cleanup & test update()
-// TODO: can set() date value to 0000-00-00 00:00:00
+// TODO: only do our own transaction if nested transactions are enabled, or transaction depth is 0
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -196,7 +195,10 @@ class BasicOrmTest extends SimpleTest {
 
   // * can load and save a timestamp
   function test_3_timestamp() {
+    $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '0000-00-00 00:00:00');
+
     $Person = Person::Load(1);
+    $this->assert($Person->last_happy_moment == $zerodate);
     $Person->last_happy_moment = new DateTime();
     $Person->Save();
 
@@ -208,6 +210,12 @@ class BasicOrmTest extends SimpleTest {
 
     $Person->last_happy_moment = null;
     $Person->Save();
+    $Person = Person::Load(1);
+    $this->assert($Person->last_happy_moment == $zerodate);
+    $Person->last_happy_moment = '0000-00-00 00:00:00';
+    $Person->Save();
+    $Person = Person::Load(1);
+    $this->assert($Person->last_happy_moment == $zerodate);
   }
 
   // * json type can be used/loaded/saved
