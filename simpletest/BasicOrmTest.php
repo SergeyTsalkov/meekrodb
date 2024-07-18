@@ -60,6 +60,7 @@ class Company extends MeekroORM {
 // TODO: can load() table with multiple primary keys?
 // TODO: test _pre_save() returning false, failure to commit
 // TODO: cleanup & test update()
+// TODO: can set() date value to 0000-00-00 00:00:00
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -170,6 +171,25 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->name === 'Ellie');
     $this->assert($Person->is_alive === false);
     $this->assert($Person->is_male === false);
+    $Person->is_alive = true;
+    $Person->Save();
+  }
+
+  // * can use Search() to load entry with extra fields
+  // * can use dirtyhash() to see modified properties
+  function test_3_extravars() {
+    $Person = Person::Search("SELECT *, age+1 AS nextyear FROM persons WHERE age = 17");
+    $this->assert($Person->name === 'Ellie');
+    $this->assert($Person->is_alive === true);
+    $this->assert($Person->nextyear === '18');
+    $Person->is_alive = false;
+
+    $dirty = $Person->dirtyhash();
+    $this->assert(count($dirty) === 1);
+    $this->assert(array_keys($dirty)[0] === 'is_alive');
+    $this->assert(array_values($dirty)[0] === 0);
+    
+    $Person->Save();
     $Person->is_alive = true;
     $Person->Save();
   }

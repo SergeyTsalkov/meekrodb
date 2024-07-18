@@ -11,6 +11,7 @@
   ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 */
 
+#[\AllowDynamicProperties]
 abstract class MeekroORM {
   // INTERNAL -- DO NOT TOUCH
   private $_orm_row = []; // processed hash
@@ -81,6 +82,32 @@ abstract class MeekroORM {
   }
 
   // -------------- GET/SET AND MARSHAL / UNMARSHAL
+  public function __set($key, $value) {
+    if (!$this->is_fresh() && static::_orm_struct()->is_primary_key($key)) {
+      throw new MeekroORMException("Can't update primary key!");
+    }
+    else if ($this->has($key)) {
+      $this->set($key, $value);
+    }
+    else {
+      $this->$key = $value;
+    }
+  }
+
+  // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
+  public function &__get($key) {
+    // return by reference requires temp var
+    if (static::is_assoc($key)) {
+      $result = $this->assoc($key);
+      return $result;
+    }
+    if ($this->has($key)) {
+      return $this->get($key);
+    }
+
+    return $this->$key;
+  }
+
   public function has($key) {
     return !! static::_orm_coltype($key);
   }
@@ -280,10 +307,16 @@ abstract class MeekroORM {
   // -------------- CONSTRUCTORS
   public function _load_hash(array $row) {
     $this->_orm_is_fresh = false;
+    $this->_orm_row_orig = [];
+    $this->_orm_row = [];
     $this->_orm_assoc_load = [];
-    $this->_orm_row_orig = $row;
     foreach ($row as $key => $value) {
-      $this->_orm_row[$key] = $this->_unmarshal($key, $value);
+      if ($this->has($key)) {
+        $this->_orm_row[$key] = $this->_unmarshal($key, $value);
+        $this->_orm_row_orig[$key] = $this->_marshal($key, $this->_orm_row[$key]);
+      } else {
+        $this->$key = $value;
+      }
     }
   }
 
@@ -345,34 +378,6 @@ abstract class MeekroORM {
       }
     }
     return $result;
-  }
-
-
-  // -------------- DYNAMIC METHODS
-  public function __set($key, $value) {
-    if (!$this->is_fresh() && static::_orm_struct()->is_primary_key($key)) {
-      throw new MeekroORMException("Can't update primary key!");
-    }
-    else if ($this->has($key)) {
-      $this->set($key, $value);
-    }
-    else {
-      $this->$key = $value;
-    }
-  }
-
-  // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
-  public function &__get($key) {
-    // return by reference requires temp var
-    if (static::is_assoc($key)) {
-      $result = $this->assoc($key);
-      return $result;
-    }
-    if (static::_orm_struct()->has($key)) {
-      return $this->get($key);
-    }
-
-    return $this->$key;
   }
 
   static function _orm_scopes() {
