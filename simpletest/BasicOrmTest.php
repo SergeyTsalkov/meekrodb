@@ -57,7 +57,6 @@ class Company extends MeekroORM {
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
 // TODO: computed vars?
-// TODO: test toHash()
 // TODO: can load() table with multiple primary keys?
 // TODO: test _pre_save() returning false, failure to commit
 // TODO: cleanup & test update()
@@ -157,11 +156,13 @@ class BasicOrmTest extends SimpleTest {
 
   // * can search for Person by int value
   // * bool value is marshalled and unmarshalled correctly
+  // * toHash() works
   function test_2_bool() {
     $Person = Person::Search(['age' => 17]);
     $this->assert($Person->name === 'Ellie');
     $this->assert($Person->is_alive === true);
     $this->assert($Person->is_male === false);
+    $this->assert($Person->toHash()['is_male'] === false);
     $Person->is_alive = false;
     $Person->Save();
 
