@@ -68,12 +68,14 @@ abstract class MeekroORM {
     return $where;
   }
 
-  protected function _orm_run_callback() {
-    $args = func_get_args();
-    $func_name = array_shift($args);
-    $func_call = array($this, $func_name);
-    if (is_callable($func_call)) return call_user_func_array($func_call, $args);
-    return false;
+  private function _orm_run_callback($func_name, ...$args) {
+    if (method_exists($this, $func_name)) {
+      $result = $this->$func_name(...$args);
+      if ($result === false) {
+        throw new MeekroORMException("{$func_name} returned false");
+      }
+      return $result;
+    }
   }
 
 

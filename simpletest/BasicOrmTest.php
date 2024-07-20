@@ -31,6 +31,16 @@ class Person extends MeekroORM {
       $interval->s +
       ($interval->f);
   }
+
+  function _pre_save() {
+    if ($this->name == 'Kevin') {
+      if ($this->age == 53) {
+        return false;
+      }
+
+      $this->age = 28;
+    }
+  }
 }
 
 class House extends MeekroORM {
@@ -55,9 +65,7 @@ class Company extends MeekroORM {
 }
 
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
-// TODO: _pre callback adds a dirty field, make sure it saves and that _post callbacks include it in dirty list
 // TODO: can load() table with multiple primary keys?
-// TODO: test _pre_save() returning false, failure to commit
 // TODO: cleanup & test update()
 // TODO: only do our own transaction if nested transactions are enabled, or transaction depth is 0
 
@@ -71,7 +79,6 @@ class BasicOrmTest extends SimpleTest {
   // * can create basic Person objects and save them
   // * can use ::Load() to look up an object with a simple primary key
   // * can use ::Search() to look up an object by string match
-  // * can reload() an object to undo pending changes
   function test_1_basic() {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
@@ -137,14 +144,18 @@ class BasicOrmTest extends SimpleTest {
     $Person->is_male = false;
     $Person->Save();
 
-    $Person = new Person();
-    $Person->Save();
-
     $Person = Person::Load(1);
     $this->assert($Person->age === 23);
 
     $Person = Person::Search(['name' => 'Gavin']);
     $this->assert($Person->age === 15);
+  }
+
+  // * can save an empty record
+  // * can reload() an object to undo pending changes
+  function test_2_empty() {
+    $Person = new Person();
+    $Person->Save();
 
     $Person = Person::Search(['name' => '']);
     $this->assert($Person->age === 0);
@@ -152,6 +163,27 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->age === 1);
     $Person->reload();
     $this->assert($Person->age === 0);
+  }
+
+  // * _pre_save returning false throws exception
+  // * _pre_save can add a dirty field
+  function test_2_presave() {
+    $error = '';
+    try {
+      $Person = new Person();
+      $Person->name = 'Kevin';
+      $Person->age = 53;
+      $Person->Save();
+    } catch (MeekroORMException $e) {
+      $error = $e->getMessage();
+    }
+    $this->assert($error == '_pre_save returned false');
+
+    $Person = new Person();
+    $Person->name = 'Kevin';
+    $Person->Save();
+    $Person->reload();
+    $this->assert($Person->age === 28);
   }
 
   // * can search for Person by int value
