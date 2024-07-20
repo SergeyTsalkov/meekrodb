@@ -67,7 +67,6 @@ class Company extends MeekroORM {
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: can load() table with multiple primary keys?
 // TODO: cleanup & test update()
-// TODO: only do our own transaction if nested transactions are enabled, or transaction depth is 0
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -268,31 +267,42 @@ class BasicOrmTest extends SimpleTest {
 
   // * NULL values can be set to either NULL, or empty string, and those are different
   // * NOT NULL values will be set to empty string (or equivalent) when we try to null them
-  // TODO: test this with int, double
   function test_4_null() {
     $Person = Person::Search(['name' => 'Nick']);
     $this->assert($Person->favorite_color === 'blue');
     $this->assert($Person->favorite_animaniacs === 'Yakko');
     $this->assert($Person->is_alive === true);
+    $this->assert($Person->age === 23);
+    $this->assert($Person->height === 1.7);
     $Person->favorite_color = '';
     $Person->favorite_animaniacs = '';
     $Person->is_alive = '';
+    $Person->age = '';
+    $Person->height = '';
     $Person->Save();
     $Person = Person::Search(['name' => 'Nick']);
     $this->assert($Person->favorite_color === '');
     $this->assert($Person->favorite_animaniacs === '');
     $this->assert($Person->is_alive === false);
+    $this->assert($Person->age === 0);
+    $this->assert($Person->height === 0.0);
     $Person->favorite_color = null;
     $Person->favorite_animaniacs = null;
     $Person->is_alive = null;
+    $Person->age = null;
+    $Person->height = null;
     $Person->Save();
     $Person = Person::Search(['name' => 'Nick']);
     $this->assert($Person->favorite_color === null);
     $this->assert($Person->favorite_animaniacs === '');
     $this->assert($Person->is_alive === null);
+    $this->assert($Person->age === 0);
+    $this->assert($Person->height === 0.0);
     $Person->is_alive = true;
     $Person->favorite_color = 'blue';
     $Person->favorite_animaniacs = 'Yakko';
+    $Person->age = 23;
+    $Person->height = 1.7;
     $Person->Save();
   }
 
