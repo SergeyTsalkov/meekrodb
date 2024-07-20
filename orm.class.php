@@ -1,16 +1,4 @@
 <?php
-/*
-  CREATE TABLE `users_params` (
-   `id` bigint(20) unsigned NOT NULL,
-   `key` varchar(255) NOT NULL,
-   `value` varchar(255) NOT NULL,
-   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-   `expires_at` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-   PRIMARY KEY (`id`,`key`),
-   KEY `expires_at` (`expires_at`)
-  ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
-*/
-
 #[\AllowDynamicProperties]
 abstract class MeekroORM {
   // INTERNAL -- DO NOT TOUCH
