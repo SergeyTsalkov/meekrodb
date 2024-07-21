@@ -45,6 +45,18 @@ abstract class MeekroORM {
     return $hash;
   }
 
+  public function dirtyfields() {
+    return array_keys($this->dirtyhash());
+  }
+
+  private function _dirtyhash($fields) {
+    if (! $fields) return $this->dirtyhash();
+    return array_intersect_key($this->dirtyhash(), array_flip($fields));
+  }
+  private function _dirtyfields($fields) {
+    return array_keys($this->_dirtyhash($fields));
+  }
+
   protected function _where() {
     $where = new WhereClause('and');
     $primary_keys = static::_orm_struct()->primary_keys();
@@ -407,17 +419,23 @@ abstract class MeekroORM {
     return $Scope;
   }
 
-  public function save($run_callbacks=true) {
+  public function save($run_callbacks=null) {
+    return $this->_save(null, $run_callbacks);
+  }
+
+  // if $savefields is set, only those fields will be saved
+  private function _save($savefields, $run_callbacks=null) {
+    if (! is_bool($run_callbacks)) $run_callbacks = true;
+
     $is_fresh = $this->is_fresh();
     $have_committed = false;
     $table = static::_orm_tablename();
     $mdb = static::_orm_meekrodb();
-    $mdb->startTransaction();
 
+    $mdb->startTransaction();
     try {
       if ($run_callbacks) {
-        $fields = array_keys($this->dirtyhash());
-
+        $fields = $this->_dirtyfields($savefields);
         foreach ($fields as $field) {
           $this->_orm_run_callback("_validate_{$field}");
         }
@@ -428,7 +446,7 @@ abstract class MeekroORM {
       }
       
       // dirty fields list might change while running the _pre callbacks
-      $replace = $this->dirtyhash();
+      $replace = $this->_dirtyhash($savefields);
       $fields = array_keys($replace);
 
       if ($is_fresh) {
@@ -444,9 +462,13 @@ abstract class MeekroORM {
         $mdb->update($table, $replace, "%l", $this->_where());
       }
       
-      // for INSERTs, pick up any default values
-      $this->reload();
-
+      // don't reload if we did a partial save only
+      if ($savefields) {
+        $this->_orm_row_orig = array_merge($this->_orm_row_orig, $replace);
+      } else {
+        $this->reload();
+      }
+      
       if ($run_callbacks) {
         if ($is_fresh) $this->_orm_run_callback('_post_create', $fields);
         else $this->_orm_run_callback('_post_update', $fields);
@@ -481,24 +503,18 @@ abstract class MeekroORM {
 
   public function lock() { $this->reload(true); }
 
-  // TODO: cleanup update(), optionally run pre/post functions?
-  public function update($key, $value=null) {
-    if (is_array($key)) $hash = $key;
-    else $hash = array($key => $value);
-    //$dirty_fields = array_keys($hash);
-
-    $this->_orm_row = array_merge($this->_orm_row, $hash);
-
-    if (! $this->is_fresh()) {
-      //$this->_orm_run_callback('_pre_save', $dirty_fields);
-      //$this->_orm_run_callback('_pre_update', $dirty_fields);
-
-      static::_orm_meekrodb()->update(static::_orm_tablename(), $hash, "%l", $this->_where());
-      $this->_orm_row_orig = array_merge($this->_orm_row_orig, $hash);
-
-      //$this->_orm_run_callback('_post_update', $dirty_fields);
-      //$this->_orm_run_callback('_post_save', $dirty_fields);
+  public function update($one, $two=null) {
+    if ($this->is_fresh()) {
+      throw new MeekroORMException("Unable to update(): record is fresh");
     }
+    if (is_array($one)) $hash = $one;
+    else $hash = [$one => $two];
+
+    foreach ($hash as $key => $value) {
+      $this->set($key, $value);
+    }
+
+    return $this->_save(array_keys($hash));
   }
 
   public function destroy() {

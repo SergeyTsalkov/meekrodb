@@ -66,7 +66,8 @@ class Company extends MeekroORM {
 
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: can load() table with multiple primary keys?
-// TODO: cleanup & test update()
+// TODO: test with sqlite, pgsql
+// TODO: drop lock(), FOR UPDATE, etc?
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -148,6 +149,25 @@ class BasicOrmTest extends SimpleTest {
 
     $Person = Person::Search(['name' => 'Gavin']);
     $this->assert($Person->age === 15);
+  }
+
+  // * update() works, both with a hash and with a single key/value combo
+  function test_2_update() {
+    $Person = Person::Load(1);
+    $this->assert($Person->age === 23);
+
+    $Person->age = 24;
+    $Person->update('height', 2);
+    $this->assert($Person->dirtyfields() == ['age']);
+    $Person->update(['height' => 3, 'is_male' => false]);
+    $this->assert($Person->dirtyfields() == ['age']);
+
+    $Person->reload();
+    $this->assert($Person->age === 23);
+    $this->assert($Person->is_male === false);
+    $this->assert($Person->height === 3.0);
+
+    $Person->update(['height' => 1.7, 'is_male' => true]);
   }
 
   // * can save an empty record
