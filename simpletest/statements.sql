@@ -1,94 +1,103 @@
+-- name: AUTOKEY ; db: mysql
+INT unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY
 
--- name: create_accounts ; db: mysql
+-- name: AUTOKEY ; db: sqlite
+INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT
+
+-- name: AUTOKEY ; db: pgsql
+SERIAL PRIMARY KEY
+
+-- name: INT ; db: mysql
+INT
+
+-- name: INT ; db: sqlite
+INTEGER
+
+-- name: INT ; db: pgsql
+INT
+
+-- name: VARCHAR ; db: mysql
+VARCHAR(255)
+
+-- name: VARCHAR ; db: sqlite
+VARCHAR(255)
+
+-- name: VARCHAR ; db: pgsql
+VARCHAR(255)
+
+-- name: DOUBLE ; db: mysql
+DOUBLE
+
+-- name: DOUBLE ; db: sqlite
+DOUBLE
+
+-- name: DOUBLE ; db: pgsql
+DOUBLE PRECISION
+
+-- name: TIMESTAMP ; db: mysql
+TIMESTAMP
+
+-- name: TIMESTAMP ; db: sqlite
+TIMESTAMP
+
+-- name: TIMESTAMP ; db: pgsql
+VARCHAR(255)
+
+
+-- name: create_accounts
 CREATE TABLE `accounts` (
-  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `profile_id` INT NOT NULL DEFAULT 0,
-  `username` VARCHAR( 255 ) NOT NULL DEFAULT '',
-  `password` VARCHAR( 255 ) NULL ,
-  `age` INT NOT NULL DEFAULT '10',
-  `height` DOUBLE NOT NULL DEFAULT '10.0',
-  `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
-  `birthday` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00'
+  `id` {{AUTOKEY}},
+  `profile_id` {{INT}} NOT NULL DEFAULT 0,
+  `username` {{VARCHAR}} NOT NULL DEFAULT '',
+  `password` {{VARCHAR}} NULL ,
+  `age` {{INT}} NOT NULL DEFAULT '10',
+  `height` {{DOUBLE}} NOT NULL DEFAULT '10.0',
+  `favorite_word` {{VARCHAR}} NULL DEFAULT 'hi',
+  `birthday` {{TIMESTAMP}} NOT NULL DEFAULT '0000-00-00 00:00:00'
 )
 
--- name: create_accounts ; db: sqlite
-CREATE TABLE `accounts` (
-  `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-  `profile_id` INTEGER NOT NULL DEFAULT 0,
-  `username` VARCHAR( 255 ) NOT NULL DEFAULT '',
-  `password` VARCHAR( 255 ) NULL ,
-  `age` INT NOT NULL DEFAULT '10',
-  `height` DOUBLE NOT NULL DEFAULT '10.0',
-  `favorite_word` VARCHAR( 255 ) NULL DEFAULT 'hi',
-  `birthday` TIMESTAMP NOT NULL DEFAULT '0000-00-00 00:00:00'
-)
-
--- name: create_accounts ; db: pgsql
-CREATE TABLE accounts (
-  id SERIAL PRIMARY KEY,
-  profile_id INT NOT NULL DEFAULT 0,
-  username VARCHAR( 255 ) NOT NULL DEFAULT '',
-  password VARCHAR( 255 ) NULL ,
-  age INT NOT NULL DEFAULT '10',
-  height DOUBLE PRECISION NOT NULL DEFAULT 10.0,
-  favorite_word VARCHAR( 255 ) NULL DEFAULT 'hi',
-  birthday VARCHAR( 255 ) NOT NULL DEFAULT '0000-00-00 00:00:00'
-)
-
--- name: create_persons ; db: mysql
+-- name: create_persons
 CREATE TABLE persons (
-  `id` int unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `employer_id` int unsigned NOT NULL DEFAULT 0,
-  `name` varchar(255) NOT NULL DEFAULT '',
-  `age` int unsigned NOT NULL DEFAULT 0,
-  `height` double unsigned NOT NULL DEFAULT 0,
-  `favorite_color` varchar(255) NULL,
-  `favorite_animaniacs` varchar(255) NOT NULL DEFAULT '',
-  `last_happy_moment` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-  `is_male` tinyint(1) NOT NULL DEFAULT 0,
-  `is_alive` tinyint(1) NULL,
-  `data` VARCHAR(255) NOT NULL DEFAULT ''
-) ENGINE = InnoDB
+  `id` {{AUTOKEY}},
+  `employer_id` {{INT}} unsigned NOT NULL DEFAULT 0,
+  `name` {{VARCHAR}} NOT NULL DEFAULT '',
+  `age` {{INT}} unsigned NOT NULL DEFAULT 0,
+  `height` {{DOUBLE}} unsigned NOT NULL DEFAULT 0,
+  `favorite_color` {{VARCHAR}} NULL,
+  `favorite_animaniacs` {{VARCHAR}} NOT NULL DEFAULT '',
+  `last_happy_moment` {{TIMESTAMP}} NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `is_male` {{INT}} NOT NULL DEFAULT 0,
+  `is_alive` {{INT}} NULL,
+  `data` {{VARCHAR}} NOT NULL DEFAULT ''
+)
 
--- name: create_houses ; db: mysql
+-- name: create_houses
 CREATE TABLE `houses` (
-  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `owner_id` INT NOT NULL DEFAULT 0,
-  `address` VARCHAR(255) NOT NULL DEFAULT '',
-  `sqft` INT NOT NULL DEFAULT 0,
-  `price` INT NOT NULL DEFAULT 0
+  `id` {{AUTOKEY}},
+  `owner_id` {{INT}} NOT NULL DEFAULT 0,
+  `address` {{VARCHAR}} NOT NULL DEFAULT '',
+  `sqft` {{INT}} NOT NULL DEFAULT 0,
+  `price` {{INT}} NOT NULL DEFAULT 0
 )
 
--- name: create_souls ; db: mysql
+-- name: create_souls
 CREATE TABLE `souls` (
-  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `person_id` INT NOT NULL DEFAULT 0,
-  `heaven_bound` tinyint(1) NOT NULL DEFAULT 0
+  `id` {{AUTOKEY}},
+  `person_id` {{INT}} NOT NULL DEFAULT 0,
+  `heaven_bound` {{INT}} NOT NULL DEFAULT 0
 )
 
--- name: create_companies ; db: mysql
+-- name: create_companies
 CREATE TABLE `companies` (
-  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `name` VARCHAR(255) NOT NULL DEFAULT '',
-  `shares` INT NOT NULL DEFAULT 0
+  `id` {{AUTOKEY}},
+  `name` {{VARCHAR}} NOT NULL DEFAULT '',
+  `shares` {{INT}} NOT NULL DEFAULT 0
 )
 
--- name: create_profile ; db: mysql
+-- name: create_profile
 CREATE TABLE `profile` (
-  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  `signature` VARCHAR( 255 ) NULL DEFAULT 'donewriting'
-)
-
--- name: create_profile ; db: sqlite
-CREATE TABLE `profile` (
-  `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-  `signature` VARCHAR( 255 ) NULL DEFAULT 'donewriting'
-)
-
--- name: create_profile ; db: pgsql
-CREATE TABLE profile (
-  id SERIAL PRIMARY KEY,
-  signature VARCHAR( 255 ) NULL DEFAULT 'donewriting'
+  id {{AUTOKEY}},
+  signature {{VARCHAR}} NULL DEFAULT 'donewriting'
 )
 
 -- name: create_store ; db: mysql

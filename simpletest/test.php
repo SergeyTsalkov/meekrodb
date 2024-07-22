@@ -60,20 +60,33 @@ class SimpleTest {
     $this->data = $data;
   }
 
-  protected function get_sql($name) {
+  public function get_sql($name) {
     if (is_null($this->data)) $this->init_sqlstore();
 
+    $contents = null;
     $search = array('name' => $name, 'db' => $this->db_type);
     foreach ($this->data as $entry) {
       foreach ($search as $key => $value) {
-        if (! array_key_exists($key, $entry)) continue 2;
+        if (! array_key_exists($key, $entry)) continue;
         if ($entry[$key] != $value) continue 2;
       }
 
-      return $entry['contents'];
+      $contents = $entry['contents'];
+      break;
     }
 
-    throw new Exception("Unable to find sql");
+    if (! $contents) {
+      throw new Exception("Unable to find sql: $name");
+    }
+
+    if (preg_match_all('/{{(\w+)}}/', $contents, $matches)) {
+      $matches = array_unique($matches[1]);
+      foreach ($matches as $match) {
+        $contents = str_replace('{{' . $match . '}}', $this->get_sql($match), $contents);
+      }
+    }
+
+    return $contents;
   }
 
   protected function fail($msg = '') {
