@@ -555,7 +555,7 @@ class MeekroORMTable {
   function primary_keys() {
     return array_keys(array_filter(
       $this->struct, 
-      function($x) { return $x['Key'] == 'PRI'; }
+      function($x) { return $x->is_primary; }
     ));
   }
 
@@ -568,14 +568,69 @@ class MeekroORMTable {
   }
 
   function ai_field() {
-    $data = array_filter($this->struct, function($x) { return $x['Extra'] == 'auto_increment'; });
-    if (! $data) return null;
-    $data = array_values($data);
-    return $data[0]['Field'];
+    $names = array_keys(array_filter($this->struct, function($x) { return $x->is_autoincrement; }));
+    return $names ? $names[0] : null;
   }
 
   function column_type($column) {
+    if (! $this->has($column)) return;
+    return $this->struct[$column]->simpletype;
+  }
+
+  function column_nullable($column) {
+    if (! $this->has($column)) return;
+    return $this->struct[$column]->is_nullable;
+  }
+
+  function has($column) {
+    return array_key_exists($column, $this->struct);
+  }
+
+  protected function table_struct() {
+    $mdb = $this->class_name::_orm_meekrodb();
+    $db_type = $mdb->db_type();
+    $data = $mdb->columnList($this->table_name);
+
+    if ($db_type == 'mysql') return $this->table_struct_mysql($data);
+    else if ($db_type == 'sqlite') return $this->table_struct_sqlite($data);
+    else if ($db_type == 'pgsql') return $this->table_struct_pgsql($data);
+    else throw new MeekroORMException("Unsupported database type: {$db_type}");
+  }
+
+  protected function table_struct_mysql($data) {
+    $struct = [];
+    foreach ($data as $name => $hash) {
+      $Column = new MeekroORMColumn();
+      $Column->name = $name;
+      $Column->is_nullable = ($hash['null'] == 'YES');
+      $Column->is_primary = ($hash['key'] == 'PRI');
+      $Column->is_autoincrement = (($hash['extra'] ?? '') == 'auto_increment');
+      $Column->type = $hash['type'];
+      $Column->simpletype = $this->table_struct_simpletype($hash['type']);
+      $struct[$name] = $Column;
+    }
+
+    return $struct;
+  }
+
+  protected function table_struct_sqlite($data) {
+    $struct = [];
+    foreach ($data as $name => $hash) {
+      $Column = new MeekroORMColumn();
+      $Column->name = $name;
+      $Column->is_nullable = ($hash['notnull'] == 0);
+      $Column->is_primary = ($hash['pk'] == 1);
+      $Column->type = $hash['type'];
+      $Column->simpletype = $this->table_struct_simpletype($hash['type']);
+      $Column->is_autoincrement = ($Column->simpletype == 'int' && $Column->is_primary);
+      $struct[$name] = $Column;
+    }
+    return $struct;
+  }
+
+  protected function table_struct_simpletype($type) {
     static $typemap = [
+      // mysql
       'tinyint' => 'int',
       'smallint' => 'int',
       'mediumint' => 'int',
@@ -586,35 +641,25 @@ class MeekroORMTable {
       'decimal' => 'double',
       'datetime' => 'datetime',
       'timestamp' => 'datetime',
+
+      // sqlite
+      'integer' => 'int',
     ];
 
-    if (! $this->has($column)) return;
-    $type = strtolower($this->struct[$column]['Type'][0]);
-    return $typemap[$type] ?? 'string';
+    $type = strtolower($type);
+    $parts = preg_split('/\W+/', $type, -1, PREG_SPLIT_NO_EMPTY);
+    return $typemap[$parts[0]] ?? 'string';
   }
 
-  function column_nullable($column) {
-    if (! $this->has($column)) return;
-    $type = strtolower($this->struct[$column]['Null']);
-    return $type == 'yes';
-  }
+}
 
-  function has($column) {
-    return array_key_exists($column, $this->struct);
-  }
-
-  protected function table_struct() {
-    $mdb = $this->class_name::_orm_meekrodb();
-    $table = $mdb->query("DESCRIBE %b", $this->table_name);
-    $struct = [];
-    
-    foreach ($table as $row) {
-      $row['Type'] = preg_split('/\W+/', $row['Type'], -1, PREG_SPLIT_NO_EMPTY);
-      $struct[$row['Field']] = $row;
-    }
-    return $struct;
-  }
-
+class MeekroORMColumn {
+  public $name;
+  public $type;
+  public $simpletype;
+  public $is_primary;
+  public $is_nullable;
+  public $is_autoincrement;
 }
 
 class MeekroORMScope implements ArrayAccess, Iterator, Countable {
