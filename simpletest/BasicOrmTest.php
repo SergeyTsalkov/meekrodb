@@ -67,7 +67,6 @@ class Company extends MeekroORM {
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: can load() table with multiple primary keys?
 // TODO: test with sqlite, pgsql
-// TODO: drop lock(), FOR UPDATE, etc?
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -77,8 +76,8 @@ class BasicOrmTest extends SimpleTest {
   }
 
   // * can create basic Person objects and save them
-  // * can use ::Load() to look up an object with a simple primary key
-  // * can use ::Search() to look up an object by string match
+  // * can use Load() to look up an object with a simple primary key
+  // * can use Search() and SearchMany() with either hash or query match
   function test_1_basic() {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
@@ -149,6 +148,17 @@ class BasicOrmTest extends SimpleTest {
 
     $Person = Person::Search(['name' => 'Gavin']);
     $this->assert($Person->age === 15);
+
+    $Person = Person::Search("SELECT * FROM %b WHERE name=%s", 'persons', 'Gavin');
+    $this->assert($Person->age === 15);
+
+    $Persons = Person::SearchMany(['name' => 'Gavin']);
+    $this->assert(count($Persons) === 1);
+    $this->assert($Persons[0]->age === 15);
+
+    $Persons = Person::SearchMany("SELECT * FROM %b WHERE age>12 AND age<20 ORDER BY id", 'persons');
+    $this->assert(count($Persons) === 2);
+    $this->assert($Persons[0]->name === 'Ellie');
   }
 
   // * update() works, both with a hash and with a single key/value combo

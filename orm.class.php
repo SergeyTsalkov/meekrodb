@@ -339,41 +339,31 @@ abstract class MeekroORM {
     return static::Search(array_combine($keys, $values));
   }
 
-  protected static function _orm_query_from_hash(array $hash, $one, $lock=false) {
-    $query = "SELECT * FROM %b WHERE %ha";
-    if ($one) $query .= " LIMIT 1";
-    if ($lock) $query .= " FOR UPDATE";
-
-    return array($query, static::_orm_tablename(), $hash);
-  }
-
-  public static function Search() {
+  public static function Search($query, ...$args) {
     // infer the table structure first in case we run FOUND_ROWS()
     static::_orm_struct();
-
-    $args = func_get_args();
-    if (is_array($args[0])) {
-      $opts_default = array('lock' => false);
-      $opts = isset($args[1]) && is_array($args[1]) ? $args[1] : array();
-      $opts = array_merge($opts_default, $opts);
-
-      $args = static::_orm_query_from_hash($args[0], true, $opts['lock']);
+    
+    if (is_array($query)) {
+      $args = [static::_orm_tablename(), $query];
+      $query = "SELECT * FROM %b WHERE %ha LIMIT 1";
     }
 
-    $row = static::_orm_meekrodb()->queryFirstRow(...$args);
+    $row = static::_orm_meekrodb()->queryFirstRow($query, ...$args);
     if (is_array($row)) return static::LoadFromHash($row);
     else return null;
   }
 
-  public static function SearchMany() {
+  public static function SearchMany($query, ...$args) {
     // infer the table structure first in case we run FOUND_ROWS()
     static::_orm_struct();
 
-    $args = func_get_args();
-    if (is_array($args[0])) $args = static::_orm_query_from_hash($args[0], false);
+    if (is_array($query)) {
+      $args = [static::_orm_tablename(), $query];
+      $query = "SELECT * FROM %b WHERE %ha";
+    }
     
     $result = [];
-    $rows = static::_orm_meekrodb()->query(...$args);
+    $rows = static::_orm_meekrodb()->query($query, ...$args);
     if (is_array($rows)) {
       foreach ($rows as $row) {
         $result[] = static::LoadFromHash($row);
@@ -493,7 +483,8 @@ abstract class MeekroORM {
 
     $mdb = static::_orm_meekrodb();
     $table = static::_orm_tablename();
-    $row = $mdb->queryFirstRow("SELECT * FROM %b WHERE %l LIMIT 1", $table, $this->_where());
+    $row = $mdb->queryFirstRow("SELECT * FROM %b WHERE %l LIMIT 1 %l", 
+      $table, $this->_where(), $lock ? 'FOR UPDATE' : '');
 
     if (! $row) {
       throw new MeekroORMException("Unable to reload(): missing row");
