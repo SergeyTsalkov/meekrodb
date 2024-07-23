@@ -34,6 +34,18 @@ abstract class MeekroORM {
 
   public static function _orm_meekrodb() { return DB::getMDB(); }
 
+  // use for internal queries, since we don't know what the user's param_char is
+  protected static function _orm_query($func_name, ...$args) {
+    $mdb = static::_orm_meekrodb();
+    $old_char = $mdb->param_char;
+    $mdb->param_char = ':';
+    try {
+      return $mdb->$func_name(...$args);
+    } finally {
+      $mdb->param_char = $old_char;
+    }
+  }
+
   public function dirtyhash() {
     $hash = [];
     foreach ($this->toRawHash() as $key => $value) {
@@ -57,15 +69,13 @@ abstract class MeekroORM {
     return array_keys($this->_dirtyhash($fields));
   }
 
-  protected function _where() {
-    $where = new WhereClause('and');
+  protected function _whereHash() {
+    $hash = [];
     $primary_keys = static::_orm_struct()->primary_keys();
-
     foreach ($primary_keys as $key) {
-      $where->add('%c = %?', $key, $this->getraw($key));
+      $hash[$key] = $this->getraw($key);
     }
-    
-    return $where;
+    return $hash;
   }
 
   private function _orm_run_callback($func_name, ...$args) {
@@ -301,7 +311,7 @@ abstract class MeekroORM {
       ]);
     }
     else if ($assoc['type'] == 'has_many') {
-      return $class_name::Where('%c=%?', $assoc['foreign_key'], $primary_value);
+      return $class_name::Where([$assoc['foreign_key'] => $primary_value]);
     }
     else {
       throw new Exception("Invalid type for $name association");
@@ -346,11 +356,13 @@ abstract class MeekroORM {
     static::_orm_struct();
     
     if (is_array($query)) {
-      $args = [static::_orm_tablename(), $query];
-      $query = "SELECT * FROM %b WHERE %ha LIMIT 1";
+      $row = static::_orm_query('queryFirstRow', 'SELECT * FROM :b WHERE :ha LIMIT 1', 
+        static::_orm_tablename(), $query);
+    }
+    else {
+      $row = static::_orm_meekrodb()->queryFirstRow($query, ...$args);
     }
 
-    $row = static::_orm_meekrodb()->queryFirstRow($query, ...$args);
     if (is_array($row)) return static::LoadFromHash($row);
     else return null;
   }
@@ -360,12 +372,14 @@ abstract class MeekroORM {
     static::_orm_struct();
 
     if (is_array($query)) {
-      $args = [static::_orm_tablename(), $query];
-      $query = "SELECT * FROM %b WHERE %ha";
+      $rows = static::_orm_query('query', 'SELECT * FROM :b WHERE :ha', 
+        static::_orm_tablename(), $query);
+    }
+    else {
+      $rows = static::_orm_meekrodb()->query($query, ...$args);
     }
     
     $result = [];
-    $rows = static::_orm_meekrodb()->query($query, ...$args);
     if (is_array($rows)) {
       foreach ($rows as $row) {
         $result[] = static::LoadFromHash($row);
@@ -451,7 +465,7 @@ abstract class MeekroORM {
         }
       }
       else if (count($replace) > 0) {
-        $mdb->update($table, $replace, "%l", $this->_where());
+        $mdb->update($table, $replace, $this->_whereHash());
       }
       
       // don't reload if we did a partial save only
@@ -483,10 +497,9 @@ abstract class MeekroORM {
       throw new MeekroORMException("Can't reload unsaved record!");
     }
 
-    $mdb = static::_orm_meekrodb();
     $table = static::_orm_tablename();
-    $row = $mdb->queryFirstRow("SELECT * FROM %b WHERE %l LIMIT 1 %l", 
-      $table, $this->_where(), $lock ? 'FOR UPDATE' : '');
+    $row = static::_orm_query('queryFirstRow', 'SELECT * FROM :b WHERE :ha LIMIT 1 :l', 
+      $table, $this->_whereHash(), $lock ? 'FOR UPDATE' : '');
 
     if (! $row) {
       throw new MeekroORMException("Unable to reload(): missing row");
@@ -516,7 +529,7 @@ abstract class MeekroORM {
 
     try {
       $this->_orm_run_callback('_pre_destroy');
-      $mdb->query("DELETE FROM %b WHERE %l LIMIT 1", static::_orm_tablename(), $this->_where());
+      static::_orm_query('query', 'DELETE FROM :b WHERE :ha LIMIT 1', static::_orm_tablename(), $this->_whereHash());
       $this->_orm_run_callback('_post_destroy');
       $mdb->commit();
       $have_committed = true;
@@ -718,7 +731,12 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     $this->Objects = null;
     $this->position = 0;
 
-    $this->Where->add(...$args);
+    if (is_array($args[0])) {
+      $this->Where->add($this->query_cleanup(':ha'), $args[0]);
+    } else {
+      $this->Where->add(...$args);
+    }
+    
     return $this;
   }
 
@@ -768,20 +786,20 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   protected function run() {
     $table_name = $this->class_name::_orm_tablename();
 
-    $query = 'SELECT * FROM %b WHERE %l';
+    $query = 'SELECT * FROM :b WHERE :l';
     $args = [$table_name, $this->Where];
 
     if (count($this->order_by) > 0) {
       // array_is_list
       if ($this->order_by == array_values($this->order_by)) {
-        $c_string = array_fill(0, count($this->order_by), '%c');
+        $c_string = array_fill(0, count($this->order_by), ':c');
         $query .= ' ORDER BY ' . implode(',', $c_string);
         $args = array_merge($args, array_values($this->order_by));
       }
       else {
         $c_string = [];
         foreach ($this->order_by as $column => $order) {
-          $c_string[] = '%c ' . (strtolower($order) == 'desc' ? 'desc' : 'asc');
+          $c_string[] = ':c ' . (strtolower($order) == 'desc' ? 'desc' : 'asc');
         }
         $query .= ' ORDER BY ' . implode(',', $c_string);
         $args = array_merge($args, array_keys($this->order_by));
@@ -797,6 +815,7 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
       }
     }
 
+    $query = $this->query_cleanup($query);
     $this->Objects = $this->class_name::SearchMany($query, ...$args);
     return $this->Objects;
   }
@@ -804,6 +823,11 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   protected function run_if_missing() {
     if (is_array($this->Objects)) return;
     return $this->run();
+  }
+
+  protected function query_cleanup($query) {
+    $param_char = $this->class_name::_orm_meekrodb()->param_char;
+    return str_replace(':', $param_char, $query);
   }
 
   #[\ReturnTypeWillChange]

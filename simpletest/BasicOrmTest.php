@@ -18,7 +18,7 @@ class Person extends MeekroORM {
       'living' => function() { return self::where('is_alive=1'); },
       'male' => function() { return self::where('is_male=1'); },
       'female' => function() { return self::where('is_male=0'); },
-      'teenager' => function() { return self::where('age>%i AND age<%i', 12, 20); },
+      'teenager' => function() { return self::where('age>@i AND age<@i', 12, 20); },
       'first_teenager' => function() { return self::scope('teenager')->order_by('id')->limit(1); }
     ];
   }
@@ -46,7 +46,7 @@ class Person extends MeekroORM {
 class House extends MeekroORM {
   static function _orm_scopes() {
     return [
-      'over' => function($over) { return self::where('price >= %i', $over); },
+      'over' => function($over) { return self::where('price >= @i', $over); },
     ];
   }
 }
@@ -66,12 +66,14 @@ class Company extends MeekroORM {
 
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: can load() table with multiple primary keys?
-// TODO: shared mdb instance works even when param_char is not %
+// TODO: test destroy()
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
+    DB::$param_char = '@';
+
     foreach (DB::tableList() as $table) {
-      DB::query("DROP TABLE %b", $table);
+      DB::query("DROP TABLE @b", $table);
     }
   }
 
@@ -149,14 +151,14 @@ class BasicOrmTest extends SimpleTest {
     $Person = Person::Search(['name' => 'Gavin']);
     $this->assert($Person->age === 15);
 
-    $Person = Person::Search("SELECT * FROM %b WHERE name=%s", 'persons', 'Gavin');
+    $Person = Person::Search("SELECT * FROM @b WHERE name=@s", 'persons', 'Gavin');
     $this->assert($Person->age === 15);
 
     $Persons = Person::SearchMany(['name' => 'Gavin']);
     $this->assert(count($Persons) === 1);
     $this->assert($Persons[0]->age === 15);
 
-    $Persons = Person::SearchMany("SELECT * FROM %b WHERE age>12 AND age<20 ORDER BY id", 'persons');
+    $Persons = Person::SearchMany("SELECT * FROM @b WHERE age>12 AND age<20 ORDER BY id", 'persons');
     $this->assert(count($Persons) === 2);
     $this->assert($Persons[0]->name === 'Ellie');
   }
