@@ -66,7 +66,7 @@ class Company extends MeekroORM {
 
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: can load() table with multiple primary keys?
-// TODO: test with sqlite, pgsql
+// TODO: shared mdb instance works even when param_char is not %
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -256,7 +256,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * can load and save a timestamp
   function test_3_timestamp() {
-    $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '0000-00-00 00:00:00');
+    $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '1970-01-01 00:00:00');
 
     $Person = Person::Load(1);
     $this->assert($Person->last_happy_moment == $zerodate);
@@ -273,7 +273,7 @@ class BasicOrmTest extends SimpleTest {
     $Person->Save();
     $Person = Person::Load(1);
     $this->assert($Person->last_happy_moment == $zerodate);
-    $Person->last_happy_moment = '0000-00-00 00:00:00';
+    $Person->last_happy_moment = '1970-01-01 00:00:00';
     $Person->Save();
     $Person = Person::Load(1);
     $this->assert($Person->last_happy_moment == $zerodate);

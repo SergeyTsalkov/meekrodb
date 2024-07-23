@@ -196,7 +196,7 @@ class BasicTest extends SimpleTest {
       $date2 = DB::queryFirstField("SELECT strftime('%m/%d/%Y', '2009-10-04 22:23:00')");
     }
     else if ($this->db_type == 'pgsql') {
-      $date = DB::queryFirstField("SELECT TO_CHAR(TO_TIMESTAMP(birthday, 'YYYY-MM-DD HH24:MI:SS'), 'MM/DD/YYYY') FROM accounts WHERE username=%s", "Charlie's Friend");
+      $date = DB::queryFirstField("SELECT TO_CHAR(birthday, 'MM/DD/YYYY') FROM accounts WHERE username=%s", "Charlie's Friend");
       $date2 = DB::queryFirstField("SELECT TO_CHAR(TIMESTAMP '2009-10-04 22:23:00', 'MM/DD/YYYY')");
     }
     else {

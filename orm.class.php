@@ -210,7 +210,9 @@ abstract class MeekroORM {
   }
 
   public function _marshal_type_datetime($key, $value, $is_nullable) {
-    if (!$is_nullable && is_null($value)) $value = '0000-00-00 00:00:00';
+    // 0000-00-00 00:00:00 is technically not a valid date, and pgsql rejects it
+    // so lets use 1970-01-01 as default
+    if (!$is_nullable && is_null($value)) $value = '1970-01-01 00:00:00';
     if ($value instanceof \DateTime) return $value->format('Y-m-d H:i:s');
     return $value;
   }
@@ -586,10 +588,13 @@ class MeekroORMTable {
     return array_key_exists($column, $this->struct);
   }
 
+  function mdb() {
+    return $this->class_name::_orm_meekrodb();
+  }
+
   protected function table_struct() {
-    $mdb = $this->class_name::_orm_meekrodb();
-    $db_type = $mdb->db_type();
-    $data = $mdb->columnList($this->table_name);
+    $db_type = $this->mdb()->db_type();
+    $data = $this->mdb()->columnList($this->table_name);
 
     if ($db_type == 'mysql') return $this->table_struct_mysql($data);
     else if ($db_type == 'sqlite') return $this->table_struct_sqlite($data);
@@ -628,6 +633,39 @@ class MeekroORMTable {
     return $struct;
   }
 
+  protected function table_struct_pgsql($data) {
+    $struct = [];
+    foreach ($data as $name => $hash) {
+      $Column = new MeekroORMColumn();
+      $Column->name = $name;
+      $Column->is_nullable = ($hash['is_nullable'] == 'YES');
+      $Column->type = $hash['data_type'];
+      $Column->simpletype = $this->table_struct_simpletype($Column->type);
+      $Column->is_autoincrement = ($hash['column_default'] && substr($hash['column_default'], 0, 8) == 'nextval(');
+      $Column->is_primary = false;
+      $struct[$name] = $Column;
+    }
+
+    $primary_keys = $this->mdb()->queryFirstColumn("
+      SELECT kcu.column_name
+      FROM information_schema.table_constraints tc
+      JOIN 
+        information_schema.key_column_usage kcu
+        ON tc.constraint_name = kcu.constraint_name
+        AND tc.table_schema = kcu.table_schema
+      WHERE
+        tc.constraint_type = 'PRIMARY KEY'
+        AND tc.table_name = %s
+        AND tc.table_schema = 'public';
+    ", $this->table_name);
+
+    foreach ($primary_keys as $primary_key) {
+      $struct[$primary_key]->is_primary = true;
+    }
+
+    return $struct;
+  }
+
   protected function table_struct_simpletype($type) {
     static $typemap = [
       // mysql
@@ -642,7 +680,7 @@ class MeekroORMTable {
       'datetime' => 'datetime',
       'timestamp' => 'datetime',
 
-      // sqlite
+      // sqlite, pgsql
       'integer' => 'int',
     ];
 

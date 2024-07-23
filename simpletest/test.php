@@ -113,16 +113,16 @@ $contexts = array();
 require_once __DIR__ . '/test_setup.php'; //test config values go here
 
 $classes_to_test = array(
-  // 'BasicTest',
-  // 'UpsertTest',
-  // 'BadStringsTest',
-  // 'MultiDbTest',
-  // 'WalkTest',
-  // 'CallTest',
-  // 'WhereClauseTest',
-  // 'ObjectTest',
-  // 'HookTest',
-  // 'TransactionTest',
+  'BasicTest',
+  'UpsertTest',
+  'BadStringsTest',
+  'MultiDbTest',
+  'WalkTest',
+  'CallTest',
+  'WhereClauseTest',
+  'ObjectTest',
+  'HookTest',
+  'TransactionTest',
   'BasicOrmTest',
 );
 
