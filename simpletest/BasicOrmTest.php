@@ -66,7 +66,6 @@ class Company extends MeekroORM {
 
 // TODO: do auto-increment without primary key (and vice-versa) columns still work?
 // TODO: can load() table with multiple primary keys?
-// TODO: test destroy()
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -184,6 +183,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * can save an empty record
   // * can reload() an object to undo pending changes
+  // * can destroy() an object
   function test_2_empty() {
     $Person = new Person();
     $Person->Save();
@@ -194,6 +194,10 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->age === 1);
     $Person->reload();
     $this->assert($Person->age === 0);
+
+    $Person->Destroy();
+    $Person = Person::Search(['name' => '']);
+    $this->assert($Person === null);
   }
 
   // * _pre_save returning false throws exception
