@@ -526,10 +526,11 @@ abstract class MeekroORM {
   public function destroy() {
     $mdb = static::_orm_meekrodb();
     $mdb->startTransaction();
+    $have_committed = false;
 
     try {
       $this->_orm_run_callback('_pre_destroy');
-      static::_orm_query('query', 'DELETE FROM :b WHERE :ha LIMIT 1', static::_orm_tablename(), $this->_whereHash());
+      static::_orm_query('query', 'DELETE FROM :b WHERE :ha', static::_orm_tablename(), $this->_whereHash());
       $this->_orm_run_callback('_post_destroy');
       $mdb->commit();
       $have_committed = true;
