@@ -72,6 +72,9 @@ abstract class MeekroORM {
   protected function _whereHash() {
     $hash = [];
     $primary_keys = static::_orm_struct()->primary_keys();
+    if (! $primary_keys) {
+      throw new MeekroORMException("$this has no primary keys");
+    }
     foreach ($primary_keys as $key) {
       $hash[$key] = $this->getraw($key);
     }
