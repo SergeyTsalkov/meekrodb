@@ -64,8 +64,9 @@ class Company extends MeekroORM {
 
 }
 
-// TODO: do auto-increment without primary key (and vice-versa) columns still work?
-// TODO: can load() table with multiple primary keys?
+class Assignment extends MeekroORM {
+
+}
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
@@ -79,11 +80,13 @@ class BasicOrmTest extends SimpleTest {
   // * can create basic Person objects and save them
   // * can use Load() to look up an object with a simple primary key
   // * can use Search() and SearchMany() with either hash or query match
+  // * can Load() with multiple primary keys
   function test_1_basic() {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
     DB::query($this->get_sql('create_souls'));
     DB::query($this->get_sql('create_companies'));
+    DB::query($this->get_sql('create_assignments'));
 
     $Person = new Person();
     $Person->name = 'Nick';
@@ -120,6 +123,12 @@ class BasicOrmTest extends SimpleTest {
     $Person->employer_id = $Company->id;
     $Person->Save();
 
+    $Assignment = new Assignment();
+    $Assignment->person_id = $Person->id;
+    $Assignment->company_id = $Company->id;
+    $Assignment->name = 'Big Boss';
+    $Assignment->Save();
+
     $Person = new Person();
     $Person->name = 'Ellie';
     $Person->age = 17;
@@ -144,6 +153,18 @@ class BasicOrmTest extends SimpleTest {
     $Person->is_male = false;
     $Person->Save();
 
+    $Company = new Company();
+    $Company->name = 'Dead Company Walking';
+    $Company->Save();
+    $Person->employer_id = $Company->id;
+    $Person->Save();
+
+    $Assignment = new Assignment();
+    $Assignment->person_id = $Person->id;
+    $Assignment->company_id = $Company->id;
+    $Assignment->name = 'Trash Guy';
+    $Assignment->Save();
+
     $Person = Person::Load(1);
     $this->assert($Person->age === 23);
 
@@ -160,6 +181,13 @@ class BasicOrmTest extends SimpleTest {
     $Persons = Person::SearchMany("SELECT * FROM @b WHERE age>12 AND age<20 ORDER BY id", 'persons');
     $this->assert(count($Persons) === 2);
     $this->assert($Persons[0]->name === 'Ellie');
+
+    $Assignment = Assignment::Load(1, 1);
+    $this->assert($Assignment->name === 'Big Boss');
+
+    $Person = Person::Search(['name' => 'Abigail']);
+    $Assignment = Assignment::Load($Person->id, $Person->employer_id);
+    $this->assert($Assignment->name === 'Trash Guy');
   }
 
   // * update() works, both with a hash and with a single key/value combo

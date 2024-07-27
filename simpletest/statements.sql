@@ -76,6 +76,14 @@ CREATE TABLE companies (
   shares {{INT}} NOT NULL DEFAULT 0
 )
 
+-- name: create_assignments
+CREATE TABLE assignments (
+  person_id {{INT}} NOT NULL DEFAULT 0,
+  company_id {{INT}} NOT NULL DEFAULT 0,
+  name VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (person_id, company_id)
+)
+
 -- name: create_profile
 CREATE TABLE profile (
   id {{AUTOKEY}},
