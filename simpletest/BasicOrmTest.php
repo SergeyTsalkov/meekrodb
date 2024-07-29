@@ -81,7 +81,7 @@ class BasicOrmTest extends SimpleTest {
   // * can use Load() to look up an object with a simple primary key
   // * can use Search() and SearchMany() with either hash or query match
   // * can Load() with multiple primary keys
-  function test_1_basic() {
+  function test_01_basic() {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
     DB::query($this->get_sql('create_souls'));
@@ -191,14 +191,14 @@ class BasicOrmTest extends SimpleTest {
   }
 
   // * can SELECT with extra, virtual columns
-  function test_2_extra() {
+  function test_02_extra() {
     $Person = Person::Search("SELECT *, age+1 as nextage FROM persons WHERE id=1");
     $this->assert($Person->name === 'Nick');
     $this->assert($Person->nextage === '24');
   }
 
   // * update() works, both with a hash and with a single key/value combo
-  function test_2_update() {
+  function test_03_update() {
     $Person = Person::Load(1);
     $this->assert($Person->age === 23);
 
@@ -219,7 +219,7 @@ class BasicOrmTest extends SimpleTest {
   // * can save an empty record
   // * can reload() an object to undo pending changes
   // * can destroy() an object
-  function test_2_empty() {
+  function test_04_empty() {
     $Person = new Person();
     $Person->Save();
 
@@ -237,7 +237,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * _pre_save returning false throws exception
   // * _pre_save can add a dirty field
-  function test_2_presave() {
+  function test_05_presave() {
     $error = '';
     try {
       $Person = new Person();
@@ -259,7 +259,7 @@ class BasicOrmTest extends SimpleTest {
   // * can search for Person by int value
   // * bool value is marshalled and unmarshalled correctly
   // * toHash() works
-  function test_2_bool() {
+  function test_06_bool() {
     $Person = Person::Search(['age' => 17]);
     $this->assert($Person->name === 'Ellie');
     $this->assert($Person->is_alive === true);
@@ -278,7 +278,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * can use Search() to load entry with extra fields
   // * can use dirtyhash() to see modified properties
-  function test_3_extravars() {
+  function test_07_extravars() {
     $Person = Person::Search("SELECT *, age+1 AS nextyear FROM persons WHERE age = 17");
     $this->assert($Person->name === 'Ellie');
     $this->assert($Person->is_alive === true);
@@ -296,7 +296,7 @@ class BasicOrmTest extends SimpleTest {
   }
 
   // * can load and save a timestamp
-  function test_3_timestamp() {
+  function test_08_timestamp() {
     $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '1970-01-01 00:00:00');
 
     $Person = Person::Load(1);
@@ -322,7 +322,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * json type can be used/loaded/saved
   // * json type can be appended to with "var[] = val"
-  function test_31_json() {
+  function test_09_json() {
     $Person = Person::Load(1);
     $Person->data = [1,3,5];
     $Person->Save();
@@ -338,7 +338,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * NULL values can be set to either NULL, or empty string, and those are different
   // * NOT NULL values will be set to empty string (or equivalent) when we try to null them
-  function test_4_null() {
+  function test_10_null() {
     $Person = Person::Search(['name' => 'Nick']);
     $this->assert($Person->favorite_color === 'blue');
     $this->assert($Person->favorite_animaniacs === 'Yakko');
@@ -377,7 +377,7 @@ class BasicOrmTest extends SimpleTest {
     $Person->Save();
   }
 
-  function test_5_scope() {
+  function test_11_scope() {
     $Living = Person::scope('living');
     $this->assert(count($Living) === 3);
 
@@ -402,7 +402,7 @@ class BasicOrmTest extends SimpleTest {
   // * has_many: no results means empty scope/array
   // * has_one: assocs properly loaded only once
   // * belongs_to: class_name works
-  function test_6_assoc() {
+  function test_12_assoc() {
     $Person = Person::Search(['name' => 'Nick']);
     $Houses = $Person->House->order_by('price');
 
