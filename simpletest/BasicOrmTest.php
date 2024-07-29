@@ -190,6 +190,13 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Assignment->name === 'Trash Guy');
   }
 
+  // * can SELECT with extra, virtual columns
+  function test_2_extra() {
+    $Person = Person::Search("SELECT *, age+1 as nextage FROM persons WHERE id=1");
+    $this->assert($Person->name === 'Nick');
+    $this->assert($Person->nextage === '24');
+  }
+
   // * update() works, both with a hash and with a single key/value combo
   function test_2_update() {
     $Person = Person::Load(1);
