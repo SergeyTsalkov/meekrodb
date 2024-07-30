@@ -354,41 +354,41 @@ abstract class MeekroORM {
     return static::Search(array_combine($keys, $values));
   }
 
-  public static function Search($query, ...$args) {
-    // infer the table structure first in case we run FOUND_ROWS()
-    static::_orm_struct();
-    
-    if (is_array($query)) {
-      $row = static::_orm_query('queryFirstRow', 'SELECT * FROM :b WHERE :ha LIMIT 1', 
-        static::_orm_tablename(), $query);
-    }
-    else {
-      $row = static::_orm_meekrodb()->queryFirstRow($query, ...$args);
-    }
-
-    if (is_array($row)) return static::LoadFromHash($row);
-    else return null;
-  }
-
-  public static function SearchMany($query, ...$args) {
+  private static function _Search($many, $query, ...$args) {
     // infer the table structure first in case we run FOUND_ROWS()
     static::_orm_struct();
 
     if (is_array($query)) {
-      $rows = static::_orm_query('query', 'SELECT * FROM :b WHERE :ha', 
-        static::_orm_tablename(), $query);
+      $table = static::_orm_tablename();
+      $limiter = $many ? '' : 'LIMIT 1';
+
+      if ($query) {
+        $rows = static::_orm_query('query', 'SELECT * FROM :b WHERE :ha :l', $table, $query, $limiter);
+      } else {
+        $rows = static::_orm_query('query', 'SELECT * FROM :b :l', $table, $limiter);
+      }
     }
     else {
       $rows = static::_orm_meekrodb()->query($query, ...$args);
     }
-    
-    $result = [];
-    if (is_array($rows)) {
-      foreach ($rows as $row) {
-        $result[] = static::LoadFromHash($row);
-      }
+
+    if (! $rows) {
+      return $many ? [] : null;
     }
-    return $result;
+
+    $rows = array_map(function ($row) {
+      return static::LoadFromHash($row);
+    }, $rows);
+
+    return $many ? $rows : $rows[0];
+  }
+
+  public static function Search($query=[], ...$args) {
+    return static::_Search(false, $query, ...$args);
+  }
+
+  public static function SearchMany($query=[], ...$args) {
+    return static::_Search(true, $query, ...$args);
   }
 
   static function _orm_scopes() {

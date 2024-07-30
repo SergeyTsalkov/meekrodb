@@ -188,6 +188,13 @@ class BasicOrmTest extends SimpleTest {
     $Person = Person::Search(['name' => 'Abigail']);
     $Assignment = Assignment::Load($Person->id, $Person->employer_id);
     $this->assert($Assignment->name === 'Trash Guy');
+
+    // ORDER is not guaranteed here
+    $Person = Person::Search();
+    $this->assert($Person instanceof Person);
+
+    $Persons = Person::SearchMany();
+    $this->assert(count($Persons) === 4);
   }
 
   // * can SELECT with extra, virtual columns
