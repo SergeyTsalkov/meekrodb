@@ -2,7 +2,7 @@
 use Carbon\Carbon;
 
 class Person extends MeekroORM {
-  static $_orm_columns = [
+  static $_columns = [
     'is_alive' => ['type' => 'bool'],
     'is_male' => ['type' => 'bool'],
     'data' => ['type' => 'json'],
@@ -54,7 +54,7 @@ class House extends MeekroORM {
 class Soul extends MeekroORM {
   public $tmp;
 
-  static $_orm_columns = [
+  static $_columns = [
     'heaven_bound' => ['type' => 'bool'],
   ];
 }

@@ -11,7 +11,7 @@ abstract class MeekroORM {
   // (OPTIONAL) SET IN INHERITING CLASS
   protected static $_orm_tablename = null;
   protected static $_orm_associations = [];
-  protected static $_orm_columns = [];
+  protected static $_columns = [];
   protected static $_orm_scopes = [];
 
   // -------------- SIMPLE HELPER FUNCTIONS
@@ -253,10 +253,10 @@ abstract class MeekroORM {
   }
 
   public static function _orm_colinfo($column, $type) {
-    if (! is_array(static::$_orm_columns)) return;
-    if (! array_key_exists($column, static::$_orm_columns)) return;
+    if (! is_array(static::$_columns)) return;
+    if (! array_key_exists($column, static::$_columns)) return;
 
-    $info = static::$_orm_columns[$column];
+    $info = static::$_columns[$column];
     return $info[$type] ?? null;
   }
 
