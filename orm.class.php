@@ -10,7 +10,7 @@ abstract class MeekroORM {
 
   // (OPTIONAL) SET IN INHERITING CLASS
   protected static $_orm_tablename = null;
-  protected static $_orm_associations = [];
+  protected static $_associations = [];
   protected static $_columns = [];
   protected static $_orm_scopes = [];
 
@@ -270,8 +270,8 @@ abstract class MeekroORM {
   // -------------- ASSOCIATIONS
   public static function is_assoc($name) { return !! static::_orm_assoc($name); }
   protected static function _orm_assoc($name) {
-    if (! array_key_exists($name, static::$_orm_associations)) return null;
-    $assoc = static::$_orm_associations[$name];
+    if (! array_key_exists($name, static::$_associations)) return null;
+    $assoc = static::$_associations[$name];
 
     if (! isset($assoc['foreign_key'])) {
       throw new MeekroORMException("assocation must have foreign_key");

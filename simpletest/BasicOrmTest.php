@@ -7,7 +7,7 @@ class Person extends MeekroORM {
     'is_male' => ['type' => 'bool'],
     'data' => ['type' => 'json'],
   ];
-  static $_orm_associations = [
+  static $_associations = [
     'House' => ['type' => 'has_many', 'foreign_key' => 'owner_id'],
     'Soul' => ['type' => 'has_one', 'foreign_key' => 'person_id'],
     'Employer' => ['type' => 'belongs_to', 'foreign_key' => 'employer_id', 'class_name' => 'Company'],
