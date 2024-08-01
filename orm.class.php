@@ -446,7 +446,7 @@ abstract class MeekroORM {
       if ($run_callbacks) {
         $fields = $this->_dirtyfields($savefields);
         foreach ($fields as $field) {
-          $this->_orm_run_callback("_validate_{$field}");
+          $this->_orm_run_callback("_validate_{$field}", $this->get($field));
         }
         
         $this->_orm_run_callback('_pre_save', $fields);
