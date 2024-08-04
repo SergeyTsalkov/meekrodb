@@ -13,7 +13,7 @@ class Person extends MeekroORM {
     'Employer' => ['type' => 'belongs_to', 'foreign_key' => 'employer_id', 'class_name' => 'Company'],
   ];
 
-  static function _orm_scopes() {
+  static function _scopes() {
     return [
       'living' => function() { return self::where('is_alive=1'); },
       'male' => function() { return self::where('is_male=1'); },
@@ -44,7 +44,7 @@ class Person extends MeekroORM {
 }
 
 class House extends MeekroORM {
-  static function _orm_scopes() {
+  static function _scopes() {
     return [
       'over' => function($over) { return self::where('price >= @i', $over); },
     ];

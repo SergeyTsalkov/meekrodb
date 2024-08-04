@@ -12,7 +12,6 @@ abstract class MeekroORM {
   protected static $_orm_tablename = null;
   protected static $_associations = [];
   protected static $_columns = [];
-  protected static $_orm_scopes = [];
 
   // -------------- SIMPLE HELPER FUNCTIONS
   public static function _orm_struct() {
@@ -391,12 +390,12 @@ abstract class MeekroORM {
     return static::_Search(true, $query, ...$args);
   }
 
-  static function _orm_scopes() {
+  static function _scopes() {
     return [];
   }
 
   static function _orm_runscope($scope, ...$args) {
-    $scopes = static::_orm_scopes();
+    $scopes = static::_scopes();
     if (! is_array($scopes)) {
       throw new MeekroORMException("No scopes available");
     }
