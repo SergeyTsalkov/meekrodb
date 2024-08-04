@@ -833,6 +833,17 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     return str_replace(':', $param_char, $query);
   }
 
+  function first() {
+    if (count($this) == 0) return null;
+    return $this[0];
+  }
+
+  function last() {
+    $count = count($this);
+    if ($count == 0) return null;
+    return $this[$count-1];
+  }
+
   #[\ReturnTypeWillChange]
   function count() {
     $this->run_if_missing();
