@@ -1,9 +1,6 @@
 <?php
 use Carbon\Carbon;
 
-// TODO:
-// * scopes with arguments
-
 class Person extends MeekroORM {
   static $_columns = [
     'is_alive' => ['type' => 'bool'],
@@ -22,6 +19,7 @@ class Person extends MeekroORM {
       'male' => function() { return self::where('is_male=1'); },
       'female' => function() { return self::where('is_male=0'); },
       'teenager' => function() { return self::where('age>@i AND age<@i', 12, 20); },
+      'age' => function($age) { return self::where('age=@i', $age); },
       'first_teenager' => function() { return self::scope('teenager')->order_by('id')->limit(1); }
     ];
   }
@@ -395,6 +393,10 @@ class BasicOrmTest extends SimpleTest {
     $this->assert(count($EmptyScope) === 0);
     $this->assert($EmptyScope->first() === null);
     $this->assert($EmptyScope->last() === null);
+
+    $Person = Person::scope('age', 23);
+    $this->assert(count($Person) === 1);
+    $this->assert($Person->first()->name === 'Nick');
 
     $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');
     $this->assert(count($LivingTeens) === 2);
