@@ -9,21 +9,21 @@ abstract class MeekroORM {
   private static $_orm_struct = [];
 
   // (OPTIONAL) SET IN INHERITING CLASS
-  protected static $_orm_tablename = null;
+  protected static $_tablename = null;
   protected static $_associations = [];
   protected static $_columns = [];
 
   // -------------- SIMPLE HELPER FUNCTIONS
   public static function _orm_struct() {
-    $table_name = static::_orm_tablename();
+    $table_name = static::_tablename();
     if (! array_key_exists($table_name, self::$_orm_struct)) {
       self::$_orm_struct[$table_name] = new MeekroORMTable(get_called_class());
     }
     return self::$_orm_struct[$table_name];
   }
 
-  public static function _orm_tablename() {
-    if (static::$_orm_tablename) return static::$_orm_tablename;
+  public static function _tablename() {
+    if (static::$_tablename) return static::$_tablename;
     
     $table = strtolower(get_called_class());
     $last_char = substr($table, strlen($table)-1, 1);
@@ -358,7 +358,7 @@ abstract class MeekroORM {
     static::_orm_struct();
 
     if (is_array($query)) {
-      $table = static::_orm_tablename();
+      $table = static::_tablename();
       $limiter = $many ? '' : 'LIMIT 1';
 
       if ($query) {
@@ -437,7 +437,7 @@ abstract class MeekroORM {
 
     $is_fresh = $this->is_fresh();
     $have_committed = false;
-    $table = static::_orm_tablename();
+    $table = static::_tablename();
     $mdb = static::_orm_meekrodb();
 
     $mdb->startTransaction();
@@ -499,7 +499,7 @@ abstract class MeekroORM {
       throw new MeekroORMException("Can't reload unsaved record!");
     }
 
-    $table = static::_orm_tablename();
+    $table = static::_tablename();
     $row = static::_orm_query('queryFirstRow', 'SELECT * FROM :b WHERE :ha LIMIT 1 :l', 
       $table, $this->_whereHash(), $lock ? 'FOR UPDATE' : '');
 
@@ -532,7 +532,7 @@ abstract class MeekroORM {
 
     try {
       $this->_orm_run_callback('_pre_destroy');
-      static::_orm_query('query', 'DELETE FROM :b WHERE :ha', static::_orm_tablename(), $this->_whereHash());
+      static::_orm_query('query', 'DELETE FROM :b WHERE :ha', static::_tablename(), $this->_whereHash());
       $this->_orm_run_callback('_post_destroy');
       $mdb->commit();
       $have_committed = true;
@@ -566,7 +566,7 @@ class MeekroORMTable {
   
   function __construct($class_name) {
     $this->class_name = $class_name;
-    $this->table_name = $class_name::_orm_tablename();
+    $this->table_name = $class_name::_tablename();
     $this->struct = $this->table_struct();
   }
 
@@ -787,7 +787,7 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   }
 
   protected function run() {
-    $table_name = $this->class_name::_orm_tablename();
+    $table_name = $this->class_name::_tablename();
 
     $query = 'SELECT * FROM :b WHERE :l';
     $args = [$table_name, $this->Where];

@@ -61,7 +61,7 @@ class Soul extends MeekroORM {
 }
 
 class Company extends MeekroORM {
-  static $_orm_tablename = 'companies';
+  static $_tablename = 'companies';
 
 }
 
