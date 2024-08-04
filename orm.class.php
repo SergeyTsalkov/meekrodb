@@ -31,11 +31,11 @@ abstract class MeekroORM {
     return $table;
   }
 
-  public static function _orm_meekrodb() { return DB::getMDB(); }
+  public static function _meekrodb() { return DB::getMDB(); }
 
   // use for internal queries, since we don't know what the user's param_char is
   protected static function _orm_query($func_name, ...$args) {
-    $mdb = static::_orm_meekrodb();
+    $mdb = static::_meekrodb();
     $old_char = $mdb->param_char;
     $mdb->param_char = ':';
     try {
@@ -368,7 +368,7 @@ abstract class MeekroORM {
       }
     }
     else {
-      $rows = static::_orm_meekrodb()->query($query, ...$args);
+      $rows = static::_meekrodb()->query($query, ...$args);
     }
 
     if (! $rows) {
@@ -438,7 +438,7 @@ abstract class MeekroORM {
     $is_fresh = $this->is_fresh();
     $have_committed = false;
     $table = static::_tablename();
-    $mdb = static::_orm_meekrodb();
+    $mdb = static::_meekrodb();
 
     $mdb->startTransaction();
     try {
@@ -526,7 +526,7 @@ abstract class MeekroORM {
   }
 
   public function destroy() {
-    $mdb = static::_orm_meekrodb();
+    $mdb = static::_meekrodb();
     $mdb->startTransaction();
     $have_committed = false;
 
@@ -605,7 +605,7 @@ class MeekroORMTable {
   }
 
   function mdb() {
-    return $this->class_name::_orm_meekrodb();
+    return $this->class_name::_meekrodb();
   }
 
   protected function table_struct() {
@@ -829,7 +829,7 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   }
 
   protected function query_cleanup($query) {
-    $param_char = $this->class_name::_orm_meekrodb()->param_char;
+    $param_char = $this->class_name::_meekrodb()->param_char;
     return str_replace(':', $param_char, $query);
   }
 
