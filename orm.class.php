@@ -91,13 +91,13 @@ abstract class MeekroORM {
   }
 
 
-  public function is_fresh() {
+  public function isFresh() {
     return $this->_orm_is_fresh;
   }
 
   // -------------- GET/SET AND MARSHAL / UNMARSHAL
   public function __set($key, $value) {
-    if (!$this->is_fresh() && static::_orm_struct()->is_primary_key($key)) {
+    if (!$this->isFresh() && static::_orm_struct()->is_primary_key($key)) {
       throw new MeekroORMException("Can't update primary key!");
     }
     else if ($this->has($key)) {
@@ -435,7 +435,7 @@ abstract class MeekroORM {
   private function _save($savefields, $run_callbacks=null) {
     if (! is_bool($run_callbacks)) $run_callbacks = true;
 
-    $is_fresh = $this->is_fresh();
+    $is_fresh = $this->isFresh();
     $have_committed = false;
     $table = static::_tablename();
     $mdb = static::_meekrodb();
@@ -495,7 +495,7 @@ abstract class MeekroORM {
   }
 
   public function reload($lock=false) {
-    if ($this->is_fresh()) {
+    if ($this->isFresh()) {
       throw new MeekroORMException("Can't reload unsaved record!");
     }
 
@@ -512,7 +512,7 @@ abstract class MeekroORM {
   public function lock() { $this->reload(true); }
 
   public function update($one, $two=null) {
-    if ($this->is_fresh()) {
+    if ($this->isFresh()) {
       throw new MeekroORMException("Unable to update(): record is fresh");
     }
     if (is_array($one)) $hash = $one;
