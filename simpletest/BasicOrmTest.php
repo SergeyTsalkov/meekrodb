@@ -71,6 +71,8 @@ class Assignment extends MeekroORM {
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
+    // make sure we run the struct discovery code for every database type we test on
+    Person::_orm_struct_reset();
     DB::$param_char = '@';
 
     foreach (DB::tableList() as $table) {

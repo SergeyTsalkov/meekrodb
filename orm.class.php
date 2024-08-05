@@ -22,6 +22,10 @@ abstract class MeekroORM {
     return self::$_orm_struct[$table_name];
   }
 
+  public static function _orm_struct_reset() {
+    self::$_orm_struct = [];
+  }
+
   public static function _tablename() {
     if (static::$_tablename) return static::$_tablename;
     

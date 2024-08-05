@@ -3,6 +3,8 @@ class BasicTest extends SimpleTest {
   public $last_func;
 
   function __construct() {
+    DB::$param_char = '%';
+
     foreach (DB::tableList() as $table) {
       DB::query("DROP TABLE %b", $table);
     }
