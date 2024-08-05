@@ -38,7 +38,7 @@ abstract class MeekroORM {
   public static function _meekrodb() { return DB::getMDB(); }
 
   // use for internal queries, since we don't know what the user's param_char is
-  protected static function _orm_query($func_name, ...$args) {
+  public static function _orm_query($func_name, ...$args) {
     $mdb = static::_meekrodb();
     $old_char = $mdb->param_char;
     $mdb->param_char = ':';
@@ -612,6 +612,10 @@ class MeekroORMTable {
     return $this->class_name::_meekrodb();
   }
 
+  function query(...$args) {
+    return $this->class_name::_orm_query(...$args);
+  }
+
   protected function table_struct() {
     $db_type = $this->mdb()->db_type();
     $data = $this->mdb()->columnList($this->table_name);
@@ -640,14 +644,18 @@ class MeekroORMTable {
 
   protected function table_struct_sqlite($data) {
     $struct = [];
+
+    $has_autoincrement = $this->query('queryFirstField', 'SELECT COUNT(*) FROM sqlite_master 
+      WHERE tbl_name=:s AND sql LIKE "%AUTOINCREMENT%"', $this->table_name);
+
     foreach ($data as $name => $hash) {
       $Column = new MeekroORMColumn();
       $Column->name = $name;
       $Column->is_nullable = ($hash['notnull'] == 0);
-      $Column->is_primary = ($hash['pk'] == 1);
+      $Column->is_primary = ($hash['pk'] > 0);
       $Column->type = $hash['type'];
       $Column->simpletype = $this->table_struct_simpletype($hash['type']);
-      $Column->is_autoincrement = ($Column->simpletype == 'int' && $Column->is_primary);
+      $Column->is_autoincrement = ($Column->is_primary && $has_autoincrement);
       $struct[$name] = $Column;
     }
     return $struct;
@@ -666,7 +674,7 @@ class MeekroORMTable {
       $struct[$name] = $Column;
     }
 
-    $primary_keys = $this->mdb()->queryFirstColumn("
+    $primary_keys = $this->query('queryFirstColumn', "
       SELECT kcu.column_name
       FROM information_schema.table_constraints tc
       JOIN 
@@ -675,7 +683,7 @@ class MeekroORMTable {
         AND tc.table_schema = kcu.table_schema
       WHERE
         tc.constraint_type = 'PRIMARY KEY'
-        AND tc.table_name = %s
+        AND tc.table_name = :s
         AND tc.table_schema = 'public';
     ", $this->table_name);
 
