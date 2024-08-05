@@ -388,6 +388,9 @@ class BasicOrmTest extends SimpleTest {
   }
 
   function test_11_scope() {
+    $All = Person::all();
+    $this->assert(count($All) === 5);
+
     $Living = Person::scope('living');
     $this->assert(count($Living) === 3);
 

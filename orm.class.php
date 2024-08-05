@@ -419,6 +419,10 @@ abstract class MeekroORM {
     return $Scope;
   }
 
+  static function all() {
+    return new MeekroORMScope(get_called_class());
+  }
+
   static function where(...$args) {
     $Scope = new MeekroORMScope(get_called_class());
     $Scope->where(...$args);
