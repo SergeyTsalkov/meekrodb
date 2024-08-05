@@ -24,7 +24,8 @@
     },
     "autoload": {
         "classmap": [
-            "db.class.php"
+            "db.class.php",
+            "orm.class.php"
         ]
     }
 }
