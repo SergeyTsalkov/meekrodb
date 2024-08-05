@@ -1320,7 +1320,7 @@ class WhereClause implements Countable {
     $sql = array();
     $args = array();
     
-    if (count($this) == 0) return array('(1)', $args);
+    if (count($this) == 0) return array('(1=1)', $args);
     
     foreach ($this->clauses as $clause) {
       if ($clause instanceof WhereClause) { 

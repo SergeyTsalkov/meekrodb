@@ -89,6 +89,12 @@ class WhereClauseTest extends SimpleTest {
     $this->assert(count($rows) === 1);
     $this->assert($rows[0]['id'] === '2');
   }
+
+  function test_9_empty() {
+    $where = new WhereClause('and');
+    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
+    $this->assert(count($result) === 8);
+  }
   
 
 }
