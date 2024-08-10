@@ -12,6 +12,7 @@ abstract class MeekroORM {
   protected static $_tablename = null;
   protected static $_associations = [];
   protected static $_columns = [];
+  public $_use_transactions = null;
 
   // -------------- SIMPLE HELPER FUNCTIONS
   private static function _orm_struct() {
@@ -47,6 +48,25 @@ abstract class MeekroORM {
     } finally {
       $mdb->param_char = $old_char;
     }
+  }
+
+  private function _tr_enabled() {
+    if (is_bool($this->_use_transactions)) {
+      return $this->_use_transactions;
+    }
+    return static::_meekrodb()->nested_transactions;
+  }
+  private function _tr_start() {
+    if (! $this->_tr_enabled()) return;
+    static::_meekrodb()->startTransaction();
+  }
+  private function _tr_commit() {
+    if (! $this->_tr_enabled()) return;
+    static::_meekrodb()->commit();
+  }
+  private function _tr_rollback() {
+    if (! $this->_tr_enabled()) return;
+    static::_meekrodb()->rollback();
   }
 
   public function dirtyhash() {
@@ -448,7 +468,7 @@ abstract class MeekroORM {
     $table = static::_tablename();
     $mdb = static::_meekrodb();
 
-    $mdb->startTransaction();
+    $this->_tr_start();
     try {
       if ($run_callbacks) {
         $fields = $this->_dirtyfields($savefields);
@@ -490,11 +510,11 @@ abstract class MeekroORM {
         else $this->_orm_run_callback('_post_update', $fields);
         $this->_orm_run_callback('_post_save', $fields);
       }
-      $mdb->commit();
+      $this->_tr_commit();
       $have_committed = true;
 
     } finally {
-      if (! $have_committed) $mdb->rollback();
+      if (! $have_committed) $this->_tr_rollback();
     }
 
     if ($run_callbacks) {
@@ -534,18 +554,17 @@ abstract class MeekroORM {
   }
 
   public function destroy() {
-    $mdb = static::_meekrodb();
-    $mdb->startTransaction();
+    $this->_tr_start();
     $have_committed = false;
 
     try {
       $this->_orm_run_callback('_pre_destroy');
       static::_orm_query('query', 'DELETE FROM :b WHERE :ha', static::_tablename(), $this->_whereHash());
       $this->_orm_run_callback('_post_destroy');
-      $mdb->commit();
+      $this->_tr_commit();
       $have_committed = true;
     } finally {
-      if (! $have_committed) $mdb->rollback();
+      if (! $have_committed) $this->_tr_rollback();
     }
   }
 

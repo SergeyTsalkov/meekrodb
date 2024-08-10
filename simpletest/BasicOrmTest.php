@@ -44,6 +44,14 @@ class Person extends MeekroORM {
   }
 }
 
+class Person2 extends MeekroORM {
+  static $_tablename = 'persons';
+
+  function _post_save() {
+    return false;
+  }
+}
+
 class House extends MeekroORM {
   static function _scopes() {
     return [
@@ -74,6 +82,7 @@ class BasicOrmTest extends SimpleTest {
     // make sure we run the struct discovery code for every database type we test on
     Person::_orm_struct_reset();
     DB::$param_char = '@';
+    DB::$nested_transactions = true;
 
     foreach (DB::tableList() as $table) {
       DB::query("DROP TABLE @b", $table);
@@ -446,6 +455,34 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->Soul->tmp === true);
 
     $this->assert($Person->Employer->name === 'Acme Shoe Co');
+  }
+
+  function test_13_transactions() {
+    DB::$nested_transactions = true;
+    
+    try {
+      $Person = new Person2();
+      $Person->name = 'FrankieJoe';
+      $Person->Save();
+    } catch (Exception $e) {}
+
+    $Search = Person::Search(['name' => 'FrankieJoe']);
+    $this->assert($Search === null);
+
+    DB::$nested_transactions = false;
+    try {
+      $Person = new Person2();
+      $Person->name = 'FrankieJoe';
+      $Person->Save();
+    } catch (Exception $e) {}
+    $Search = Person::Search(['name' => 'FrankieJoe']);
+    $this->assert($Search instanceof Person);
+    
+    $Search->Destroy();
+    $Search = Person::Search(['name' => 'FrankieJoe']);
+    $this->assert($Search === null);
+
+    DB::$nested_transactions = true;
   }
 
 }
