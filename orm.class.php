@@ -14,7 +14,7 @@ abstract class MeekroORM {
   protected static $_columns = [];
 
   // -------------- SIMPLE HELPER FUNCTIONS
-  public static function _orm_struct() {
+  private static function _orm_struct() {
     $table_name = static::_tablename();
     if (! array_key_exists($table_name, self::$_orm_struct)) {
       self::$_orm_struct[$table_name] = new MeekroORMTable(get_called_class());
@@ -255,7 +255,7 @@ abstract class MeekroORM {
     return json_decode($value, true);
   }
 
-  public static function _orm_colinfo($column, $type) {
+  private static function _orm_colinfo($column, $type) {
     if (! is_array(static::$_columns)) return;
     if (! array_key_exists($column, static::$_columns)) return;
 
@@ -263,7 +263,7 @@ abstract class MeekroORM {
     return $info[$type] ?? null;
   }
 
-  public static function _orm_coltype($column) {
+  private static function _orm_coltype($column) {
     if ($type = static::_orm_colinfo($column, 'type')) {
       return $type;
     }
@@ -272,7 +272,7 @@ abstract class MeekroORM {
 
   // -------------- ASSOCIATIONS
   public static function is_assoc($name) { return !! static::_orm_assoc($name); }
-  protected static function _orm_assoc($name) {
+  private static function _orm_assoc($name) {
     if (! array_key_exists($name, static::$_associations)) return null;
     $assoc = static::$_associations[$name];
 
@@ -293,7 +293,7 @@ abstract class MeekroORM {
     return $this->_orm_assoc_load[$name];
   }
 
-  protected function _load_assoc($name) {
+  private function _load_assoc($name) {
     $assoc = static::_orm_assoc($name);
     if (! $assoc) {
       throw new MeekroORMException("Unknown assocation: $name");
@@ -325,7 +325,7 @@ abstract class MeekroORM {
   }
 
   // -------------- CONSTRUCTORS
-  public function _load_hash(array $row) {
+  private function _load_hash(array $row) {
     $this->_orm_is_fresh = false;
     $this->_orm_row_orig = [];
     $this->_orm_row = [];
@@ -394,11 +394,11 @@ abstract class MeekroORM {
     return static::_Search(true, $query, ...$args);
   }
 
-  static function _scopes() {
+  public static function _scopes() {
     return [];
   }
 
-  static function _orm_runscope($scope, ...$args) {
+  public static function _orm_runscope($scope, ...$args) {
     $scopes = static::_scopes();
     if (! is_array($scopes)) {
       throw new MeekroORMException("No scopes available");
@@ -419,17 +419,17 @@ abstract class MeekroORM {
     return $Scope;
   }
 
-  static function all() {
+  public static function all() {
     return new MeekroORMScope(get_called_class());
   }
 
-  static function where(...$args) {
+  public static function where(...$args) {
     $Scope = new MeekroORMScope(get_called_class());
     $Scope->where(...$args);
     return $Scope;
   }
 
-  static function scope(...$scopes) {
+  public static function scope(...$scopes) {
     $Scope = new MeekroORMScope(get_called_class());
     $Scope->scope(...$scopes);
     return $Scope;
