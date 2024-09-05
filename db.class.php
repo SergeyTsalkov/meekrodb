@@ -841,8 +841,8 @@ class MeekroDB {
     }
 
     if ($use_numbered_args) {
-      if ($max_numbered_arg+1 > count($args)) {
-        throw new MeekroDBException(sprintf('Expected %d args, but only got %d!', $max_numbered_arg+1, count($args)));
+      if ($max_numbered_arg+1 != count($args)) {
+        throw new MeekroDBException(sprintf('Expected %d args, but got %d!', $max_numbered_arg+1, count($args)));
       }
     }
 

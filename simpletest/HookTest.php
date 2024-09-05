@@ -178,17 +178,25 @@ class HookTest extends SimpleTest {
   }
 
   function test_9_enough_args() {
-    $error_worked = false;
+    $error_count = 0;
 
     try {
       DB::query("SELECT * FROM accounts WHERE id=%i AND username=%s", 1);
     } catch (MeekroDBException $e) {
-      if ($e->getMessage() == 'Expected 2 args, but only got 1!') {
-        $error_worked = true;
+      if ($e->getMessage() == 'Expected 2 args, but got 1!') {
+        $error_count++;
       }
     }
 
-    $this->assert($error_worked);
+    try {
+      DB::query("SELECT * FROM accounts WHERE id=%i AND username=%s", 1, 2, 3);
+    } catch (MeekroDBException $e) {
+      if ($e->getMessage() == 'Expected 2 args, but got 3!') {
+        $error_count++;
+      }
+    }
+
+    $this->assert($error_count === 2);
   }
 
   function test_10_named_keys_present() {
