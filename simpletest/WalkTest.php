@@ -36,7 +36,7 @@ class WalkTest extends SimpleTest {
 
   function test_3_walk_insert() {
     // old mysql pdo driver chokes when you try to 
-    if ($this->db_type == 'mysql' && phpversion() < '7.4') return;
+    if ($this->db_type == 'mysql' && phpversion() < '8') return;
 
     $Walk = DB::queryWalk("INSERT INTO profile (id) VALUES (100)");
 

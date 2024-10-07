@@ -247,8 +247,9 @@ abstract class MeekroORM {
 
   public function _marshal_type_datetime($key, $value, $is_nullable) {
     // 0000-00-00 00:00:00 is technically not a valid date, and pgsql rejects it
-    // so lets use 1970-01-01 as default
-    if (!$is_nullable && is_null($value)) $value = '1970-01-01 00:00:00';
+    // we can't use 1970-01-01 00:00:00 because, depending on the local TIMESTAMP, it might
+    // become a negative unixtime
+    if (!$is_nullable && is_null($value)) $value = '1970-01-03 00:00:00';
     if ($value instanceof \DateTime) return $value->format('Y-m-d H:i:s');
     return $value;
   }

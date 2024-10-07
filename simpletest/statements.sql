@@ -35,7 +35,7 @@ CREATE TABLE accounts (
   age {{INT}} NOT NULL DEFAULT '10',
   height {{DOUBLE}} NOT NULL DEFAULT '10.0',
   favorite_word VARCHAR(255) NULL DEFAULT 'hi',
-  birthday TIMESTAMP NOT NULL DEFAULT '1970-01-01 00:00:00'
+  birthday TIMESTAMP NOT NULL DEFAULT '1970-01-03 00:00:00'
 )
 
 -- name: create_persons
@@ -47,7 +47,7 @@ CREATE TABLE persons (
   height {{DOUBLE}} NOT NULL DEFAULT 0,
   favorite_color VARCHAR(255) NULL,
   favorite_animaniacs VARCHAR(255) NOT NULL DEFAULT '',
-  last_happy_moment TIMESTAMP NOT NULL DEFAULT '1970-01-01 00:00:00',
+  last_happy_moment TIMESTAMP NOT NULL DEFAULT '1970-01-03 00:00:00',
   is_male {{INT}} NOT NULL DEFAULT 0,
   is_alive {{INT}} NULL,
   data VARCHAR(255) NOT NULL DEFAULT ''

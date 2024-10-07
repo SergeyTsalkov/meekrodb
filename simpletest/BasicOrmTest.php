@@ -316,7 +316,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * can load and save a timestamp
   function test_08_timestamp() {
-    $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '1970-01-01 00:00:00');
+    $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '1970-01-03 00:00:00');
 
     $Person = Person::Load(1);
     $this->assert($Person->last_happy_moment == $zerodate);
@@ -333,7 +333,7 @@ class BasicOrmTest extends SimpleTest {
     $Person->Save();
     $Person = Person::Load(1);
     $this->assert($Person->last_happy_moment == $zerodate);
-    $Person->last_happy_moment = '1970-01-01 00:00:00';
+    $Person->last_happy_moment = '1970-01-03 00:00:00';
     $Person->Save();
     $Person = Person::Load(1);
     $this->assert($Person->last_happy_moment == $zerodate);

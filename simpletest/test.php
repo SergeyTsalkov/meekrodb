@@ -105,7 +105,7 @@ function microtime_float()
 ini_set('date.timezone', 'America/Los_Angeles');
 
 error_reporting(E_ALL | E_STRICT);
-require_once __DIR__ . '/../vendor/autoload.php';
+// require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../db.class.php';
 require_once __DIR__ . '/../orm.class.php';
 
