@@ -345,7 +345,18 @@ class BasicTest extends SimpleTest {
     DB::delete('accounts', ['username' => '']);
   }
 
-  function test_16_timeout() {
+  // * in an insert, if an array is given where a scalar is expected, convert to NULL
+  // * try with both first value as array, and second value as array
+  function test_16_insert_with_wrong_array() {
+    DB::insert('accounts', ['password' => []]);
+    $id1 = DB::insertId();
+    DB::insert('accounts', ['age' => 121, 'password' => []]);
+    $id2 = DB::insertId();
+
+    DB::delete('accounts', 'id IN %li', [$id1, $id2]);
+  }
+
+  function test_17_timeout() {
     if ($this->db_type != 'mysql') return;
     if ($this->fast) return;
     

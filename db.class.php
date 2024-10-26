@@ -402,8 +402,9 @@ class MeekroDB {
 
     $datas = unserialize(serialize($datas)); // break references within array
     $keys = $values = array();
+    $array_is_list = ($datas === [] || $datas === array_values($datas));
     
-    if (isset($datas[0]) && is_array($datas[0])) {
+    if ($array_is_list && count($datas) > 0 && is_array($datas[0])) {
       foreach ($datas as $datum) {
         ksort($datum);
         if (! $keys) $keys = array_keys($datum);
@@ -721,9 +722,8 @@ class MeekroDB {
       return new MeekroDBParsedQuery('?', array(strval($input)));
     }
 
-    if (is_null($input)) return new MeekroDBParsedQuery('NULL');
+    if (is_null($input) || is_array($input)) return new MeekroDBParsedQuery('NULL');
     else if (is_bool($input)) return new MeekroDBParsedQuery('?', array($input ? 1 : 0));
-    else if (is_array($input)) return new MeekroDBParsedQuery('');
     return new MeekroDBParsedQuery('?', array($input));
   }
 
