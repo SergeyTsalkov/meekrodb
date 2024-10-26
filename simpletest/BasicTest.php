@@ -349,14 +349,28 @@ class BasicTest extends SimpleTest {
   // * try with both first value as array, and second value as array
   function test_16_insert_with_wrong_array() {
     DB::insert('accounts', ['password' => []]);
-    $id1 = DB::insertId();
+    DB::delete('accounts', ['id' => DB::insertId()]);
     DB::insert('accounts', ['age' => 121, 'password' => []]);
-    $id2 = DB::insertId();
-
-    DB::delete('accounts', 'id IN %li', [$id1, $id2]);
+    DB::delete('accounts', ['id' => DB::insertId()]);
   }
 
-  function test_17_timeout() {
+  // * when inserting multiple rows at once, they must all have the same keys
+  function test_17_insert_with_different_multiples() {
+    $rows[] = ['age' => 121];
+    $rows[] = ['password' => 'abcde', 'age' => 121];
+    $got_error = false;
+
+    try {
+      DB::insert('accounts', $rows);
+    } catch (MeekroDBException $e) {
+      if (substr_count($e->getMessage(), 'have the same keys')) {
+        $got_error = true;
+      }
+    }
+    $this->assert($got_error);
+  }
+
+  function test_18_timeout() {
     if ($this->db_type != 'mysql') return;
     if ($this->fast) return;
     

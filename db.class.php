@@ -407,7 +407,13 @@ class MeekroDB {
     if ($array_is_list && count($datas) > 0 && is_array($datas[0])) {
       foreach ($datas as $datum) {
         ksort($datum);
-        if (! $keys) $keys = array_keys($datum);
+        if (! $keys) {
+          $keys = array_keys($datum);
+        }
+        else if ($keys !== array_keys($datum)) {
+          throw new MeekroDBException("when inserting multiple rows at once, they must have the same keys");
+        }
+
         $values[] = array_values($datum);  
       }
 
