@@ -156,7 +156,7 @@ class MeekroDB {
     'run_failed' => array(),
   );
 
-  public function __construct($dsn='', $user='', $password='', $opts=array()) {
+  public function __construct(string $dsn='', string $user='', string $password='', array $opts=array()) {
     $this->sync_config();
 
     if ($dsn) $this->dsn = $dsn;
