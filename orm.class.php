@@ -880,6 +880,10 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     return $this[$count-1];
   }
 
+  function toArray() {
+    return iterator_to_array($this);
+  }
+
   #[\ReturnTypeWillChange]
   function count() {
     $this->run_if_missing();

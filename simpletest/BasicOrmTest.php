@@ -429,6 +429,11 @@ class BasicOrmTest extends SimpleTest {
     $FirstTeenager = Person::scope('first_teenager');
     $this->assert(count($FirstTeenager) === 1);
     $this->assert($FirstTeenager[0]->name === 'Ellie');
+
+    $array = $FirstTeenager->toArray();
+    $this->assert(!is_array($FirstTeenager));
+    $this->assert(is_array($array));
+    $this->assert($array[0]->name === 'Ellie');
   }
 
   // * has_many: works with scoping
