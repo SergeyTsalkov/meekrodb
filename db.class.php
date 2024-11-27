@@ -599,7 +599,7 @@ class MeekroDB {
         return new MeekroDBParsedQuery(strval($arg));
       },
       't' => function($arg) use ($t) {
-        return new MeekroDBParsedQuery('?', $t->sanitizeTS($arg));
+        return new MeekroDBParsedQuery('?', array($t->sanitizeTS($arg)));
       },
       'ss' => function($arg) use ($t) { 
         $str = '%' . str_replace(array('%', '_'), array('\%', '\_'), $arg) . '%';

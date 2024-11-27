@@ -163,6 +163,11 @@ class BasicTest extends SimpleTest {
     $this->assert(count($results) === 1);
     $this->assert($results[0]['age'] === '30' && $results[0]['password'] === 'goodbye');
     $this->assert($results[0]['birthday'] == '2000-09-10 13:13:13');
+
+    $result = DB::queryFirstRow("SELECT * FROM accounts WHERE birthday=%t", new DateTime('September 10 2000 13:13:13'));
+    $this->assert($result['age'] === '30');
+    $this->assert($result['password'] === 'goodbye');
+    $this->assert($result['birthday'] == '2000-09-10 13:13:13');
     
     $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
     $this->assert(count($results) === 3);
