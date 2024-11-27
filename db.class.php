@@ -701,10 +701,7 @@ class MeekroDB {
     return array('b', 'c');
   }
 
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function sanitizeTS($ts) {
+  protected function sanitizeTS($ts) {
     if (is_string($ts)) {
       return date('Y-m-d H:i:s', strtotime($ts));
     }
@@ -714,10 +711,7 @@ class MeekroDB {
     return '';
   }
 
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function sanitize($input) {
+  protected function sanitize($input) {
     if (is_object($input)) {
       if ($input instanceof DateTime) {
         return new MeekroDBParsedQuery('?', array($input->format('Y-m-d H:i:s')));
@@ -733,10 +727,7 @@ class MeekroDB {
     return new MeekroDBParsedQuery('?', array($input));
   }
 
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function formatName($name, $can_join=false) {
+  protected function formatName($name, $can_join=false) {
     if (is_array($name)) {
       if ($can_join) return implode('.', array_map(array($this, 'formatName'), $name));
       throw new MeekroDBException("Invalid column/table name");
@@ -745,11 +736,8 @@ class MeekroDB {
     if ($this->db_type() == 'pgsql') $char = '"';
     return $char . str_replace($char, $char . $char, $name) . $char; 
   }
-  
-  /**
-   * @internal has to be public for PHP 5.3 compatability
-   */
-  public function intval($var) {
+
+  protected function intval($var) {
     if (PHP_INT_SIZE == 8) return intval($var);
     return floor(doubleval($var));
   }
