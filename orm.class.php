@@ -641,7 +641,7 @@ class MeekroORMTable {
   }
 
   protected function table_struct() {
-    $db_type = $this->mdb()->db_type();
+    $db_type = $this->mdb()->dbType();
     $data = $this->mdb()->columnList($this->table_name);
 
     if ($db_type == 'mysql') return $this->table_struct_mysql($data);

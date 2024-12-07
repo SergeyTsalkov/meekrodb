@@ -138,7 +138,7 @@ foreach ($contexts as $name => $fn) {
     require_once sprintf('%s/%s.php', __DIR__, $class);
 
     $object = new $class();
-    $object->db_type = DB::db_type();
+    $object->db_type = DB::dbType();
     foreach ($data as $key => $value) {
       $object->$key = $value;
     }

@@ -175,7 +175,7 @@ class MeekroDB {
     }
   }
 
-  public function db_type() {
+  public function dbType() {
     // $this->db_type var is only set after we connect, so we have to
     // make sure we've connected before returning the info
     $this->get();
@@ -200,7 +200,8 @@ class MeekroDB {
       }
 
       list($this->db_type) = explode(':', $this->dsn);
-      if (!$this->db_type) {
+      $this->db_type = strtolower($this->db_type);
+      if (!in_array($this->db_type, ['mysql', 'sqlite', 'pgsql'])) {
         throw new MeekroDBException("Invalid DSN: " . $this->dsn);
       }
 
@@ -229,9 +230,8 @@ class MeekroDB {
   
   public function setDB() { return $this->useDB(...func_get_args()); }
   public function useDB($dbName) { 
-    $db_type = $this->db_type();
-    if (in_array($db_type, array('pgsql', 'sqlite'))) {
-      throw new MeekroDBException("Database switching not supported by {$db_type}.");
+    if (in_array($this->dbType(), array('pgsql', 'sqlite'))) {
+      throw new MeekroDBException(sprintf('Database switching not supported by %s', $this->dbType()));
     }
 
     $this->_query('useDB', "USE :c", $dbName);
@@ -239,7 +239,7 @@ class MeekroDB {
   
   public function startTransaction() {
     $start_transaction = 'START TRANSACTION';
-    if ($this->db_type() == 'sqlite') {
+    if ($this->dbType() == 'sqlite') {
       $start_transaction = 'BEGIN TRANSACTION';
     }
 
@@ -377,7 +377,7 @@ class MeekroDB {
   }
   
   protected function insertOrReplace($mode, $table, $datas, $options=array()) {
-    $db_type = $this->db_type();
+    $db_type = $this->dbType();
     $fn_name = 'insert';
 
     if ($mode == 'insert') {
@@ -496,7 +496,7 @@ class MeekroDB {
   }
   
   public function columnList($table) {
-    $db_type = $this->db_type();
+    $db_type = $this->dbType();
 
     if ($db_type == 'sqlite') {
       $query = 'PRAGMA table_info(:b)';
@@ -529,14 +529,14 @@ class MeekroDB {
   }
   
   public function tableList($db = null) {
-    if ($this->db_type() == 'sqlite') {
+    if ($this->dbType() == 'sqlite') {
       if ($db) $tbl = "{$db}.sqlite_master";
       else $tbl = "sqlite_master";
 
       $result = $this->_query('tableList', "SELECT name FROM :b 
         WHERE type='table' AND name NOT LIKE 'sqlite_%'", $tbl);
     }
-    else if ($this->db_type() == 'pgsql') {
+    else if ($this->dbType() == 'pgsql') {
       $result = $this->_query('tableList', "SELECT table_name
         FROM information_schema.tables
         WHERE table_schema='public'
@@ -733,7 +733,7 @@ class MeekroDB {
       throw new MeekroDBException("Invalid column/table name");
     }
     $char = '`';
-    if ($this->db_type() == 'pgsql') $char = '"';
+    if ($this->dbType() == 'pgsql') $char = '"';
     return $char . str_replace($char, $char . $char, $name) . $char; 
   }
 
@@ -984,7 +984,7 @@ class MeekroDB {
     $pdo = $this->get();
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    $db_type = $this->db_type();
+    $db_type = $this->dbType();
     if ($db_type == 'mysql') {
       $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
     }
