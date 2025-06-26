@@ -789,7 +789,7 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     return $this;
   }
 
-  function limit(int $one, int $two=null) {
+  function limit(int $one, ?int $two=null) {
     if (is_null($two)) {
       $this->limit_rowcount = $one;
     } else {
@@ -939,5 +939,3 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
 }
 
 class MeekroORMException extends Exception { }
-
-?>
