@@ -986,7 +986,7 @@ class MeekroDB {
 
     $db_type = $this->dbType();
     if ($db_type == 'mysql') {
-      $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
+      $pdo->setAttribute(PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_USE_BUFFERED_QUERY : PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
     }
     else if ($db_type == 'pgsql') {
       $pdo->setAttribute(PDO::PGSQL_ATTR_DISABLE_PREPARES, 1);
