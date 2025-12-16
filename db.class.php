@@ -154,6 +154,7 @@ class MeekroDB {
     'post_run' => array(),
     'run_success' => array(),
     'run_failed' => array(),
+    'con_failed' => array(),
   );
 
   public function __construct(string $dsn='', string $user='', string $password='', array $opts=array()) {
@@ -199,17 +200,37 @@ class MeekroDB {
         $this->dsn = 'mysql:' . implode(';', $dsn_parts);
       }
 
+      $hookHash = array(
+        'dsn' => $this->dsn,
+        'error' => null,
+        'exception' => null,
+      );
+      
       list($this->db_type) = explode(':', $this->dsn);
       $this->db_type = strtolower($this->db_type);
       if (!in_array($this->db_type, ['mysql', 'sqlite', 'pgsql'])) {
-        throw new MeekroDBException("Invalid DSN: " . $this->dsn);
+        $Exception = new MeekroDBException("Invalid DSN: " . $this->dsn);
+  
+        $hookHash['error'] = $Exception->getMessage();
+        $hookHash['exception'] = $Exception;
+
+        if ($this->runHook('con_failed', $hookHash) !== false) {
+          throw $Exception;
+        }
       }
 
       try {
         $pdo = new PDO($this->dsn, $this->user, $this->password, $this->connect_options);
         $this->internal_pdo = $pdo;
       } catch (PDOException $e) {
-        throw new MeekroDBException($e->getMessage());
+        $Exception = new MeekroDBException($e->getMessage());
+
+        $hookHash['error'] = $Exception->getMessage();
+        $hookHash['exception'] = $Exception;
+
+        if ($this->runHook('con_failed', $hookHash) !== false) {
+          throw $Exception;
+        }
       }
       
     }
@@ -1166,6 +1187,13 @@ class MeekroDB {
       
       foreach ($this->hooks[$type] as $hook) {
         $result = call_user_func($hook, $args);
+        if ($result === false) return false;
+      }
+    }
+    else if ($type == 'con_failed') {
+
+      foreach ($this->hooks[$type] as $hook) {
+        call_user_func($hook, $args);
         if ($result === false) return false;
       }
     }
