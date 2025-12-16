@@ -1193,7 +1193,7 @@ class MeekroDB {
     else if ($type == 'con_failed') {
 
       foreach ($this->hooks[$type] as $hook) {
-        call_user_func($hook, $args);
+        $result = call_user_func($hook, $args);
         if ($result === false) return false;
       }
     }
