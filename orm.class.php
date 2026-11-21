@@ -254,11 +254,11 @@ abstract class MeekroORM {
 
   public function _marshal_type_double($key, $value, $is_nullable) {
     if ($is_nullable && is_null($value)) return null;
-    return doubleval($value);
+    return floatval($value);
   }
   public function _unmarshal_type_double($key, $value) {
     if (is_null($value)) return null;
-    return doubleval($value);
+    return floatval($value);
   }
 
   public function _marshal_type_datetime($key, $value, $is_nullable) {
