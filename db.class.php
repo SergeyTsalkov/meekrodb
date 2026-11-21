@@ -613,7 +613,7 @@ class MeekroDB {
     return array(
       's' => function($arg) use ($t) { return $t->escape($arg); },
       'i' => function($arg) use ($t) { return $t->intval($arg); },
-      'd' => function($arg) use ($t) { return doubleval($arg); },
+      'd' => function($arg) use ($t) { return floatval($arg); },
       'b' => function($arg) use ($t) { return $t->formatTableName($arg); },
       'c' => function($arg) use ($t) { return $t->formatColumnName($arg); },
       'l' => function($arg) use ($t) { return strval($arg); },
@@ -623,7 +623,7 @@ class MeekroDB {
       'sse' => function($arg) use ($t) { return $t->escape("%" . str_replace(array('%', '_'), array('\%', '\_'), $arg)); },
       'ls' => function($arg) use ($t) { return array_map(array($t, 'escape'), $arg); },
       'li' => function($arg) use ($t) { return array_map(array($t, 'intval'), $arg); },
-      'ld' => function($arg) use ($t) { return array_map('doubleval', $arg); },
+      'ld' => function($arg) use ($t) { return array_map('floatval', $arg); },
       'lb' => function($arg) use ($t) { return array_map(array($t, 'formatTableName'), $arg); },
       'lc' => function($arg) use ($t) { return array_map(array($t, 'formatColumnName'), $arg); },
       'll' => function($arg) use ($t) { return array_map('strval', $arg); },
@@ -885,7 +885,7 @@ class MeekroDB {
    */
   public function intval($var) {
     if (PHP_INT_SIZE == 8) return intval($var);
-    return floor(doubleval($var));
+    return floor(floatval($var));
   }
 
   public function query() { return $this->queryHelper(array('assoc' => true), func_get_args()); }
