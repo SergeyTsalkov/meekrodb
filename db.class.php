@@ -594,7 +594,7 @@ class MeekroDB {
         return new MeekroDBParsedQuery('?', array($t->intval($arg)));
       },
       'd' => function($arg) use ($t) { 
-        return new MeekroDBParsedQuery('?', array(doubleval($arg)));
+        return new MeekroDBParsedQuery('?', array(floatval($arg)));
       },
       'b' => function($arg) use ($t) { 
         return new MeekroDBParsedQuery($t->formatName($arg, true));
@@ -629,7 +629,7 @@ class MeekroDB {
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
       'ld' => function($arg) use ($t, $placeholders) {
-        $arg = array_map('doubleval', $arg);
+        $arg = array_map('floatval', $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
       'lb' => function($arg) use ($t) { 
@@ -754,7 +754,7 @@ class MeekroDB {
 
   protected function intval($var) {
     if (PHP_INT_SIZE == 8) return intval($var);
-    return floor(doubleval($var));
+    return floor(floatval($var));
   }
 
   protected function nextQueryParam($query) {
