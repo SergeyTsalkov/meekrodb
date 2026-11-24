@@ -377,6 +377,26 @@ abstract class MeekroORM {
     }
   }
 
+  // clone produces a fresh (unsaved) copy with primary keys unset
+  // it can be saved as a new record, either with new primary keys set manually
+  // or with auto-increment
+  public function __clone() {
+    $this->_orm_is_fresh = true;
+    $this->_orm_row_orig = [];
+    $this->_orm_assoc_load = [];
+
+    foreach (static::_orm_struct()->primary_keys() as $key) {
+      unset($this->_orm_row[$key]);
+    }
+
+    // don't share mutable objects (e.g. DateTime) with the original
+    foreach ($this->_orm_row as $key => $value) {
+      if (is_object($value)) {
+        $this->_orm_row[$key] = clone $value;
+      }
+    }
+  }
+
   public static function LoadFromHash(array $row = []) {
     $class_name = get_called_class();
     $Obj = new $class_name();

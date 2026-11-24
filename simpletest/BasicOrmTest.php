@@ -504,4 +504,54 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->age === null);
   }
 
+  // * clone produces a fresh object with primary key unset, which saves as a new row
+  // * clone doesn't share DateTime objects with the original
+  // * clone works with multi-column primary keys
+  function test_15_clone() {
+    $Person = Person::Search(['name' => 'Nick']);
+    $original_id = $Person->id;
+    $original_moment = $Person->last_happy_moment;
+
+    $Clone = clone $Person;
+    $this->assert($Clone->isFresh());
+    $this->assert(!$Person->isFresh());
+    $this->assert($Clone->id === null);
+    $this->assert($Person->id === $original_id);
+    $this->assert($Clone->name === 'Nick');
+    $this->assert($Clone->age === 23);
+    $this->assert($Clone->data === $Person->data);
+    $this->assert($Clone->last_happy_moment == $original_moment);
+    $this->assert($Clone->last_happy_moment !== $Person->last_happy_moment);
+
+    $Clone->name = 'Nick Clone';
+    $Clone->Save();
+    $this->assert(!$Clone->isFresh());
+    $this->assert($Clone->id && $Clone->id != $original_id);
+
+    $Loaded = Person::Load($Clone->id);
+    $this->assert($Loaded->name === 'Nick Clone');
+    $this->assert($Loaded->age === 23);
+    $this->assert($Loaded->favorite_color === 'blue');
+    $this->assert(Person::Load($original_id)->name === 'Nick');
+
+    // the clone's House association refers to the clone, not the original
+    $this->assert(count($Person->House) === 2);
+    $this->assert(count($Clone->House) === 0);
+    $Loaded->Destroy();
+
+    $Assignment = Assignment::Load(1, 1);
+    $Clone = clone $Assignment;
+    $this->assert($Clone->person_id === null);
+    $this->assert($Clone->company_id === null);
+    $this->assert($Clone->name === 'Big Boss');
+    $Clone->person_id = 2;
+    $Clone->company_id = 1;
+    $Clone->Save();
+
+    $Loaded = Assignment::Load(2, 1);
+    $this->assert($Loaded->name === 'Big Boss');
+    $this->assert(Assignment::Load(1, 1)->name === 'Big Boss');
+    $Loaded->Destroy();
+  }
+
 }
