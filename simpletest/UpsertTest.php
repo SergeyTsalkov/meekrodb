@@ -8,10 +8,14 @@ class UpsertTest extends SimpleTest {
   }
 
   function skip() {
-    if ($this->db_type == 'pgsql') return "pgsql does not support upserts";
+    if (!DB::supports('insert_ignore') && !DB::supports('insert_update')) {
+      return sprintf("%s %s does not support upserts", $this->db_type, DB::serverVersion());
+    }
   }
 
   function test_1_insert_ignore() {
+    if (! DB::supports('insert_ignore')) return;
+
     $affected_rows = DB::insertIgnore('accounts', array(
       'id' => 1, //duplicate primary key
       'username' => 'gonesoon',
@@ -24,6 +28,8 @@ class UpsertTest extends SimpleTest {
   }
 
   function test_2_insert_update() {
+    if (! DB::supports('insert_update')) return;
+
     DB::insertUpdate('accounts', array(
       'id' => 2, //duplicate primary key
       'username' => 'gonesoon',
