@@ -139,3 +139,19 @@ CREATE TABLE bool_test (
   flag BOOLEAN NOT NULL,
   nullable_flag BOOLEAN NULL
 )
+
+-- name: create_tickets ; db: mysql
+CREATE TABLE tickets (
+  id INT NOT NULL AUTO_INCREMENT,
+  region INT NOT NULL DEFAULT 1,
+  name VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (id, region)
+)
+
+-- name: create_tickets ; db: pgsql
+CREATE TABLE tickets (
+  id SERIAL,
+  region INT NOT NULL DEFAULT 1,
+  name VARCHAR(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (id, region)
+)

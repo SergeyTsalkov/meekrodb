@@ -402,5 +402,78 @@ class BasicTest extends SimpleTest {
     DB::query("SELECT * FROM accounts");
     DB::$reconnect_after = $default;
   }
+
+  // * supports('returning') matches the database type, unknown features throw
+  // * unknown insert() options throw
+  // * insert() with returning gives back the full row, including database defaults
+  // * multi-row insert() with returning gives back a list of rows
+  // * returning can be limited to a list of columns
+  // * insertIgnore() with returning gives back null when the row was ignored
+  // * where RETURNING isn't supported, asking for it throws
+  function test_19_insert_returning() {
+    $is_mariadb = stripos(DB::serverVersion(), 'mariadb') !== false;
+    $supported = DB::supports('returning');
+    if ($this->db_type == 'pgsql') $this->assert($supported === true);
+    if ($this->db_type == 'sqlite') $this->assert($supported === version_compare(DB::serverVersion(), '3.35', '>='));
+    if ($this->db_type == 'mysql' && !$is_mariadb) $this->assert($supported === false);
+
+    $got_error = false;
+    try {
+      DB::supports('time_travel');
+    } catch (MeekroDBException $e) {
+      $got_error = substr_count($e->getMessage(), 'unknown feature') > 0;
+    }
+    $this->assert($got_error);
+
+    $got_error = false;
+    try {
+      DB::insert('accounts', ['username' => 'RetTypo'], ['returnin' => true]);
+    } catch (MeekroDBException $e) {
+      $got_error = substr_count($e->getMessage(), 'unknown option') > 0;
+    }
+    $this->assert($got_error);
+
+    if (! $supported) {
+      $got_error = false;
+      try {
+        DB::insert('accounts', ['username' => 'Ret1'], ['returning' => true]);
+      } catch (MeekroDBException $e) {
+        $got_error = substr_count($e->getMessage(), 'does not support RETURNING') > 0;
+      }
+      $this->assert($got_error);
+      $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username='Ret1'") === '0');
+      return;
+    }
+
+    $row = DB::insert('accounts', ['username' => 'Ret1'], ['returning' => true]);
+    $this->assert($this->last_func === 'insert');
+    $this->assert(DB::affectedRows() === 1);
+    $this->assert(is_array($row));
+    $this->assert($row['username'] === 'Ret1');
+    $this->assert($row['age'] === '10');
+    $this->assert($row['favorite_word'] === 'hi');
+    $this->assert($row['password'] === null);
+    $this->assert($row['id'] === DB::queryFirstField("SELECT id FROM accounts WHERE username='Ret1'"));
+
+    $rows = DB::insert('accounts', [
+      ['username' => 'Ret2', 'age' => 20],
+      ['username' => 'Ret3', 'age' => 30],
+    ], ['returning' => ['id', 'username', 'age']]);
+    $this->assert(is_array($rows) && count($rows) === 2);
+    $this->assert(DB::affectedRows() === 2);
+    $this->assert(array_keys($rows[0]) === ['id', 'username', 'age']);
+    $by_name = array_column($rows, 'age', 'username');
+    ksort($by_name);
+    $this->assert($by_name === ['Ret2' => '20', 'Ret3' => '30']);
+
+    if (DB::supports('insert_ignore')) {
+      $ignored = DB::insertIgnore('accounts', ['id' => $row['id'], 'username' => 'RetDup'], ['returning' => true]);
+      $this->assert($ignored === null);
+      $this->assert(DB::affectedRows() === 0);
+      $this->assert(DB::queryFirstField("SELECT username FROM accounts WHERE id=%i", $row['id']) === 'Ret1');
+    }
+
+    DB::query("DELETE FROM accounts WHERE username IN %ls", ['Ret1', 'Ret2', 'Ret3']);
+  }
   
 }

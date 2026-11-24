@@ -522,13 +522,32 @@ abstract class MeekroORM {
       $replace = $this->_dirtyhash($savefields);
       $fields = array_keys($replace);
 
+      $have_loaded = false;
+      $unknown_keys = [];
       if ($is_fresh) {
-        $mdb->insert($table, $replace);
-        $this->_orm_is_fresh = false;
+        if ($mdb->supports('returning')) {
+          // get back the full row (auto-increment and defaulted columns included)
+          // so we don't need to reload(), which might not even be possible
+          // if part of the primary key was filled in by the database
+          $row = $mdb->insert($table, $replace, ['returning' => true]);
+          if (! $row) {
+            throw new MeekroORMException("Unable to save(): INSERT RETURNING returned no row");
+          }
+          $this->_load_hash($row);
+          $have_loaded = true;
+        }
+        else {
+          $mdb->insert($table, $replace);
+          $this->_orm_is_fresh = false;
 
-        // for reload() to work below, we need to know what our auto-increment value is
-        if ($aifield = static::_orm_struct()->ai_field()) {
-          $this->set($aifield, $mdb->insertId());
+          // for reload() to work below, we need to know what our auto-increment value is
+          if ($aifield = static::_orm_struct()->ai_field()) {
+            $this->set($aifield, $mdb->insertId());
+          }
+
+          // primary keys filled in by the database (other than auto-increment) can't be known
+          // without RETURNING, so reload() below will probably fail
+          $unknown_keys = array_diff(static::_orm_struct()->primary_keys(), array_keys($this->_orm_row));
         }
       }
       else if (count($replace) > 0) {
@@ -538,8 +557,15 @@ abstract class MeekroORM {
       // don't reload if we did a partial save only
       if ($savefields) {
         $this->_orm_row_orig = array_merge($this->_orm_row_orig, $replace);
-      } else {
-        $this->reload();
+      } else if (! $have_loaded) {
+        try {
+          $this->reload();
+        } catch (MeekroORMException $e) {
+          if (! $unknown_keys) throw $e;
+          throw new MeekroORMException(sprintf("Unable to save(): primary key(s) %s were not set, " .
+            "and this database doesn't support INSERT ... RETURNING to find out their values",
+            implode(', ', $unknown_keys)));
+        }
       }
       
       if ($run_callbacks) {

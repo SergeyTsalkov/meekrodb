@@ -77,6 +77,11 @@ class Assignment extends MeekroORM {
 
 }
 
+// primary key is (id, region): id is auto-increment, region has a default value
+class Ticket extends MeekroORM {
+
+}
+
 class BasicOrmTest extends SimpleTest {
   function __construct() {
     // make sure we run the struct discovery code for every database type we test on
@@ -552,6 +557,85 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Loaded->name === 'Big Boss');
     $this->assert(Assignment::Load(1, 1)->name === 'Big Boss');
     $Loaded->Destroy();
+  }
+
+  // * saving a new object fills in database defaults
+  // * where RETURNING is supported, saving a new object doesn't need a reload() SELECT
+  function test_16_save_without_reload() {
+    $queries = [];
+    $hook_id = DB::addHook('pre_run', function($hash) use (&$queries) {
+      $queries[] = trim($hash['query']);
+    });
+
+    try {
+      $Person = new Person();
+      $Person->name = 'Nora';
+      $Person->Save();
+    } finally {
+      DB::removeHook('pre_run', $hook_id);
+    }
+
+    $selects = array_filter($queries, function($query) {
+      return stripos($query, 'SELECT') === 0;
+    });
+    if (DB::supports('returning')) $this->assert(count($selects) === 0);
+    else $this->assert(count($selects) > 0);
+
+    $this->assert(!$Person->isFresh());
+    $this->assert($Person->id > 0);
+    $this->assert($Person->age === 0);
+    $this->assert($Person->favorite_animaniacs === '');
+    $this->assert($Person->favorite_color === null);
+    $this->assert($Person->last_happy_moment instanceof DateTime);
+    $this->assert($Person->dirtyfields() === []);
+
+    $Loaded = Person::Load($Person->id);
+    $this->assert($Loaded->name === 'Nora');
+    $this->assert($Loaded->toHash() == $Person->toHash());
+    $Loaded->Destroy();
+  }
+
+  // * where RETURNING is supported, a split primary key (auto-increment + default value) works
+  // * where it isn't, saving throws a clear error and the insert is rolled back
+  function test_17_split_primary_key() {
+    // sqlite only allows AUTOINCREMENT on a single-column primary key
+    if ($this->db_type == 'sqlite') return;
+    DB::query($this->get_sql('create_tickets'));
+
+    $Ticket = new Ticket();
+    $Ticket->name = 'First';
+
+    if (! DB::supports('returning')) {
+      $error = '';
+      try {
+        $Ticket->Save();
+      } catch (MeekroORMException $e) {
+        $error = $e->getMessage();
+      }
+      $this->assert(substr_count($error, 'primary key(s) region were not set') === 1);
+      $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM tickets") === '0');
+      return;
+    }
+
+    $Ticket->Save();
+    $this->assert(!$Ticket->isFresh());
+    $this->assert($Ticket->id > 0);
+    $this->assert($Ticket->region === 1);
+
+    $Ticket2 = new Ticket();
+    $Ticket2->name = 'Second';
+    $Ticket2->region = 2;
+    $Ticket2->Save();
+    $this->assert($Ticket2->region === 2);
+    $this->assert($Ticket2->id !== $Ticket->id);
+
+    $this->assert(Ticket::Load($Ticket->id, 1)->name === 'First');
+    $this->assert(Ticket::Load($Ticket2->id, 2)->name === 'Second');
+
+    // now that the full primary key is known, updates work too
+    $Ticket->name = 'First Updated';
+    $Ticket->Save();
+    $this->assert(Ticket::Load($Ticket->id, 1)->name === 'First Updated');
   }
 
 }

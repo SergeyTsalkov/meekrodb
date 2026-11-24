@@ -34,11 +34,11 @@ if (! extension_loaded('pdo')) {
  *
  * @link https://meekro.com/docs/altering-data.html Altering Data
  *
- * @method static int insert(string $table_name, array $data, ...$parameters)
+ * @method static int|array|null insert(string $table_name, array $data, array $options = [])
  * @method static mixed insertId()
- * @method static int insertIgnore(string $table_name, array $data, ...$parameters)
+ * @method static int|array|null insertIgnore(string $table_name, array $data, array $options = [])
  * @method static int insertUpdate(string $table_name, array $data, ...$parameters)
- * @method static int replace(string $table_name, array $data, ...$parameters)
+ * @method static int|array|null replace(string $table_name, array $data, array $options = [])
  * @method static int update(string $table_name, array $data, ...$parameters)
  * @method static int delete(string $table_name, ...$parameters)
  * @method static int affectedRows()
@@ -67,6 +67,7 @@ if (! extension_loaded('pdo')) {
  * @method static PDO get()
  * @method static string lastQuery()
  * @method static string serverVersion()
+ * @method static bool supports(string $feature)
  * @method static void debugMode(bool $enable = true)
  * @method static mixed parse(string $query, ...$parameters)
  */
@@ -150,6 +151,7 @@ class MeekroDB {
   public $nested_transactions_count = 0;
   public $last_query;
   public $last_query_at=0;
+  protected $supports_cache = array();
 
   protected $hooks = array(
     'pre_run' => array(),
@@ -221,6 +223,48 @@ class MeekroDB {
   
   public function disconnect() {
     $this->internal_pdo = null;
+    $this->supports_cache = array();
+  }
+
+  /**
+   * Check whether the connected database supports a feature.
+   * Features: 'returning', 'insert_ignore', 'insert_update'
+   */
+  public function supports($feature) {
+    if (! in_array($feature, array('returning', 'insert_ignore', 'insert_update'), true)) {
+      throw new MeekroDBException("supports(): unknown feature: {$feature}");
+    }
+    if (! array_key_exists($feature, $this->supports_cache)) {
+      $this->supports_cache[$feature] = $this->checkSupports($feature);
+    }
+    return $this->supports_cache[$feature];
+  }
+
+  protected function checkSupports($feature) {
+    $db_type = $this->dbType();
+    $version = $this->serverVersion();
+
+    // MariaDB reports e.g. "10.11.6-MariaDB-1" or "5.5.5-10.11.6-MariaDB"
+    $mariadb_version = null;
+    if ($db_type == 'mysql' && preg_match('/(\d+\.\d+\.\d+)-MariaDB/i', $version, $match)) {
+      $mariadb_version = $match[1];
+    }
+
+    switch ($feature) {
+      case 'returning':
+        if ($db_type == 'pgsql') return true;
+        if ($db_type == 'sqlite') return version_compare($version, '3.35', '>=');
+        return $mariadb_version && version_compare($mariadb_version, '10.5', '>=');
+
+      case 'insert_ignore':
+        return $db_type != 'pgsql';
+
+      case 'insert_update':
+        if ($db_type == 'pgsql') return false;
+        if ($db_type == 'sqlite') return version_compare($version, '3.35', '>=');
+        return true;
+    }
+    return false;
   }
 
   public function serverVersion() { return $this->get()->getAttribute(PDO::ATTR_SERVER_VERSION); }
@@ -391,11 +435,11 @@ class MeekroDB {
       $action = 'INSERT';
     } else if ($mode == 'ignore') {
       $fn_name = 'insertIgnore';
-      if ($db_type == 'sqlite') {
-        $action = 'INSERT';
-      }
-      else if ($db_type == 'pgsql') {
+      if (! $this->supports('insert_ignore')) {
         throw new MeekroDBException("postgres does not support insertIgnore()");
+      }
+      else if ($db_type == 'sqlite') {
+        $action = 'INSERT';
       }
       else {
         $action = 'INSERT IGNORE';
@@ -407,11 +451,29 @@ class MeekroDB {
       throw new MeekroDBException("insertOrReplace() mode must be: insert, ignore, replace");
     }
 
+    $returning = $options['returning'] ?? null;
+    if ($returning) {
+      if (! $this->supports('returning')) {
+        throw new MeekroDBException("{$db_type} " . $this->serverVersion() . " does not support RETURNING");
+      }
+
+      if ($returning === true || $returning === '*') {
+        $returning_str = '*';
+      }
+      else if (is_array($returning)) {
+        $returning_str = implode(',', array_map(array($this, 'formatName'), array_values($returning)));
+      }
+      else {
+        throw new MeekroDBException("returning option must be true, '*', or an array of column names");
+      }
+    }
+
     $datas = unserialize(serialize($datas)); // break references within array
     $keys = $values = array();
     $array_is_list = ($datas === [] || $datas === array_values($datas));
+    $is_multi = ($array_is_list && count($datas) > 0 && is_array($datas[0]));
     
-    if ($array_is_list && count($datas) > 0 && is_array($datas[0])) {
+    if ($is_multi) {
       foreach ($datas as $datum) {
         ksort($datum);
         if (! $keys) {
@@ -445,16 +507,12 @@ class MeekroDB {
     }
     else if ($do_update) {
       $fn_name = 'insertUpdate';
-      if ($db_type == 'sqlite') {
-        $on_duplicate = 'ON CONFLICT DO UPDATE SET';
-        
-        $sqlite_version = $this->serverVersion();
-        if ($sqlite_version < '3.35') {
-          throw new MeekroDBException("sqlite {$sqlite_version} does not support insertUpdate(), please upgrade");
-        }
+      if (! $this->supports('insert_update')) {
+        if ($db_type == 'pgsql') throw new MeekroDBException("postgres does not support insertUpdate()");
+        throw new MeekroDBException("{$db_type} " . $this->serverVersion() . " does not support insertUpdate(), please upgrade");
       }
-      else if ($db_type == 'pgsql') {
-        throw new MeekroDBException("postgres does not support insertUpdate()");
+      else if ($db_type == 'sqlite') {
+        $on_duplicate = 'ON CONFLICT DO UPDATE SET';
       }
       else {
         $on_duplicate = 'ON DUPLICATE KEY UPDATE';
@@ -472,12 +530,39 @@ class MeekroDB {
       $ParsedQuery->add($Update);
     }
 
-    return $this->_query($fn_name, $ParsedQuery);
+    if ($returning) {
+      $ParsedQuery->add(" RETURNING {$returning_str}");
+    }
+
+    $result = $this->_query($fn_name, $ParsedQuery);
+    if (! $returning) return $result;
+
+    // return shape matches the input: one row in, one row (or null) out
+    $rows = is_array($result) ? $result : array();
+    $this->affected_rows = count($rows);
+    if ($is_multi) return $rows;
+    return $rows ? $rows[0] : null;
+  }
+
+  protected function insertOptions($fn_name, $options) {
+    $allowed = array('returning');
+    foreach (array_keys($options) as $key) {
+      if (! in_array($key, $allowed, true)) {
+        throw new MeekroDBException("{$fn_name}(): unknown option: {$key}");
+      }
+    }
+    return $options;
   }
   
-  public function insert($table, $data) { return $this->insertOrReplace('insert', $table, $data); }
-  public function insertIgnore($table, $data) { return $this->insertOrReplace('ignore', $table, $data); }
-  public function replace($table, $data) { return $this->insertOrReplace('replace', $table, $data); }
+  public function insert($table, $data, $options=array()) {
+    return $this->insertOrReplace('insert', $table, $data, $this->insertOptions('insert', $options));
+  }
+  public function insertIgnore($table, $data, $options=array()) {
+    return $this->insertOrReplace('ignore', $table, $data, $this->insertOptions('insertIgnore', $options));
+  }
+  public function replace($table, $data, $options=array()) {
+    return $this->insertOrReplace('replace', $table, $data, $this->insertOptions('replace', $options));
+  }
   
   public function insertUpdate() {
     $args = func_get_args();
