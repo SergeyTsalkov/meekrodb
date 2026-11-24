@@ -439,7 +439,8 @@ class MeekroDB {
         throw new MeekroDBException("postgres does not support insertIgnore()");
       }
       else if ($db_type == 'sqlite') {
-        $action = 'INSERT';
+        // works on all sqlite 3.x, unlike ON CONFLICT DO NOTHING (3.24+)
+        $action = 'INSERT OR IGNORE';
       }
       else {
         $action = 'INSERT IGNORE';
@@ -502,10 +503,7 @@ class MeekroDB {
     $do_update = $mode == 'insert' && isset($options['update']) 
       && is_array($options['update']) && $options['update'];
 
-    if ($mode == 'ignore' && $db_type == 'sqlite') {
-      $ParsedQuery->add(' ON CONFLICT DO NOTHING');
-    }
-    else if ($do_update) {
+    if ($do_update) {
       $fn_name = 'insertUpdate';
       if (! $this->supports('insert_update')) {
         if ($db_type == 'pgsql') throw new MeekroDBException("postgres does not support insertUpdate()");
