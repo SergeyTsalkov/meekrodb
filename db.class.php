@@ -152,6 +152,7 @@ class MeekroDB {
   public $last_query;
   public $last_query_at=0;
   protected $supports_cache = array();
+  protected $params_map_keys = array(); // param_char => placeholder names, see paramsMapKeys()
 
   protected $hooks = array(
     'pre_run' => array(),
@@ -761,6 +762,17 @@ class MeekroDB {
     );
   }
 
+  // placeholder names from paramsMap(), cached because nextQueryParam() needs them for every
+  // placeholder in every query, and building paramsMap() creates a closure for each one.
+  // cached per param_char, since that's one of the keys (and _query()/_parse() switch it temporarily)
+  protected function paramsMapKeys() {
+    $param_char = $this->param_char;
+    if (! array_key_exists($param_char, $this->params_map_keys)) {
+      $this->params_map_keys[$param_char] = array_keys($this->paramsMap());
+    }
+    return $this->params_map_keys[$param_char];
+  }
+
   protected function paramsMapArrayTypes() {
     return array('ls', 'li', 'ld', 'lb', 'lc', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
   }
@@ -810,7 +822,7 @@ class MeekroDB {
   }
 
   protected function nextQueryParam($query) {
-    $keys = array_keys($this->paramsMap());
+    $keys = $this->paramsMapKeys();
 
     $first_position = PHP_INT_MAX;
     $first_param = null;
