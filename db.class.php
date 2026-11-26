@@ -762,7 +762,7 @@ class MeekroDB {
   }
 
   protected function paramsMapArrayTypes() {
-    return array('ls', 'li', 'ld', 'lb', 'lc', 'll', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
+    return array('ls', 'li', 'ld', 'lb', 'lc', 'lt', 'l?', 'll?', 'hc', 'ha', 'ho');
   }
   protected function paramsMapOptArrayTypes() {
     return array('b', 'c');
