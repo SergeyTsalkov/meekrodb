@@ -279,6 +279,7 @@ abstract class MeekroORM {
   }
 
   public function _marshal_type_json($key, $value, $is_nullable) {
+    if ($is_nullable && is_null($value)) return null;
     return json_encode($value);
   }
   public function _unmarshal_type_json($key, $value) {

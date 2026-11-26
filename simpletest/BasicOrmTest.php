@@ -98,7 +98,9 @@ class Book extends MeekroORM {
 }
 
 class Bio extends MeekroORM {
-
+  static $_columns = [
+    'tags' => ['type' => 'json'],
+  ];
 }
 
 class BasicOrmTest extends SimpleTest {
@@ -727,6 +729,27 @@ class BasicOrmTest extends SimpleTest {
 
     // belongs_to
     $this->assert($Books[0]->Writer->name === 'Ursula');
+  }
+
+  // * json columns: null is stored as SQL NULL if the column is nullable, not as the string 'null'
+  function test_19_json_null() {
+    $Bio = new Bio();
+    $Bio->summary = 'No tags yet';
+    $Bio->tags = null;
+    $Bio->Save();
+    $this->assert($Bio->tags === null);
+    $this->assert(DB::queryFirstField("SELECT tags FROM bios WHERE bio_id=@i", $Bio->bio_id) === null);
+
+    $Bio->tags = ['fantasy', 'scifi'];
+    $Bio->Save();
+    $Bio = Bio::Load($Bio->bio_id);
+    $this->assert($Bio->tags === ['fantasy', 'scifi']);
+
+    $Bio->tags = null;
+    $Bio->Save();
+    $Bio = Bio::Load($Bio->bio_id);
+    $this->assert($Bio->tags === null);
+    $this->assert(DB::queryFirstField("SELECT tags FROM bios WHERE bio_id=@i", $Bio->bio_id) === null);
   }
 
 }

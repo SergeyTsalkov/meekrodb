@@ -173,5 +173,6 @@ CREATE TABLE books (
 CREATE TABLE bios (
   bio_id {{AUTOKEY}},
   author_id {{INT}} NOT NULL DEFAULT 0,
-  summary VARCHAR(255) NOT NULL DEFAULT ''
+  summary VARCHAR(255) NOT NULL DEFAULT '',
+  tags VARCHAR(255) NULL
 )
