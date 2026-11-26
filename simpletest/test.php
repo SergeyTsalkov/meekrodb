@@ -154,7 +154,7 @@ class SimpleTest {
   protected function fail($msg = '') {
     echo "FAILURE! $msg\n";
     debug_print_backtrace();
-    die;
+    exit(1); // non-zero, so anything checking the exit status sees the failure
   }
 }
 
