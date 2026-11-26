@@ -66,23 +66,27 @@ abstract class MeekroORM {
   }
 
   // -------------- TRANSACTIONS
-  private function _tr_enabled() {
-    if (is_bool($this->_use_transactions)) {
-      return $this->_use_transactions;
+  // run $fn inside a transaction (if enabled): commit if it returns, roll back if it throws
+  // $_use_transactions overrides the default, which is to use transactions only if nested_transactions is on
+  private function _orm_in_transaction(callable $fn) {
+    $mdb = static::_meekrodb();
+    $use_transactions = is_bool($this->_use_transactions)
+      ? $this->_use_transactions
+      : $mdb->nested_transactions;
+
+    if (! $use_transactions) return $fn();
+
+    $mdb->startTransaction();
+    $have_committed = false;
+
+    try {
+      $result = $fn();
+      $mdb->commit();
+      $have_committed = true;
+      return $result;
+    } finally {
+      if (! $have_committed) $mdb->rollback();
     }
-    return static::_meekrodb()->nested_transactions;
-  }
-  private function _tr_start() {
-    if (! $this->_tr_enabled()) return;
-    static::_meekrodb()->startTransaction();
-  }
-  private function _tr_commit() {
-    if (! $this->_tr_enabled()) return;
-    static::_meekrodb()->commit();
-  }
-  private function _tr_rollback() {
-    if (! $this->_tr_enabled()) return;
-    static::_meekrodb()->rollback();
   }
 
   // -------------- STATE AND DIRTY TRACKING
@@ -474,12 +478,10 @@ abstract class MeekroORM {
     if (! is_bool($run_callbacks)) $run_callbacks = true;
 
     $is_fresh = $this->isFresh();
-    $have_committed = false;
     $table = static::_tablename();
     $mdb = static::_meekrodb();
 
-    $this->_tr_start();
-    try {
+    $fields = $this->_orm_in_transaction(function() use ($savefields, $run_callbacks, $is_fresh, $table, $mdb) {
       if ($run_callbacks) {
         $fields = $this->_dirtyfields($savefields);
         foreach ($fields as $field) {
@@ -546,12 +548,9 @@ abstract class MeekroORM {
         else $this->_orm_run_callback('_post_update', $fields);
         $this->_orm_run_callback('_post_save', $fields);
       }
-      $this->_tr_commit();
-      $have_committed = true;
 
-    } finally {
-      if (! $have_committed) $this->_tr_rollback();
-    }
+      return $fields;
+    });
 
     if ($run_callbacks) {
       $this->_orm_run_callback('_post_commit', $fields);
@@ -590,18 +589,11 @@ abstract class MeekroORM {
   }
 
   public function destroy() {
-    $this->_tr_start();
-    $have_committed = false;
-
-    try {
+    $this->_orm_in_transaction(function() {
       $this->_orm_run_callback('_pre_destroy');
       static::_orm_query('query', 'DELETE FROM :b WHERE :ha', static::_tablename(), $this->_whereHash());
       $this->_orm_run_callback('_post_destroy');
-      $this->_tr_commit();
-      $have_committed = true;
-    } finally {
-      if (! $have_committed) $this->_tr_rollback();
-    }
+    });
   }
 
   protected function _whereHash() {
