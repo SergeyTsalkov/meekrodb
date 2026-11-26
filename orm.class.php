@@ -15,12 +15,15 @@ abstract class MeekroORM {
   public $_use_transactions = null;
 
   // -------------- TABLE AND DATABASE HELPERS
+  // table structure is cached per connection and table name: classes that share a table on the same
+  // connection share its structure, but the same table name on another connection might be different
+  // (spl_object_id() would be tidier, but needs PHP 7.2)
   private static function _orm_struct() {
-    $table_name = static::_tablename();
-    if (! array_key_exists($table_name, self::$_orm_struct)) {
-      self::$_orm_struct[$table_name] = new MeekroORMTable(static::class);
+    $key = spl_object_hash(static::_meekrodb()) . ':' . static::_tablename();
+    if (! array_key_exists($key, self::$_orm_struct)) {
+      self::$_orm_struct[$key] = new MeekroORMTable(static::class);
     }
-    return self::$_orm_struct[$table_name];
+    return self::$_orm_struct[$key];
   }
 
   public static function _orm_struct_reset() {
