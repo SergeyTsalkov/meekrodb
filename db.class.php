@@ -150,7 +150,7 @@ class MeekroDB {
   public $affected_rows = 0;
   public $nested_transactions_count = 0;
   public $last_query;
-  public $last_query_at=0;
+  public $last_query_at=0; // time of the last query, or of connecting if no query has run since
   protected $supports_cache = array();
   protected $params_map_keys = array(); // param_char => placeholder names, see paramsMapKeys()
 
@@ -213,6 +213,8 @@ class MeekroDB {
       try {
         $pdo = new PDO($this->dsn, $this->user, $this->password, $this->connect_options);
         $this->internal_pdo = $pdo;
+        // a new connection isn't idle: without this, reconnect_after would drop it on the first query
+        $this->last_query_at = time();
       } catch (PDOException $e) {
         throw MeekroDBException::fromException($e);
       }
