@@ -123,7 +123,7 @@ class BasicOrmTest extends SimpleTest {
     DB::query($this->get_sql('create_persons'));
     DB::query($this->get_sql('create_houses'));
     DB::query($this->get_sql('create_souls'));
-    DB::query($this->get_sql('create_companies'));
+    DB::query($this->get_sql('create_companies_old'));
     DB::query($this->get_sql('create_assignments'));
 
     $Person = new Person();
