@@ -1,410 +1,241 @@
 <?php
 class BasicTest extends SimpleTest {
-  public $last_func;
-
   function __construct() {
-    DB::$param_char = '%';
-
-    foreach (DB::tableList() as $table) {
-      DB::query("DROP TABLE %b", $table);
-    }
-
-    DB::removeHooks('pre_run');
+    $this->resetDatabase();
     DB::addHook('pre_run', function($hash) {
       $this->last_func = $hash['func_name'];
     });
   }
-  
-  function test_01_create_table() {
-    DB::query($this->get_sql('create_accounts'));
-    DB::query($this->get_sql('create_profile'));
-  }
-  
-  function test_02_empty_table() {
-    $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
+
+  // * query(), queryFirstRow(), queryFirstField(), queryFirstList(), queryFirstColumn(), queryAllLists()
+  // * queryRaw() gives the PDOStatement
+  // * lastQuery(), and the func_name that hooks get
+  function test_01_query_helpers() {
+    $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM users") === '4');
     $this->assert($this->last_func === 'queryFirstField');
-    $this->assert($counter === strval(0));
-    $this->assert(DB::lastQuery() === 'SELECT COUNT(*) FROM accounts');
-    
-    $row = DB::queryFirstRow("SELECT * FROM accounts");
+    $this->assert(DB::lastQuery() === 'SELECT COUNT(*) FROM users');
+
+    $row = DB::queryFirstRow("SELECT * FROM users WHERE name=%s", 'Bart');
     $this->assert($this->last_func === 'queryFirstRow');
-    $this->assert($row === null);
-    
-    $field = DB::queryFirstField("SELECT * FROM accounts");
-    $this->assert($field === null);
-    
-    $column = DB::queryFirstColumn("SELECT * FROM accounts");
-    $this->assert($this->last_func === 'queryFirstColumn');
-    $this->assert(is_array($column) && count($column) === 0);
-  }
-  
-  function test_03_insert_row() {
-    $affected_rows = DB::insert('accounts', array(
-      'username' => 'Abe',
-      'password' => 'hello'
-    ));
-    
-    $this->assert($this->last_func === 'insert');
-    $this->assert($affected_rows === 1);
-    $this->assert(DB::affectedRows() === 1);
-    
-    $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
-    $this->assert($counter === '1');
-  }
-  
-  function test_04_more_inserts() {
-    DB::insert('accounts', array(
-      'username' => 'Bart',
-      'password' => 'hello',
-      'age' => 15,
-      'height' => 10.371
-    ));
+    $this->assert($row['user_id'] === '2');
+    $this->assert($row['nickname'] === 'Bartman');
 
-    DB::insert('accounts', array(
-      'username' => 'Charlie\'s Friend',
-      'password' => 'goodbye',
-      'age' => 30,
-      'height' => 155.23,
-      'favorite_word' => null,
-    ));
-
-    $this->assert(DB::insertId() == 3);
-    $counter = DB::queryFirstField("SELECT COUNT(*) FROM accounts");
-    $this->assert($counter === strval(3));
-    
-    DB::insert('accounts', array(
-      'username' => 'Deer',
-      'password' => '',
-      'age' => 15,
-      'height' => 10.371
-    ));
-
-    $username = DB::queryFirstField("SELECT username FROM accounts WHERE password=%s0", null);
-    $this->assert($username === 'Deer');
-
-    $password = DB::queryFirstField("SELECT password FROM accounts WHERE favorite_word IS NULL");
-    $this->assert($password === 'goodbye');
-  }
-
-  // * basic test of:
-  //   queryFirstField(), queryFirstColumn(), queryFirstList(), queryRaw()
-  //   %ss, %sse, %ssb
-  function test_05_query() {
-    $charlie_password = DB::queryFirstField("SELECT password FROM accounts WHERE username IN %ls AND username = %s", 
-      array('Charlie', 'Charlie\'s Friend'), 'Charlie\'s Friend');
-    $this->assert($charlie_password === 'goodbye');
-    
-    $passwords = DB::queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Bart');
-    $this->assert(count($passwords) === 1);
-    $this->assert($passwords[0] === 'hello');
-
-    // queries that return no rows, or no result set at all, give an empty column
-    $this->assert(DB::queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Nobody') === []);
-    $this->assert(DB::queryFirstColumn("UPDATE accounts SET age=age WHERE username=%s", 'Nobody') === []);
-
-    list($username, $password) = DB::queryFirstList("SELECT username, password FROM accounts WHERE id=%i", 1);
+    list($name, $age) = DB::queryFirstList("SELECT name, age FROM users WHERE user_id=%i", 3);
     $this->assert($this->last_func === 'queryFirstList');
-    $this->assert($username === 'Abe');
-    $this->assert($password === 'hello');
-    
-    $statement = DB::queryRaw("SELECT * FROM accounts WHERE favorite_word IS NULL");
+    $this->assert($name === 'Cleo');
+    $this->assert($age === '41');
+
+    $names = DB::queryFirstColumn("SELECT name FROM users WHERE age=%i ORDER BY user_id", 15);
+    $this->assert($this->last_func === 'queryFirstColumn');
+    $this->assert($names === ['Bart', "Dana O'Neil"]);
+
+    $rows = DB::query("SELECT name, age FROM users WHERE age>%i ORDER BY user_id", 20);
+    $this->assert($this->last_func === 'query');
+    $this->assert($rows === [['name' => 'Abe', 'age' => '30'], ['name' => 'Cleo', 'age' => '41']]);
+
+    $lists = DB::queryAllLists("SELECT name, age FROM users WHERE age>%i ORDER BY user_id", 20);
+    $this->assert($this->last_func === 'queryAllLists');
+    $this->assert($lists === [['Abe', '30'], ['Cleo', '41']]);
+
+    $statement = DB::queryRaw("SELECT name FROM users WHERE user_id=%i", 1);
     $this->assert($this->last_func === 'queryRaw');
     $this->assert($statement instanceof PDOStatement);
-    $row = $statement->fetch(PDO::FETCH_ASSOC);
-    $row2 = $statement->fetch(PDO::FETCH_ASSOC);
-    $this->assert($row['password'] === 'goodbye');
-    $this->assert($row2 === false);
-
-    $rows = DB::query("SELECT * FROM accounts WHERE username LIKE %ss", 'ee');
-    $this->assert(count($rows) === 1);
-    $this->assert($rows[0]['username'] === 'Deer');
-
-    $rows = DB::query("SELECT * FROM accounts WHERE username LIKE %ssb", 'ee');
-    $this->assert(count($rows) === 0);
-
-    $rows = DB::query("SELECT * FROM accounts WHERE username LIKE %ssb", 'De');
-    $this->assert(count($rows) === 1);
-    $this->assert($rows[0]['username'] === 'Deer');
-
-    $rows = DB::query("SELECT * FROM accounts WHERE username LIKE %sse", 'eer');
-    $this->assert(count($rows) === 1);
-    $this->assert($rows[0]['username'] === 'Deer');
+    $this->assert($statement->fetch(PDO::FETCH_ASSOC) === ['name' => 'Abe']);
+    $this->assert($statement->fetch(PDO::FETCH_ASSOC) === false);
   }
 
-  // * alternative param_char and named_param_seperator separate will work
-  // * can access both named and numbered args
-  // * numbered args can be accessed both with and without named_param_seperator
-  // * param_char of strlen>1 will work
-  function test_06_alt_param_chars() {
-    DB::$param_char = ':';
-    DB::$named_param_seperator = ':';
-    $bart = DB::queryFirstRow(
-      "SELECT * FROM accounts WHERE age IN :li AND height IN :ld AND username IN :ls",
-      array(15, 25), array(10.371, 150.123), array('Bart', 'Barts')
-    );
-    $this->assert($bart['username'] === 'Bart');
-
-    $bart = DB::queryFirstRow(
-      "SELECT * FROM accounts WHERE age IN :li:ages AND height IN :ld:heights AND username IN :ls:names", array(
-          'ages' => array(15, 25), 
-          'heights' => array(10.371, 150.123),
-          'names' => array('Bart', 'Barts'),
-        )
-    );
-    $this->assert($bart['username'] === 'Bart');
-
-    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c0=:i1 AND height=:i1", 'age', 10);
-    $this->assert($row['id'] === '1');
-    $this->assert($row['username'] === 'Abe');
-
-    $row = DB::queryFirstRow("SELECT * FROM accounts WHERE :c:0=:i:1 AND height=:i:1", array('age', 10));
-    $this->assert($row['id'] === '1');
-    $this->assert($row['username'] === 'Abe');
-
-    DB::$param_char = '###';
-    DB::$named_param_seperator = '_';
-    $bart = DB::queryFirstRow("SELECT * FROM accounts WHERE age IN ###li AND height IN ###ld AND username IN ###ls", 
-      array(15, 25), array(10.371, 150.123), array('Bart', 'Barts'));
-    $this->assert($bart['username'] === 'Bart');
-    DB::insert('accounts', array('username' => 'f_u'));
-    DB::query("DELETE FROM accounts WHERE username=###s", 'f_u');
-    $this->assert($this->last_func === 'query');
-    DB::$param_char = '%';
+  // * with no matching rows, queryFirstRow/Field/List() give null, and query()/queryFirstColumn() give []
+  // * a statement with no result set at all (like an UPDATE) gives the same from the queryFirst*() helpers
+  function test_02_no_results() {
+    foreach (["SELECT * FROM users WHERE name='Nobody'", "UPDATE users SET age=age WHERE name='Nobody'"] as $query) {
+      $this->assert(DB::queryFirstRow($query) === null);
+      $this->assert(DB::queryFirstField($query) === null);
+      $this->assert(DB::queryFirstList($query) === null);
+      $this->assert(DB::queryFirstColumn($query) === []);
+    }
+    $this->assert(DB::query("SELECT * FROM users WHERE name='Nobody'") === []);
   }
-  
-  function test_07_query() {
-    $affected_rows = DB::update('accounts', array(
-      'birthday' => new DateTime('10 September 2000 13:13:13')
-    ), 'username=%s', 'Charlie\'s Friend');
-    $this->assert($affected_rows === 1);
-    $this->assert($this->last_func == 'update');
 
-    $results = DB::query("SELECT * FROM accounts WHERE username=%s AND birthday IN %lt", 'Charlie\'s Friend', array('September 10 2000 13:13:13'));
-    $this->assert(count($results) === 1);
-    $this->assert($results[0]['age'] === '30' && $results[0]['password'] === 'goodbye');
-    $this->assert($results[0]['birthday'] == '2000-09-10 13:13:13');
-
-    $result = DB::queryFirstRow("SELECT * FROM accounts WHERE birthday=%t", new DateTime('September 10 2000 13:13:13'));
-    $this->assert($result['age'] === '30');
-    $this->assert($result['password'] === 'goodbye');
-    $this->assert($result['birthday'] == '2000-09-10 13:13:13');
-    
-    $results = DB::query("SELECT * FROM accounts WHERE username!=%s", "Charlie's Friend");
-    $this->assert(count($results) === 3);
-    
-    $columnList = DB::columnList('accounts');
-    $columnKeys = array_keys($columnList);
-    $this->assert($this->last_func === 'columnList');
-    $this->assert(count($columnList) === 8);
-
-    if ($this->db_type == 'mysql') {
-      $this->assert($columnList['id']['type'] == 'int(11)');
-      $this->assert($columnList['height']['type'] == 'double');
-    }
-    else if ($this->db_type == 'sqlite') {
-      $this->assert($columnList['id']['type'] == 'INTEGER');
-      $this->assert($columnList['height']['type'] == 'DOUBLE');
-    }
-
-    $this->assert($columnKeys[5] == 'height');
-    
-    $tablelist = DB::tableList();
-    $this->assert($this->last_func === 'tableList');
-    $this->assert(count($tablelist) === 2);
-    $this->assert($tablelist[0] === 'accounts');
-    
-    $tablelist = null;
-    $tablelist = DB::tableList(DB::$dbName);
-    $this->assert(count($tablelist) === 2);
-    $this->assert($tablelist[0] === 'accounts');
-
-    if ($this->db_type == 'sqlite') {
-      $date = DB::queryFirstField("SELECT strftime('%%m/%%d/%%Y', birthday) FROM accounts WHERE username=%s", "Charlie's Friend");
-      $date2 = DB::queryFirstField("SELECT strftime('%m/%d/%Y', '2009-10-04 22:23:00')");
-    }
-    else if ($this->db_type == 'pgsql') {
-      $date = DB::queryFirstField("SELECT TO_CHAR(birthday, 'MM/DD/YYYY') FROM accounts WHERE username=%s", "Charlie's Friend");
-      $date2 = DB::queryFirstField("SELECT TO_CHAR(TIMESTAMP '2009-10-04 22:23:00', 'MM/DD/YYYY')");
-    }
-    else {
-      $date = DB::queryFirstField("SELECT DATE_FORMAT(birthday, '%%m/%%d/%%Y') FROM accounts WHERE username=%s", "Charlie's Friend");
-      $date2 = DB::queryFirstField("SELECT DATE_FORMAT('2009-10-04 22:23:00', '%m/%d/%Y')");;
-    }
-    $this->assert($date === '09/10/2000');
-    $this->assert($date2 === '10/04/2009');
-  }
-  
-  function test_08_query() {
-    DB::insert('accounts', array(
-      'username' => 'newguy',
-      'password' => DB::sqleval("SUBSTR('abcdefgh', %i)", '3'),
-      'age' => DB::sqleval('171+1'),
-      'height' => 111.15
-    ));
-    
-    $affected_rows = DB::update('accounts', array(
-      'password' => DB::sqleval("SUBSTR('abcdefgh', %i)", 4),
-      'favorite_word' => null,
-      ), 'username=%s_name', array('name' => 'newguy'));
-    
-    $row = DB::query("SELECT * FROM accounts WHERE password=%s_mypass AND (password=%s_mypass) AND username=%s_myuser", 
-      array('myuser' => 'newguy', 'mypass' => 'defgh')
-    );
-    $this->assert(count($row) === 1);
-    $this->assert($row[0]['username'] === 'newguy');
-    $this->assert($row[0]['age'] === '172');
-
-    $row = DB::query("SELECT * FROM accounts WHERE password IN %ls AND password IN %ls0 AND username=%s", array('defgh'), 'newguy');
-    $this->assert(count($row) === 1);
-    $this->assert($row[0]['username'] === 'newguy');
-    $this->assert($row[0]['age'] === '172');
-    
-    $affected_rows = DB::query("DELETE FROM accounts WHERE password=%s", 'defgh');
-    $this->assert($affected_rows === 1);
+  // * insert() returns the affected rows, and insertId() gives the new id
+  // * columns left out get their defaults, and an empty insert is all defaults
+  // * null is stored as NULL, and so is an array where a single value is expected
+  function test_03_insert() {
+    $affected = DB::insert('users', ['name' => 'Eve', 'age' => 22, 'height' => 1.7, 'nickname' => []]);
+    $this->assert($this->last_func === 'insert');
+    $this->assert($affected === 1);
     $this->assert(DB::affectedRows() === 1);
+    $this->assert(DB::insertId() == 5);
+
+    $row = DB::queryFirstRow("SELECT * FROM users WHERE user_id=%i", 5);
+    $this->assert($row['name'] === 'Eve');
+    $this->assert($row['age'] === '22');
+    $this->assert($row['height'] === '1.7');
+    $this->assert($row['nickname'] === null);
+    $this->assert($row['employer_id'] === null);
+    $this->assert($row['settings'] === '');
+    $this->assert($row['signed_up_at'] === '1970-01-03 00:00:00');
+
+    DB::insert('users', ['name' => 'Fay', 'employer_id' => null]);
+    $row = DB::queryFirstRow("SELECT * FROM users WHERE name=%s", 'Fay');
+    $this->assert($row['nickname'] === 'buddy');
+    $this->assert($row['employer_id'] === null);
+
+    DB::insert('users', []);
+    $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM users WHERE name=''") === '1');
+
+    DB::query("DELETE FROM users WHERE user_id>%i", 4);
   }
-  
-  function test_09_delete() {
-    DB::insert('accounts', array(
-      'username' => 'gonesoon',
-      'password' => 'something',
-      'age' => 61,
-      'height' => 199.194
-    ));
-    
-    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE %ha", array('username' => 'gonesoon', 'height' => 199.194));
-    $this->assert(intval($ct) === 1);
-    
-    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s1 AND height=%d0 AND height=%d", 199.194, 'gonesoon');
-    $this->assert(intval($ct) === 1);
-    
-    $affected_rows = DB::delete('accounts', 'username=%s AND age=%i AND height=%d', 
-      'gonesoon', '61', '199.194');
+
+  // * insert() several rows at once, which must all have the same keys (in any order)
+  // * ORDER BY with %c
+  function test_04_insert_many() {
+    $affected = DB::insert('users', [
+      ['name' => 'Gus', 'age' => 50],
+      ['age' => 51, 'name' => 'Hal'],
+    ]);
+    $this->assert($affected === 2);
+    $this->assert(DB::affectedRows() === 2);
+
+    $rows = DB::queryAllLists("SELECT name, age FROM users WHERE age>=%i ORDER BY %c", 50, 'age');
+    $this->assert($rows === [['Gus', '50'], ['Hal', '51']]);
+
+    $this->assertThrows(function() {
+      DB::insert('users', [['name' => 'Ivy'], ['name' => 'Jo', 'age' => 1]]);
+    }, 'must have the same keys');
+
+    DB::query("DELETE FROM users WHERE user_id>%i", 4);
+  }
+
+  // * update() and delete() take a where string with args, or a hash; both return the affected rows
+  // * values can be DateTime objects, or sqleval() expressions
+  // * query() of a statement with no result set returns the affected rows
+  function test_05_update_delete() {
+    $affected = DB::update('users', ['age' => 31, 'signed_up_at' => new DateTime('2021-05-06 07:08:09')],
+      'name=%s', 'Abe');
+    $this->assert($this->last_func === 'update');
+    $this->assert($affected === 1);
+    $this->assert(DB::affectedRows() === 1);
+    $row = DB::queryFirstRow("SELECT * FROM users WHERE user_id=%i", 1);
+    $this->assert($row['age'] === '31');
+    $this->assert($row['signed_up_at'] === '2021-05-06 07:08:09');
+
+    $affected = DB::update('users', ['age' => DB::sqleval('age + %i', 10)], ['employer_id' => 1]);
+    $this->assert($affected === 2);
+    $this->assert(DB::queryFirstColumn("SELECT age FROM users WHERE employer_id=1 ORDER BY user_id") === ['41', '25']);
+
+    DB::insert('users', ['name' => 'Temp', 'nickname' => DB::sqleval("SUBSTR('abcdefgh', %i)", 3)]);
+    $this->assert(DB::queryFirstField("SELECT nickname FROM users WHERE name='Temp'") === 'cdefgh');
+
+    $affected = DB::delete('users', 'name=%s AND age=%i', 'Temp', 0);
     $this->assert($this->last_func === 'delete');
-    $this->assert($affected_rows === 1);
+    $this->assert($affected === 1);
     $this->assert(DB::affectedRows() === 1);
-    
-    $ct = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=%s AND height=%d", 'gonesoon', '199.194');
-    $this->assert(intval($ct) === 0);
-  }
-  
-  // * insert() multiple rows at once, read them back
-  function test_10_insertmany() {
-    $ins[] = array(
-      'username' => '1ofmany',
-      'password' => 'something',
-      'age' => 23,
-      'height' => 190.194
-    );
-    $ins[] = array(
-      'password' => 'somethingelse',
-      'username' => '2ofmany',
-      'age' => 25,
-      'height' => 190.194
-    );
-    $ins[] = array(
-      'password' => NULL,
-      'username' => '3ofmany',
-      'age' => 15,
-      'height' => 111.951
-    ); 
-    
-    $affected_rows = DB::insert('accounts', $ins);
-    $this->assert($affected_rows === 3);
-    $this->assert(DB::affectedRows() === 3);
-    
-    $rows = DB::query("SELECT * FROM accounts WHERE height=%d ORDER BY %c ASC", 190.194, 'age');
-    $this->assert(count($rows) === 2);
-    $this->assert($rows[0]['username'] === '1ofmany');
-    $this->assert($rows[0]['age'] === '23');
-    $this->assert($rows[1]['age'] === '25');
-    $this->assert($rows[1]['password'] === 'somethingelse');
-    $this->assert($rows[1]['username'] === '2ofmany');
-  }
-  
-  function test_13_lb() {
-    $data = array(
-      'username' => 'vookoo',
-      'password' => 'dookoo',
-    );
-    
-    $affected_rows = DB::query("INSERT into accounts %lc VALUES %ls", array_keys($data), array_values($data));
-    $result = DB::query("SELECT * FROM accounts WHERE username=%s", 'vookoo');
-    $this->assert($affected_rows === 1);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['password'] === 'dookoo');
+    $this->assert(DB::delete('users', ['name' => 'Nobody']) === 0);
+
+    $affected = DB::query("UPDATE users SET age=%i, signed_up_at=%s WHERE user_id IN %li",
+      30, '1970-01-03 00:00:00', [1]);
+    $this->assert($affected === 1);
+    DB::update('users', ['age' => 15], ['user_id' => 2]);
   }
 
-  function test_14_fullcolumns() {
-    // old pgsql pdo driver doesn't support getColumnMeta()['table']
-    if ($this->db_type == 'pgsql' && phpversion() < '7.0') return;
+  // * %t and %lt take DateTime objects or strings
+  function test_06_timestamps() {
+    $names = DB::queryFirstColumn("SELECT name FROM users WHERE signed_up_at=%t", new DateTime('2020-01-02 03:04:05'));
+    $this->assert($names === ['Cleo']);
 
-    $affected_rows = DB::insert('profile', array(
-      'id' => 1,
-      'signature' => 'u_suck'
-    ));
-    $this->assert($affected_rows === 1);
+    $names = DB::queryFirstColumn("SELECT name FROM users WHERE signed_up_at IN %lt", ['January 2 2020 03:04:05']);
+    $this->assert($names === ['Cleo']);
+  }
 
-    DB::query("UPDATE accounts SET profile_id=1 WHERE id=2");
+  // * %% is a literal % in a query with args, and a query without any args is sent as-is
+  function test_07_percent() {
+    $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM users WHERE name LIKE 'B%%' AND age=%i", 15) === '1');
+    $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM users WHERE name LIKE 'B%'") === '1');
+  }
 
-    $as_str = '';
-    if ($this->db_type == 'pgsql') $as_str = 'AS "1+1"';
+  // * %ss, %ssb and %sse match anywhere / at the start / at the end of a string
+  // * LIKE wildcards in the value (% and _) are matched literally
+  function test_08_like() {
+    DB::insert('users', [['name' => 'snake_case'], ['name' => 'snakeXcase'], ['name' => '100% sure'], ['name' => '100 percent']]);
+    $like = function($placeholder, $value) {
+      return DB::queryFirstColumn("SELECT name FROM users WHERE name LIKE {$placeholder} ORDER BY user_id", $value);
+    };
 
-    $r = DB::queryFullColumns("SELECT accounts.*, profile.*, 1+1 {$as_str} FROM accounts
-      INNER JOIN profile ON accounts.profile_id=profile.id");
+    $this->assert($like('%ss', 'ar') === ['Bart']);
+    $this->assert($like('%ssb', 'Cl') === ['Cleo']);
+    $this->assert($like('%ssb', 'le') === []);
+    $this->assert($like('%sse', 'Neil') === ["Dana O'Neil"]);
+    $this->assert($like('%ss', '_') === ['snake_case']);
+    $this->assert($like('%ssb', 'snake_') === ['snake_case']);
+    $this->assert($like('%ss', '0%') === ['100% sure']);
+
+    DB::query("DELETE FROM users WHERE user_id>%i", 4);
+  }
+
+  // * %b and %c quote table and column names; %lc and %l? build an INSERT by hand
+  function test_09_names() {
+    $data = ['name' => 'Kim', 'age' => 33];
+    $affected = DB::query("INSERT INTO %b %lc VALUES %l?", 'users', array_keys($data), array_values($data));
+    $this->assert($affected === 1);
+    $this->assert(DB::queryFirstField("SELECT %c FROM %b WHERE %c=%s", 'age', 'users', 'name', 'Kim') === '33');
+    DB::delete('users', ['name' => 'Kim']);
+  }
+
+  // * queryFullColumns() keys each value by table.column, so columns with the same name don't collide
+  function test_10_full_columns() {
+    $as = ($this->db_type == 'pgsql') ? 'AS "1+1"' : '';
+    $rows = DB::queryFullColumns("SELECT users.*, companies.*, 1+1 {$as} FROM users
+      JOIN companies ON users.employer_id=companies.company_id WHERE users.user_id=%i", 2);
 
     $this->assert($this->last_func === 'queryFullColumns');
-    $this->assert(count($r) === 1);
-    $this->assert($r[0]['accounts.id'] === '2');
-    $this->assert($r[0]['profile.id'] === '1');
-    $this->assert($r[0]['profile.signature'] === 'u_suck');
-    $this->assert($r[0]['1+1'] === '2');
+    $this->assert(count($rows) === 1);
+    $this->assert($rows[0]['users.name'] === 'Bart');
+    $this->assert($rows[0]['companies.name'] === 'Acme');
+    $this->assert($rows[0]['companies.company_id'] === '1');
+    $this->assert($rows[0]['1+1'] === '2');
   }
 
-  // * can insert an empty row
-  function test_15_empty_insert() {
-    DB::insert('accounts', []);
+  // * columnList() gives the columns in order, with the database's own info about each
+  // * tableList() lists the tables, optionally from a named database
+  function test_11_column_and_table_lists() {
+    $columns = DB::columnList('users');
+    $this->assert($this->last_func === 'columnList');
+    $this->assert(array_keys($columns) === ['user_id', 'employer_id', 'name', 'nickname', 'age', 'height',
+      'is_active', 'settings', 'signed_up_at']);
 
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username=''");
-    $this->assert($count === '1');
-    DB::delete('accounts', ['username' => '']);
-  }
-
-  // * in an insert, if an array is given where a scalar is expected, convert to NULL
-  // * try with both first value as array, and second value as array
-  function test_16_insert_with_wrong_array() {
-    DB::insert('accounts', ['password' => []]);
-    DB::delete('accounts', ['id' => DB::insertId()]);
-    DB::insert('accounts', ['age' => 121, 'password' => []]);
-    DB::delete('accounts', ['id' => DB::insertId()]);
-  }
-
-  // * when inserting multiple rows at once, they must all have the same keys
-  function test_17_insert_with_different_multiples() {
-    $rows[] = ['age' => 121];
-    $rows[] = ['password' => 'abcde', 'age' => 121];
-    $got_error = false;
-
-    try {
-      DB::insert('accounts', $rows);
-    } catch (MeekroDBException $e) {
-      if (substr_count($e->getMessage(), 'have the same keys')) {
-        $got_error = true;
-      }
+    if ($this->db_type == 'mysql') {
+      $this->assert(substr($columns['user_id']['type'], 0, 3) === 'int');
+      $this->assert($columns['height']['type'] === 'double');
     }
-    $this->assert($got_error);
+    else if ($this->db_type == 'sqlite') {
+      $this->assert($columns['user_id']['type'] === 'INTEGER');
+      $this->assert($columns['height']['type'] === 'DOUBLE');
+    }
+    else if ($this->db_type == 'pgsql') {
+      $this->assert($columns['user_id']['data_type'] === 'integer');
+      $this->assert($columns['height']['data_type'] === 'double precision');
+    }
+
+    $expected = ['companies', 'memberships', 'profiles', 'users', 'weird %s:s_`"table'];
+    $tables = DB::tableList();
+    $this->assert($this->last_func === 'tableList');
+    sort($tables);
+    $this->assert($tables === $expected);
+
+    $tables = DB::tableList(DB::$dbName);
+    sort($tables);
+    $this->assert($tables === $expected);
   }
 
-  function test_18_timeout() {
-    if ($this->db_type != 'mysql') return;
-    if ($this->fast) return;
-    
-    $default = DB::$reconnect_after;
-    DB::$reconnect_after = 1;
-    DB::query("SET SESSION wait_timeout=1");
-    sleep(2);
-    DB::query("SELECT * FROM accounts");
-    DB::$reconnect_after = $default;
+  // * bools are stored as 1/0, and come back as '1'/'0' (or NULL), even for pgsql's native BOOLEAN
+  // * bools can be compared with %?
+  function test_12_bools() {
+    $this->assert(DB::queryFirstColumn("SELECT is_active FROM users ORDER BY user_id") === ['1', '1', '0', null]);
+
+    DB::update('users', ['is_active' => false], ['user_id' => 1]);
+    $this->assert(DB::queryFirstField("SELECT is_active FROM users WHERE user_id=1") === '0');
+    $this->assert(DB::queryFirstColumn("SELECT name FROM users WHERE is_active=%? ORDER BY user_id", true) === ['Bart']);
+    DB::update('users', ['is_active' => true], ['user_id' => 1]);
   }
 
   // * supports('returning') matches the database type, unknown features throw
@@ -414,95 +245,88 @@ class BasicTest extends SimpleTest {
   // * returning can be limited to a list of columns
   // * insertIgnore() with returning gives back null when the row was ignored
   // * where RETURNING isn't supported, asking for it throws
-  function test_19_insert_returning() {
+  function test_13_insert_returning() {
     $is_mariadb = stripos(DB::serverVersion(), 'mariadb') !== false;
     $supported = DB::supports('returning');
     if ($this->db_type == 'pgsql') $this->assert($supported === true);
     if ($this->db_type == 'sqlite') $this->assert($supported === version_compare(DB::serverVersion(), '3.35', '>='));
     if ($this->db_type == 'mysql' && !$is_mariadb) $this->assert($supported === false);
 
-    $got_error = false;
-    try {
-      DB::supports('time_travel');
-    } catch (MeekroDBException $e) {
-      $got_error = substr_count($e->getMessage(), 'unknown feature') > 0;
-    }
-    $this->assert($got_error);
-
-    $got_error = false;
-    try {
-      DB::insert('accounts', ['username' => 'RetTypo'], ['returnin' => true]);
-    } catch (MeekroDBException $e) {
-      $got_error = substr_count($e->getMessage(), 'unknown option') > 0;
-    }
-    $this->assert($got_error);
+    $this->assertThrows(function() { DB::supports('time_travel'); }, 'unknown feature');
+    $this->assertThrows(function() {
+      DB::insert('users', ['name' => 'Typo'], ['returnin' => true]);
+    }, 'unknown option');
 
     if (! $supported) {
-      $got_error = false;
-      try {
-        DB::insert('accounts', ['username' => 'Ret1'], ['returning' => true]);
-      } catch (MeekroDBException $e) {
-        $got_error = substr_count($e->getMessage(), 'does not support RETURNING') > 0;
-      }
-      $this->assert($got_error);
-      $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM accounts WHERE username='Ret1'") === '0');
+      $this->assertThrows(function() {
+        DB::insert('users', ['name' => 'Ret1'], ['returning' => true]);
+      }, 'does not support RETURNING');
+      $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM users WHERE name='Ret1'") === '0');
       return;
     }
 
-    $row = DB::insert('accounts', ['username' => 'Ret1'], ['returning' => true]);
+    $row = DB::insert('users', ['name' => 'Ret1'], ['returning' => true]);
     $this->assert($this->last_func === 'insert');
     $this->assert(DB::affectedRows() === 1);
     $this->assert(is_array($row));
-    $this->assert($row['username'] === 'Ret1');
-    $this->assert($row['age'] === '10');
-    $this->assert($row['favorite_word'] === 'hi');
-    $this->assert($row['password'] === null);
-    $this->assert($row['id'] === DB::queryFirstField("SELECT id FROM accounts WHERE username='Ret1'"));
+    $this->assert($row['name'] === 'Ret1');
+    $this->assert($row['age'] === '0');
+    $this->assert($row['nickname'] === 'buddy');
+    $this->assert($row['employer_id'] === null);
+    $this->assert($row['user_id'] === DB::queryFirstField("SELECT user_id FROM users WHERE name='Ret1'"));
 
-    $rows = DB::insert('accounts', [
-      ['username' => 'Ret2', 'age' => 20],
-      ['username' => 'Ret3', 'age' => 30],
-    ], ['returning' => ['id', 'username', 'age']]);
+    $rows = DB::insert('users', [
+      ['name' => 'Ret2', 'age' => 20],
+      ['name' => 'Ret3', 'age' => 30],
+    ], ['returning' => ['user_id', 'name', 'age']]);
     $this->assert(is_array($rows) && count($rows) === 2);
     $this->assert(DB::affectedRows() === 2);
-    $this->assert(array_keys($rows[0]) === ['id', 'username', 'age']);
-    $by_name = array_column($rows, 'age', 'username');
+    $this->assert(array_keys($rows[0]) === ['user_id', 'name', 'age']);
+    $by_name = array_column($rows, 'age', 'name');
     ksort($by_name);
     $this->assert($by_name === ['Ret2' => '20', 'Ret3' => '30']);
 
     if (DB::supports('insert_ignore')) {
-      $ignored = DB::insertIgnore('accounts', ['id' => $row['id'], 'username' => 'RetDup'], ['returning' => true]);
+      $ignored = DB::insertIgnore('users', ['user_id' => $row['user_id'], 'name' => 'RetDup'], ['returning' => true]);
       $this->assert($ignored === null);
       $this->assert(DB::affectedRows() === 0);
-      $this->assert(DB::queryFirstField("SELECT username FROM accounts WHERE id=%i", $row['id']) === 'Ret1');
+      $this->assert(DB::queryFirstField("SELECT name FROM users WHERE user_id=%i", $row['user_id']) === 'Ret1');
     }
 
-    DB::query("DELETE FROM accounts WHERE username IN %ls", ['Ret1', 'Ret2', 'Ret3']);
+    DB::query("DELETE FROM users WHERE user_id>%i", 4);
   }
 
   // * replace() inserts a new row, or replaces an existing one with the same primary key
   // * where REPLACE isn't supported (pgsql), replace() throws a clear error
-  function test_20_replace() {
+  function test_14_replace() {
     if (! DB::supports('replace')) {
-      $got_error = false;
-      try {
-        DB::replace('accounts', ['id' => 500, 'username' => 'Replaced']);
-      } catch (MeekroDBException $e) {
-        $got_error = substr_count($e->getMessage(), 'does not support replace()') > 0;
-      }
-      $this->assert($got_error);
+      $this->assertThrows(function() {
+        DB::replace('users', ['user_id' => 500, 'name' => 'Replaced']);
+      }, 'does not support replace()');
       return;
     }
 
-    DB::replace('accounts', ['id' => 500, 'username' => 'Replaced', 'age' => 50]);
+    DB::replace('users', ['user_id' => 500, 'name' => 'Replaced', 'age' => 50]);
     $this->assert($this->last_func === 'replace');
-    DB::replace('accounts', ['id' => 500, 'username' => 'Replaced Again']);
+    DB::replace('users', ['user_id' => 500, 'name' => 'Replaced Again']);
 
-    $rows = DB::query("SELECT * FROM accounts WHERE id=%i", 500);
+    $rows = DB::query("SELECT * FROM users WHERE user_id=%i", 500);
     $this->assert(count($rows) === 1);
-    $this->assert($rows[0]['username'] === 'Replaced Again');
-    $this->assert($rows[0]['age'] === '10'); // replaced, not updated: back to the column default
-    DB::delete('accounts', ['id' => 500]);
+    $this->assert($rows[0]['name'] === 'Replaced Again');
+    $this->assert($rows[0]['age'] === '0'); // replaced, not updated: back to the column default
+    DB::delete('users', ['user_id' => 500]);
   }
-  
+
+  // * (mysql) after the server drops an idle connection, reconnect_after reconnects
+  function test_15_timeout() {
+    if ($this->db_type != 'mysql') return;
+    if ($this->fast) return;
+
+    $default = DB::$reconnect_after;
+    DB::$reconnect_after = 1;
+    DB::query("SET SESSION wait_timeout=1");
+    sleep(2);
+    DB::query("SELECT * FROM users");
+    DB::$reconnect_after = $default;
+  }
 }

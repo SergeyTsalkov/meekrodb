@@ -1,99 +1,65 @@
 <?php
 class UpsertTest extends SimpleTest {
   function __construct() {
-    DB::removeHooks('pre_run');
+    $this->resetDatabase();
     DB::addHook('pre_run', function($hash) {
       $this->last_func = $hash['func_name'];
     });
   }
 
-  function skip() {
-    if (!DB::supports('insert_ignore') && !DB::supports('insert_update')) {
-      return sprintf("%s %s does not support upserts", $this->db_type, DB::serverVersion());
+  // * insertIgnore() skips a row whose primary key already exists, and inserts one that doesn't
+  // * pgsql doesn't support it, and says so
+  function test_01_insert_ignore() {
+    if (! DB::supports('insert_ignore')) {
+      $this->assertThrows(function() {
+        DB::insertIgnore('users', ['user_id' => 1, 'name' => 'Dup']);
+      }, 'does not support insertIgnore()');
+      return;
     }
-  }
 
-  function test_1_insert_ignore() {
-    if (! DB::supports('insert_ignore')) return;
-
-    $affected_rows = DB::insertIgnore('accounts', array(
-      'id' => 1, //duplicate primary key
-      'username' => 'gonesoon',
-      'password' => 'something',
-      'age' => 61,
-      'height' => 199.194
-    ));
+    $affected = DB::insertIgnore('users', ['user_id' => 1, 'name' => 'Dup']);
     $this->assert($this->last_func === 'insertIgnore');
-    $this->assert($affected_rows === 0);
+    $this->assert($affected === 0);
+    $this->assert(DB::queryFirstField("SELECT name FROM users WHERE user_id=1") === 'Abe');
+
+    $affected = DB::insertIgnore('users', ['user_id' => 10, 'name' => 'New']);
+    $this->assert($affected === 1);
+    DB::delete('users', ['user_id' => 10]);
   }
 
-  function test_2_insert_update() {
-    if (! DB::supports('insert_update')) return;
+  // * insertUpdate() inserts, or for a duplicate primary key runs the update part instead, which can be
+  //   a string with its own args, a hash, or left out (to update with the insert data)
+  // * several rows at once, which then need an update part
+  // * pgsql doesn't support it, and says so
+  function test_02_insert_update() {
+    if (! DB::supports('insert_update')) {
+      $this->assertThrows(function() {
+        DB::insertUpdate('users', ['user_id' => 1, 'name' => 'Dup']);
+      }, 'does not support insertUpdate()');
+      return;
+    }
 
-    DB::insertUpdate('accounts', array(
-      'id' => 2, //duplicate primary key
-      'username' => 'gonesoon',
-      'password' => 'something',
-      'age' => 61,
-      'height' => 199.194
-    ), 'age = age + %i', 1);
-    
-    $result = DB::query("SELECT * FROM accounts WHERE age = %i", 16);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['height'] === '10.371');
-    
-    DB::insertUpdate('accounts', array(
-      'id' => 2, //duplicate primary key
-      'username' => 'blahblahdude',
-      'age' => 233,
-      'height' => 199.194
-    ));
-    
-    $result = DB::query("SELECT * FROM accounts WHERE `age` = %i", 233);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['height'] === '199.194');
-    $this->assert($result[0]['username'] === 'blahblahdude');
-    
-    DB::insertUpdate('accounts', array(
-      'id' => 2, //duplicate primary key
-      'username' => 'gonesoon',
-      'password' => 'something',
-      'age' => 61,
-      'height' => 199.194
-    ), array(
-      'age' => 74,
-    ));
-    
-    $result = DB::query("SELECT * FROM accounts WHERE `age` = %i", 74);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['height'] === '199.194');
-    $this->assert($result[0]['username'] === 'blahblahdude');
-    
-    $multiples[] = array(
-      'id' => 3, //duplicate primary key
-      'username' => 'gonesoon',
-      'password' => 'something',
-      'age' => 61,
-      'height' => 199.194
-    );
-    $multiples[] = array(
-      'id' => 1, //duplicate primary key
-      'username' => 'gonesoon',
-      'password' => 'something',
-      'age' => 61,
-      'height' => 199.194
-    );
-    
-    DB::insertUpdate('accounts', $multiples, array('age' => 914));
+    $user = function($id) { return DB::queryFirstRow("SELECT name, age FROM users WHERE user_id=%i", $id); };
+
+    DB::insertUpdate('users', ['user_id' => 2, 'name' => 'Ignored', 'age' => 99], 'age = age + %i', 1);
     $this->assert($this->last_func === 'insertUpdate');
-    
-    $result = DB::query("SELECT * FROM accounts WHERE `age`=914 ORDER BY id ASC");
-    $this->assert(count($result) === 2);
-    $this->assert($result[0]['username'] === 'Abe');
-    $this->assert($result[1]['username'] === 'Charlie\'s Friend');
-    
-    $affected_rows = DB::query("UPDATE accounts SET `age`=15, username='Bart' WHERE `age`=%i", 74);
-    $this->assert($affected_rows === 1);
-    $this->assert(DB::affectedRows() === 1);
+    $this->assert($user(2) === ['name' => 'Bart', 'age' => '16']);
+
+    DB::insertUpdate('users', ['user_id' => 2, 'name' => 'Bartholomew', 'age' => 20]);
+    $this->assert($user(2) === ['name' => 'Bartholomew', 'age' => '20']);
+
+    DB::insertUpdate('users', ['user_id' => 2, 'name' => 'Ignored', 'age' => 99], ['age' => 74]);
+    $this->assert($user(2) === ['name' => 'Bartholomew', 'age' => '74']);
+
+    DB::insertUpdate('users', [
+      ['user_id' => 1, 'name' => 'Ignored'],
+      ['user_id' => 10, 'name' => 'New'],
+    ], ['age' => 914]);
+    $this->assert($user(1) === ['name' => 'Abe', 'age' => '914']);
+    $this->assert($user(10) === ['name' => 'New', 'age' => '0']);
+
+    $this->assertThrows(function() {
+      DB::insertUpdate('users', [['user_id' => 1, 'name' => 'A'], ['user_id' => 2, 'name' => 'B']]);
+    }, "you didn't specify the update component");
   }
 }

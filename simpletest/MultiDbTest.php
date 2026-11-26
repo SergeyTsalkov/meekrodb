@@ -1,98 +1,54 @@
 <?php
 class MultiDbTest extends SimpleTest {
-  public $last_func;
-
-  function skip() {
-    if (! $this->db2) return "no support for multiple databases";
-  }
-
   function __construct() {
-    DB::removeHooks('pre_run');
+    $this->resetDatabase();
     DB::addHook('pre_run', function($hash) {
       $this->last_func = $hash['func_name'];
     });
   }
 
-  // * can tableList() tables in foreign database
-  function test_01_init() {
-    foreach (DB::tableList($this->db2) as $table) {
-      DB::query("DROP TABLE %b", array($this->db2, $table));
-    }
+  function skip() {
+    if (! $this->db2) return "no support for multiple databases";
   }
 
-  // * can switch dbs with useDB()/setDB()
-  function test_02_create_table() {
+  // * tableList() and %b with [db, table] reach another database
+  // * useDB() and setDB() switch databases
+  function test_1_switch_db() {
+    foreach (DB::tableList($this->db2) as $table) {
+      DB::query("DROP TABLE %b", [$this->db2, $table]);
+    }
+
     DB::useDB($this->db2);
     $this->assert($this->last_func === 'useDB');
+    DB::query($this->get_sql('create_users'));
+    $this->assert(DB::tableList() === ['users']);
 
-    DB::query($this->get_sql('mini_table'));
     DB::setDB($this->db);
     $this->assert($this->last_func === 'useDB');
-    $table = array($this->db2, 'accounts');
-    $columns = DB::columnList($table);
+    $this->assert(DB::tableList($this->db2) === ['users']);
+    $this->assert(count(DB::columnList([$this->db2, 'users'])) === 9);
   }
 
-  // * can insert() to foreign database
-  // * can update() to foreign database
-  // * can replace() to foreign database
-  // * can delete() to foreign database
-  // * all of these correctly return affected_rows
-  function test_03_insert_table() {
-    $table = array($this->db2, 'accounts');
-    $affected = DB::insert($table, array(
-      'myname' => 'Paulie',
-    ));
-    $this->assert($affected === 1);
+  // * insert(), update(), replace(), insertIgnore(), insertUpdate() and delete() work on [db, table],
+  //   and return the affected rows
+  function test_2_other_db() {
+    $table = [$this->db2, 'users'];
 
-    $id = DB::queryFirstField("SELECT id FROM %b WHERE myname=%s", $table, 'Paulie');
-    $this->assert($id === '1');
+    $this->assert(DB::insert($table, ['name' => 'Paulie']) === 1);
+    $this->assert(DB::queryFirstField("SELECT user_id FROM %b WHERE name=%s", $table, 'Paulie') === '1');
 
-    $affected = DB::update($table, array('myname' => 'Nickie'), array('myname' => 'Paulie'));
-    $this->assert($affected === 1);
-    $id = DB::queryFirstField("SELECT id FROM %b WHERE myname=%s", $table, 'Nickie');
-    $this->assert($id === '1');
+    $this->assert(DB::update($table, ['name' => 'Nickie'], ['name' => 'Paulie']) === 1);
+    $this->assert(DB::queryFirstField("SELECT name FROM %b WHERE user_id=1", $table) === 'Nickie');
 
-    DB::replace($table, array('id' => 1, 'myname' => 'Jamie'));
+    DB::replace($table, ['user_id' => 1, 'name' => 'Jamie']);
     $this->assert($this->last_func === 'replace');
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", $table);
-    $this->assert($count === '1');
-    $name = DB::queryFirstField("SELECT myname FROM %b WHERE id=%i", $table, 1);
-    $this->assert($name == 'Jamie');
+    $this->assert(DB::queryAllLists("SELECT user_id, name FROM %b", $table) === [['1', 'Jamie']]);
 
-    $affected = DB::delete($table, array('myname' => 'Jamie'));
-    $this->assert($affected === 1);
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", $table);
-    $this->assert($count === '0');
+    $this->assert(DB::insertIgnore($table, ['user_id' => 1, 'name' => 'Jake']) === 0);
+    DB::insertUpdate($table, ['user_id' => 1, 'name' => 'Steve']);
+    $this->assert(DB::queryAllLists("SELECT user_id, name FROM %b", $table) === [['1', 'Steve']]);
+
+    $this->assert(DB::delete($table, ['name' => 'Steve']) === 1);
+    $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM %b", $table) === '0');
   }
-
-  // * can insertIgnore() to foreign database
-  // * can insertUpdate() to foreign database
-  // * all of these correctly return affected_rows
-  function test_04_mysql_unique_actions() {
-    // pgsql doesn't support insertIgnore() and insertUpdate()
-    if ($this->db_type == 'pgsql') return;
-
-    $table = array($this->db2, 'accounts');
-    $affected = DB::insert($table, array(
-      'myname' => 'Sam',
-    ));
-    $this->assert($affected === 1);
-
-    $affected = DB::insertIgnore($table, array(
-      'id' => 2,
-      'myname' => 'Jake',
-    ));
-    $this->assert($affected === 0);
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", $table);
-    $this->assert($count === '1');
-
-    DB::insertUpdate($table, array('id' => 2, 'myname' => 'Steve'));
-    $count = DB::queryFirstField("SELECT COUNT(*) FROM %b", $table);
-    $this->assert($count === '1');
-    $name = DB::queryFirstField("SELECT myname FROM %b WHERE id=%i", $table, 2);
-    $this->assert($name == 'Steve');
-  }
-
-
-
 }

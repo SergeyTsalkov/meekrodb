@@ -33,6 +33,7 @@ class SimpleTest {
     $this->fail("expected an exception, but none was thrown");
   }
 
+  // put DB's settings back to their defaults, and remove all hooks.
   // drop every table, then create the standard tables (see statements.sql) and fill them:
   //   companies:   1 Acme, 2 Globex
   //   users:       1 Abe (Acme), 2 Bart (Acme), 3 Cleo (Globex), 4 Dana O'Neil (no employer)
@@ -41,38 +42,40 @@ class SimpleTest {
   protected function resetDatabase() {
     // the runner only sets db_type after the constructor, which is where this usually gets called
     $this->db_type = DB::dbType();
-    $param_char = DB::$param_char;
+
     DB::$param_char = '%';
-
-    try {
-      foreach (DB::tableList() as $table) {
-        DB::query("DROP TABLE %b", $table);
-      }
-      foreach (['users', 'companies', 'profiles', 'memberships', 'weird'] as $table) {
-        DB::query($this->get_sql("create_{$table}"));
-      }
-
-      DB::insert('companies', [['name' => 'Acme'], ['name' => 'Globex']]);
-
-      DB::insert('users', ['name' => 'Abe', 'employer_id' => 1, 'age' => 30, 'height' => 1.8,
-        'is_active' => true, 'settings' => '{"theme":"dark"}']);
-      DB::insert('users', ['name' => 'Bart', 'employer_id' => 1, 'nickname' => 'Bartman', 'age' => 15,
-        'height' => 1.5, 'is_active' => true]);
-      DB::insert('users', ['name' => 'Cleo', 'employer_id' => 2, 'nickname' => null, 'age' => 41,
-        'height' => 1.65, 'is_active' => false, 'signed_up_at' => '2020-01-02 03:04:05']);
-      DB::insert('users', ['name' => "Dana O'Neil", 'nickname' => 'Dee', 'age' => 15, 'height' => 1.5]);
-
-      DB::insert('profiles', ['user_id' => 1, 'bio' => 'Founder of Acme', 'tags' => '["admin","founder"]']);
-      DB::insert('profiles', ['user_id' => 3, 'bio' => null, 'tags' => null]);
-
-      DB::insert('memberships', [
-        ['user_id' => 1, 'company_id' => 1, 'role' => 'owner'],
-        ['user_id' => 2, 'company_id' => 1, 'role' => 'intern'],
-        ['user_id' => 3, 'company_id' => 2, 'role' => 'manager'],
-      ]);
-    } finally {
-      DB::$param_char = $param_char;
+    DB::$named_param_seperator = '_';
+    DB::$nested_transactions = false;
+    DB::$logfile = null;
+    foreach (['pre_run', 'post_run', 'run_success', 'run_failed'] as $hook_type) {
+      DB::removeHooks($hook_type);
     }
+
+    foreach (DB::tableList() as $table) {
+      DB::query("DROP TABLE %b", $table);
+    }
+    foreach (['users', 'companies', 'profiles', 'memberships', 'weird'] as $table) {
+      DB::query($this->get_sql("create_{$table}"));
+    }
+
+    DB::insert('companies', [['name' => 'Acme'], ['name' => 'Globex']]);
+
+    DB::insert('users', ['name' => 'Abe', 'employer_id' => 1, 'age' => 30, 'height' => 1.8,
+      'is_active' => true, 'settings' => '{"theme":"dark"}']);
+    DB::insert('users', ['name' => 'Bart', 'employer_id' => 1, 'nickname' => 'Bartman', 'age' => 15,
+      'height' => 1.5, 'is_active' => true]);
+    DB::insert('users', ['name' => 'Cleo', 'employer_id' => 2, 'nickname' => null, 'age' => 41,
+      'height' => 1.65, 'is_active' => false, 'signed_up_at' => '2020-01-02 03:04:05']);
+    DB::insert('users', ['name' => "Dana O'Neil", 'nickname' => 'Dee', 'age' => 15, 'height' => 1.5]);
+
+    DB::insert('profiles', ['user_id' => 1, 'bio' => 'Founder of Acme', 'tags' => '["admin","founder"]']);
+    DB::insert('profiles', ['user_id' => 3, 'bio' => null, 'tags' => null]);
+
+    DB::insert('memberships', [
+      ['user_id' => 1, 'company_id' => 1, 'role' => 'owner'],
+      ['user_id' => 2, 'company_id' => 1, 'role' => 'intern'],
+      ['user_id' => 3, 'company_id' => 2, 'role' => 'manager'],
+    ]);
   }
 
   protected function match_set($haystack, array $needles) {
@@ -177,6 +180,7 @@ require_once __DIR__ . '/test_setup.php'; //test config values go here
 
 $classes_to_test = array(
   'BasicTest',
+  'ParseTest',
   'UpsertTest',
   'BadStringsTest',
   'MultiDbTest',

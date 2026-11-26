@@ -1,117 +1,85 @@
 <?php
 class TransactionTest extends SimpleTest {
-  function test_1_transactions() {
-    DB::$nested_transactions = false;
-    
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 600, 'Abe');
-    
-    $depth = DB::startTransaction();
-    $this->assert($depth === 1);
-    
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 700, 'Abe');
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 800, 'Abe');
-    
-    $depth = DB::rollback();
-    $this->assert($depth === 0);
-    
-    $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-    $this->assert($age == 600);
+  function __construct() {
+    $this->resetDatabase();
   }
 
-  function test_2_transactions() {
+  function age() {
+    return DB::queryFirstField("SELECT age FROM users WHERE user_id=1");
+  }
+
+  function setAge($age) {
+    DB::update('users', ['age' => $age], ['user_id' => 1]);
+  }
+
+  // * without nested_transactions, startTransaction() and rollback() go between depth 0 and 1
+  function test_1_rollback() {
+    $this->setAge(600);
+    $this->assert(DB::startTransaction() === 1);
+    $this->setAge(700);
+    $this->setAge(800);
+    $this->assert(DB::rollback() === 0);
+    $this->assert($this->age() === '600');
+  }
+
+  // * with nested_transactions, each level can be committed or rolled back on its own
+  function test_2_nested() {
     DB::$nested_transactions = true;
-    
-    $depth = DB::startTransaction();
-      $this->assert($depth === 1);
-      DB::query("UPDATE accounts SET age=%i WHERE username=%s", 700, 'Abe');
-      
-      $depth = DB::startTransaction();
-        $this->assert($depth === 2);
-        DB::query("UPDATE accounts SET age=%i WHERE username=%s", 800, 'Abe');
-        
-        $depth = DB::startTransaction();
-          $this->assert($depth === 3);
+
+    $this->assert(DB::startTransaction() === 1);
+      $this->setAge(700);
+      $this->assert(DB::startTransaction() === 2);
+        $this->setAge(800);
+        $this->assert(DB::startTransaction() === 3);
           $this->assert(DB::transactionDepth() === 3);
-          DB::query("UPDATE accounts SET age=%i WHERE username=%s", 500, 'Abe');
-        $depth = DB::commit();
-        
-        $this->assert($depth === 2);
-        
-        $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-        $this->assert($age == 500);
-        
-      $depth = DB::rollback();
-      $this->assert($depth === 1);
-      
-      $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-      $this->assert($age == 700);
-    
-    $depth = DB::commit();
-    $this->assert($depth === 0);
-    
-    $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-    $this->assert($age == 700);
-    
-    
-    DB::$nested_transactions = false;
-  }
-  
-  function test_3_transactions() {
-    DB::$nested_transactions = true;
-    
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 600, 'Abe');
-    
+          $this->setAge(500);
+        $this->assert(DB::commit() === 2);
+        $this->assert($this->age() === '500');
+      $this->assert(DB::rollback() === 1);
+      $this->assert($this->age() === '700');
+    $this->assert(DB::commit() === 0);
+    $this->assert($this->age() === '700');
+
+    $this->setAge(600);
     DB::startTransaction();
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 700, 'Abe');
-    DB::startTransaction();
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 800, 'Abe');
+      $this->setAge(700);
+      DB::startTransaction();
+        $this->setAge(800);
+      DB::rollback();
+      $this->assert($this->age() === '700');
     DB::rollback();
-    
-    $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-    $this->assert($age == 700);
-    
-    DB::rollback();
-    
-    $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-    $this->assert($age == 600);
-    
+    $this->assert($this->age() === '600');
+
     DB::$nested_transactions = false;
   }
-  
-  function test_4_transaction_rollback_all() {
+
+  // * rollback(true) rolls back every level at once
+  function test_3_rollback_all() {
     DB::$nested_transactions = true;
-    
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 200, 'Abe');
-    
-    $depth = DB::startTransaction();
-    $this->assert($depth === 1);
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 300, 'Abe');
-    $depth = DB::startTransaction();
-    $this->assert($depth === 2);
-    
-    DB::query("UPDATE accounts SET age=%i WHERE username=%s", 400, 'Abe');
-    $depth = DB::rollback(true);
-    $this->assert($depth === 0);
-    
-    $age = DB::queryFirstField("SELECT age FROM accounts WHERE username=%s", 'Abe');
-    $this->assert($age == 200);
-    
+
+    $this->setAge(200);
+    $this->assert(DB::startTransaction() === 1);
+    $this->setAge(300);
+    $this->assert(DB::startTransaction() === 2);
+    $this->setAge(400);
+    $this->assert(DB::rollback(true) === 0);
+    $this->assert($this->age() === '200');
+
     DB::$nested_transactions = false;
   }
 
-  // * disconnect() ends any open transaction, so the next startTransaction() is a real one (not a SAVEPOINT)
-  // (uses a separate connection, since disconnecting the main one would wipe an in-memory sqlite database)
-  function test_5_disconnect_resets_depth() {
-    $mdb = new MeekroDB();
-    $mdb->nested_transactions = true;
+  // * DBTransaction commits with commit(), and rolls back if it goes away without one
+  function test_4_dbtransaction() {
+    $this->setAge(100);
+    $Transaction = new DBTransaction();
+    $this->setAge(200);
+    $Transaction->commit();
+    $this->assert($this->age() === '200');
 
-    $this->assert($mdb->startTransaction() === 1);
-    $this->assert($mdb->startTransaction() === 2);
-    $mdb->disconnect();
-    $this->assert($mdb->transactionDepth() === 0);
-
-    $this->assert($mdb->startTransaction() === 1);
-    $this->assert($mdb->rollback() === 0);
+    $Transaction = new DBTransaction();
+    $this->setAge(300);
+    unset($Transaction);
+    $this->assert($this->age() === '200');
+    $this->assert(DB::transactionDepth() === 0);
   }
-
 }

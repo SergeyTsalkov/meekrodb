@@ -1,127 +1,101 @@
 <?php
 class WhereClauseTest extends SimpleTest {
-  function test_1_basic_where() {
-    $where = new WhereClause('and');
-    $where->add('username=%s', 'Bart');
-    $where->add('password=%s', 'hello');
-    
-    $result = DB::query("SELECT * FROM accounts WHERE %?", $where);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['age'] === '15');
+  function __construct() {
+    $this->resetDatabase();
   }
-  
-  function test_2_simple_grouping() {
-    $where = new WhereClause('and');
-    $where->add('password=%s', 'hello');
-    $subclause = $where->addClause('or');
-    $subclause->add('%c=%i', 'age', 15);
-    $subclause->add('%c=%i', 'age', 14);
-    
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['age'] === '15');
+
+  // names of the users matching $where, in user_id order
+  function names(WhereClause $where) {
+    return DB::queryFirstColumn("SELECT name FROM users WHERE %l ORDER BY user_id", $where);
   }
-  
-  function test_3_negate_last() {
+
+  // * clauses are joined with AND; the WhereClause can be used with %l or %?
+  function test_01_basic() {
     $where = new WhereClause('and');
-    $where->add('password=%s', 'hello');
+    $where->add('employer_id=%i', 1);
+    $where->add('age=%i', 15);
+    $this->assert($this->names($where) === ['Bart']);
+    $this->assert(DB::queryFirstColumn("SELECT name FROM users WHERE %?", $where) === ['Bart']);
+  }
+
+  // * addClause() adds a group, here joined with OR
+  function test_02_grouping() {
+    $where = new WhereClause('and');
+    $where->add('employer_id=%i', 1);
     $subclause = $where->addClause('or');
-    $subclause->add('username!=%s', 'Bart');
+    $subclause->add('age=%i', 15);
+    $subclause->add('age=%i', 99);
+    $this->assert($this->names($where) === ['Bart']);
+  }
+
+  // * negateLast() negates the last clause added, whether it's a plain clause or a group
+  // * negate() negates a whole group
+  function test_03_negate() {
+    $where = new WhereClause('and');
+    $where->add('employer_id=%i', 1);
+    $subclause = $where->addClause('or');
+    $subclause->add('name=%s', 'Bart');
     $subclause->negateLast();
-    
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['age'] === '15');
-  }
-  
-  function test_4_negate_last_query() {
+    $this->assert($this->names($where) === ['Abe']);
+
     $where = new WhereClause('and');
-    $where->add('password=%s', 'hello');
+    $where->add('employer_id=%i', 1);
     $subclause = $where->addClause('or');
-    $subclause->add('username!=%s', 'Bart');
+    $subclause->add('name=%s', 'Bart');
     $where->negateLast();
-    
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['age'] === '15');
-  }
-  
-  function test_5_negate() {
+    $this->assert($this->names($where) === ['Abe']);
+
     $where = new WhereClause('and');
-    $where->add('password=%s', 'hello');
+    $where->add('employer_id=%i', 1);
     $subclause = $where->addClause('or');
-    $subclause->add('username!=%s', 'Bart');
+    $subclause->add('name=%s', 'Bart');
     $subclause->negate();
-    
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 1);
-    $this->assert($result[0]['age'] === '15');
-  }
+    $this->assert($this->names($where) === ['Abe']);
 
-  function test_6_negate_two() {
     $where = new WhereClause('and');
-    $where->add('password=%s', 'hello');
-    $where->add('username=%s', 'Bart');
+    $where->add('age=%i', 15);
+    $where->add('name=%s', 'Bart');
     $where->negate();
-    
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 7);
+    $this->assert($this->names($where) === ['Abe', 'Cleo', "Dana O'Neil"]);
   }
 
-  // * WhereClause works with OR
+  // * a WhereClause with no clauses matches everything
+  function test_04_empty() {
+    $this->assert($this->names(new WhereClause('and')) === ['Abe', 'Bart', 'Cleo', "Dana O'Neil"]);
+  }
+
   // * you can add() a parse() output to a WhereClause
-  function test_7_or() {
+  // * parse() output can also be used directly, with %l or %?
+  function test_05_parsed() {
     $where = new WhereClause('or');
-    $where->add('username=%s', 'Bart');
-    $where->add(DB::parse('username=%s', 'Abe'));
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 2);
+    $where->add('name=%s', 'Bart');
+    $where->add(DB::parse('name=%s', 'Abe'));
+    $this->assert($this->names($where) === ['Abe', 'Bart']);
+
+    $part = DB::parse('WHERE name=%s', 'Bart');
+    $this->assert(DB::queryFirstColumn("SELECT name FROM users %l", $part) === ['Bart']);
+    $this->assert(DB::queryFirstColumn("SELECT name FROM users %?", $part) === ['Bart']);
   }
 
-  // * parse() output can be used as part of a query with %l or %?
-  function test_8_multipart() {
-    $part = DB::parse('WHERE username=%s', 'Bart');
-    $rows = DB::query("SELECT * FROM accounts %l", $part);
-    $this->assert(count($rows) === 1);
-    $this->assert($rows[0]['id'] === '2');
-
-    $rows = DB::query("SELECT * FROM accounts %?", $part);
-    $this->assert(count($rows) === 1);
-    $this->assert($rows[0]['id'] === '2');
-  }
-
-  function test_9_empty() {
-    $where = new WhereClause('and');
-    $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
-    $this->assert(count($result) === 8);
-  }
-
-  // * you can add() a parse() output to a WhereClause when using a different param_char,
-  //   including negated and inside a nested WhereClause
-  function test_10_parsed_alt_param_char() {
-    $old_param_char = DB::$param_char;
+  // * parse() output in a WhereClause works with a different param_char,
+  //   including negated, and inside a nested group
+  function test_06_parsed_alt_param_char() {
     DB::$param_char = '@';
-
     try {
       $where = new WhereClause('or');
-      $where->add('username=@s', 'Bart');
-      $where->add(DB::parse('username=@s', 'Abe'));
-      $result = DB::query("SELECT * FROM accounts WHERE @l", $where);
-      $this->assert(count($result) === 2);
+      $where->add('name=@s', 'Bart');
+      $where->add(DB::parse('name=@s', 'Abe'));
+      $this->assert(DB::queryFirstColumn("SELECT name FROM users WHERE @l ORDER BY user_id", $where) === ['Abe', 'Bart']);
 
       $where = new WhereClause('and');
-      $sub = $where->addClause('or');
-      $sub->add(DB::parse('username=@s', 'Bart'));
-      $sub->add(DB::parse('username=@s', 'Abe'));
-      $where->add(DB::parse('username=@s', 'Abe'));
+      $subclause = $where->addClause('or');
+      $subclause->add(DB::parse('name=@s', 'Bart'));
+      $subclause->add(DB::parse('name=@s', 'Abe'));
+      $where->add(DB::parse('name=@s', 'Abe'));
       $where->negateLast();
-      $result = DB::query("SELECT * FROM accounts WHERE @l", $where);
-      $this->assert(count($result) === 1);
-      $this->assert($result[0]['username'] === 'Bart');
+      $this->assert(DB::queryFirstColumn("SELECT name FROM users WHERE @l", $where) === ['Bart']);
     } finally {
-      DB::$param_char = $old_param_char;
+      DB::$param_char = '%';
     }
   }
-  
-
 }
