@@ -390,16 +390,7 @@ class MeekroDB {
       throw new MeekroDBException("update(): second argument must be assoc array");
     }
     $ParsedQuery = $this->_parse('UPDATE :b SET :hc WHERE ', $table, $params);
-
-    if (is_array($args[0])) {
-      $Where = $this->_parse(':ha', $args[0]);
-    } else {
-      // we don't know if they used named or numbered args, so the where clause
-      // must be run through the parser separately
-      $Where = $this->parse(...$args);
-    }
-    
-    $ParsedQuery->add($Where);
+    $ParsedQuery->add($this->parseWhere($args));
     return $this->_query('update', $ParsedQuery);
   }
 
@@ -411,15 +402,18 @@ class MeekroDB {
 
     $table = array_shift($args);
     $ParsedQuery = $this->_parse('DELETE FROM :b WHERE ', $table);
-
-    if (is_array($args[0])) {
-      $Where = $this->_parse(':ha', $args[0]);
-    } else {
-      $Where = $this->parse(...$args);
-    }
-
-    $ParsedQuery->add($Where);
+    $ParsedQuery->add($this->parseWhere($args));
     return $this->_query('delete', $ParsedQuery);
+  }
+
+  // WHERE clause for update() and delete(): either a hash of column => value, or a query string
+  // with its own args. The string is parsed separately from the rest of the query because we don't
+  // know whether it uses named or numbered args.
+  protected function parseWhere(array $args) {
+    if (is_array($args[0])) {
+      return $this->_parse(':ha', $args[0]);
+    }
+    return $this->parse(...$args);
   }
   
   protected function insertOrReplace($mode, $table, $datas, $options=array()) {
