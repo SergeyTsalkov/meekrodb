@@ -319,21 +319,27 @@ abstract class MeekroORM {
       throw new MeekroORMException(sprintf('%s is not a class that inherits from %s', $class_name, __CLASS__));
     }
 
-    $primary_key = $class_name::_orm_struct()->primary_key();
-    $primary_value = $this->getraw($primary_key);
+    $type = $assoc['type'];
 
-    if ($assoc['type'] == 'belongs_to') {
+    // belongs_to: our $foreign_key column points at their primary key
+    if ($type == 'belongs_to') {
       return $class_name::Load($this->$foreign_key);
     }
-    else if ($assoc['type'] == 'has_one') {
-      return $class_name::Search([$foreign_key => $primary_value]);
-    }
-    else if ($assoc['type'] == 'has_many') {
-      return $class_name::Where([$foreign_key => $primary_value]);
-    }
-    else {
+    if ($type != 'has_one' && $type != 'has_many') {
       throw new MeekroORMException("Invalid type for $name association");
     }
+
+    // has_one, has_many: their $foreign_key column points at our primary key
+    $primary_key = static::_orm_struct()->primary_key();
+    if (! $primary_key) {
+      throw new MeekroORMException("$this must have a single-column primary key to use $type association $name");
+    }
+    $primary_value = $this->getraw($primary_key);
+
+    if ($type == 'has_one') {
+      return $class_name::Search([$foreign_key => $primary_value]);
+    }
+    return $class_name::Where([$foreign_key => $primary_value]);
   }
 
   // -------------- LOADING AND SEARCHING

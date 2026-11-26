@@ -82,6 +82,25 @@ class Ticket extends MeekroORM {
 
 }
 
+// Author, Book and Bio all have differently-named primary keys (author_id, book_id, bio_id)
+// and Book's foreign key (writer_id) doesn't match Author's primary key name
+class Author extends MeekroORM {
+  static $_associations = [
+    'Book' => ['type' => 'has_many', 'foreign_key' => 'writer_id'],
+    'Bio' => ['type' => 'has_one', 'foreign_key' => 'author_id'],
+  ];
+}
+
+class Book extends MeekroORM {
+  static $_associations = [
+    'Writer' => ['type' => 'belongs_to', 'foreign_key' => 'writer_id', 'class_name' => 'Author'],
+  ];
+}
+
+class Bio extends MeekroORM {
+
+}
+
 class BasicOrmTest extends SimpleTest {
   function __construct() {
     // make sure we run the struct discovery code for every database type we test on
@@ -644,6 +663,58 @@ class BasicOrmTest extends SimpleTest {
     $Ticket->name = 'First Updated';
     $Ticket->Save();
     $this->assert(Ticket::Load($Ticket->id, 1)->name === 'First Updated');
+  }
+
+  // * associations work when the primary keys of the two classes have different names
+  // * belongs_to works when our foreign key name doesn't match their primary key name
+  function test_18_assoc_primary_key_names() {
+    DB::query($this->get_sql('create_authors'));
+    DB::query($this->get_sql('create_books'));
+    DB::query($this->get_sql('create_bios'));
+
+    $Author = new Author();
+    $Author->name = 'Ursula';
+    $Author->Save();
+
+    $Author2 = new Author();
+    $Author2->name = 'Terry';
+    $Author2->Save();
+    $this->assert($Author->author_id !== $Author2->author_id);
+
+    // book_id values won't line up with author_id values, so a lookup on the wrong key would be caught
+    foreach (['Filler 1', 'Filler 2', 'Filler 3'] as $title) {
+      $Book = new Book();
+      $Book->writer_id = $Author2->author_id;
+      $Book->title = $title;
+      $Book->Save();
+    }
+    foreach (['Earthsea', 'The Dispossessed'] as $title) {
+      $Book = new Book();
+      $Book->writer_id = $Author->author_id;
+      $Book->title = $title;
+      $Book->Save();
+    }
+
+    $Bio = new Bio();
+    $Bio->author_id = $Author->author_id;
+    $Bio->summary = 'Wrote about wizards';
+    $Bio->Save();
+
+    $Author = Author::Load($Author->author_id);
+
+    // has_many
+    $Books = $Author->Book->order_by('book_id');
+    $this->assert(count($Books) === 2);
+    $this->assert($Books[0]->title === 'Earthsea');
+    $this->assert($Books[1]->title === 'The Dispossessed');
+    $this->assert(count($Author2->Book) === 3);
+
+    // has_one
+    $this->assert($Author->Bio->summary === 'Wrote about wizards');
+    $this->assert($Author2->Bio === null);
+
+    // belongs_to
+    $this->assert($Books[0]->Writer->name === 'Ursula');
   }
 
 }

@@ -155,3 +155,23 @@ CREATE TABLE tickets (
   name VARCHAR(255) NOT NULL DEFAULT '',
   PRIMARY KEY (id, region)
 )
+
+-- name: create_authors
+CREATE TABLE authors (
+  author_id {{AUTOKEY}},
+  name VARCHAR(255) NOT NULL DEFAULT ''
+)
+
+-- name: create_books
+CREATE TABLE books (
+  book_id {{AUTOKEY}},
+  writer_id {{INT}} NOT NULL DEFAULT 0,
+  title VARCHAR(255) NOT NULL DEFAULT ''
+)
+
+-- name: create_bios
+CREATE TABLE bios (
+  bio_id {{AUTOKEY}},
+  author_id {{INT}} NOT NULL DEFAULT 0,
+  summary VARCHAR(255) NOT NULL DEFAULT ''
+)
