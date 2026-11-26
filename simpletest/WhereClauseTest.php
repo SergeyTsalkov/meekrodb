@@ -95,6 +95,33 @@ class WhereClauseTest extends SimpleTest {
     $result = DB::query("SELECT * FROM accounts WHERE %l", $where);
     $this->assert(count($result) === 8);
   }
+
+  // * you can add() a parse() output to a WhereClause when using a different param_char,
+  //   including negated and inside a nested WhereClause
+  function test_10_parsed_alt_param_char() {
+    $old_param_char = DB::$param_char;
+    DB::$param_char = '@';
+
+    try {
+      $where = new WhereClause('or');
+      $where->add('username=@s', 'Bart');
+      $where->add(DB::parse('username=@s', 'Abe'));
+      $result = DB::query("SELECT * FROM accounts WHERE @l", $where);
+      $this->assert(count($result) === 2);
+
+      $where = new WhereClause('and');
+      $sub = $where->addClause('or');
+      $sub->add(DB::parse('username=@s', 'Bart'));
+      $sub->add(DB::parse('username=@s', 'Abe'));
+      $where->add(DB::parse('username=@s', 'Abe'));
+      $where->negateLast();
+      $result = DB::query("SELECT * FROM accounts WHERE @l", $where);
+      $this->assert(count($result) === 1);
+      $this->assert($result[0]['username'] === 'Bart');
+    } finally {
+      DB::$param_char = $old_param_char;
+    }
+  }
   
 
 }

@@ -992,7 +992,7 @@ class MeekroDB {
           throw new MeekroDBException("WhereClause must be used with l or ?, you used {$Part['type']} instead!");
         }
 
-        list($clause_sql, $clause_args) = $val->textAndArgs();
+        list($clause_sql, $clause_args) = $val->textAndArgs($this->param_char);
         $ParsedSubQuery = $this->parse($clause_sql, ...$clause_args);
         $ParsedQuery->add($ParsedSubQuery);
       }
@@ -1371,7 +1371,8 @@ class WhereClause implements Countable {
       $this->clauses[] = $sql;
     }
     else if ($sql instanceof MeekroDBParsedQuery) {
-      $this->clauses[] = array('sql' => '%?', 'args' => [$sql]);
+      // the placeholder is written with %, and swapped for the real param_char in textAndArgs()
+      $this->clauses[] = array('sql' => '%?', 'args' => [$sql], 'is_parsed' => true);
     }
     else {
       $this->clauses[] = array('sql' => $sql, 'args' => $args);
@@ -1404,7 +1405,8 @@ class WhereClause implements Countable {
     return count($this->clauses);
   }
   
-  function textAndArgs() {
+  // $param_char should match the MeekroDB instance that will parse the result
+  function textAndArgs($param_char = '%') {
     $sql = array();
     $args = array();
     
@@ -1412,10 +1414,15 @@ class WhereClause implements Countable {
     
     foreach ($this->clauses as $clause) {
       if ($clause instanceof WhereClause) { 
-        list($clause_sql, $clause_args) = $clause->textAndArgs();
+        list($clause_sql, $clause_args) = $clause->textAndArgs($param_char);
       } else {
         $clause_sql = $clause['sql'];
         $clause_args = $clause['args'];
+
+        // added parsed queries: only ever "%?", maybe wrapped in "NOT (...)" by negateLast()
+        if (! empty($clause['is_parsed'])) {
+          $clause_sql = str_replace('%?', $param_char . '?', $clause_sql);
+        }
       }
       
       $sql[] = "($clause_sql)";
