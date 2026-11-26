@@ -199,35 +199,31 @@ abstract class MeekroORM {
     $this->_orm_row[$key] = $this->_unmarshal($key, $value);
   }
 
+  // marshal: PHP value -> database value
   public function _marshal($key, $value) {
-    $type = static::_orm_coltype($key);
-    $is_nullable = static::_orm_struct()->column_nullable($key);
-    
-    $fieldmarshal = "_marshal_field_{$key}";  
-    $typemarshal = "_marshal_type_{$type}";
-    if (method_exists($this, $fieldmarshal)) {
-      $value = $this->$fieldmarshal($key, $value, $is_nullable);
-    }
-    else if (method_exists($this, $typemarshal)) {
-      $value = $this->$typemarshal($key, $value, $is_nullable);
-    }
-
-    return $value;
+    return $this->_orm_marshal_dispatch('_marshal', $key, $value);
   }
 
+  // unmarshal: database value -> PHP value
   public function _unmarshal($key, $value) {
+    return $this->_orm_marshal_dispatch('_unmarshal', $key, $value);
+  }
+
+  // $prefix is '_marshal' or '_unmarshal'
+  // a per-field method (e.g. _marshal_field_{$key}) wins over a per-type method (e.g. _marshal_type_{$type})
+  // if neither exists, the value is passed through unchanged
+  private function _orm_marshal_dispatch($prefix, $key, $value) {
     $type = static::_orm_coltype($key);
     $is_nullable = static::_orm_struct()->column_nullable($key);
-    
-    $fieldmarshal = "_unmarshal_field_{$key}";  
-    $typemarshal = "_unmarshal_type_{$type}";
-    if (method_exists($this, $fieldmarshal)) {
-      $value = $this->$fieldmarshal($key, $value, $is_nullable);
-    }
-    else if (method_exists($this, $typemarshal)) {
-      $value = $this->$typemarshal($key, $value, $is_nullable);
-    }
 
+    $fieldmethod = "{$prefix}_field_{$key}";
+    $typemethod = "{$prefix}_type_{$type}";
+    if (method_exists($this, $fieldmethod)) {
+      return $this->$fieldmethod($key, $value, $is_nullable);
+    }
+    if (method_exists($this, $typemethod)) {
+      return $this->$typemethod($key, $value, $is_nullable);
+    }
     return $value;
   }
 
