@@ -676,6 +676,13 @@ class MeekroDB {
       return str_replace(array('%', '_'), array('\%', '\_'), $arg);
     };
 
+    // LIKE pattern as a bound param. mysql and pgsql treat backslash as the LIKE escape character
+    // by default, but sqlite has none unless the query says so
+    $like = function($pattern) {
+      $sql = ($this->dbType() == 'sqlite') ? "? ESCAPE '\\'" : '?';
+      return new MeekroDBParsedQuery($sql, array($pattern));
+    };
+
     // column => value pairs, joined by $glue (for SET, or WHERE with AND/OR)
     $hash = function($arg, $glue) use ($join) {
       $Queries = array();
@@ -715,14 +722,14 @@ class MeekroDB {
       't' => function($arg) {
         return new MeekroDBParsedQuery('?', array($this->sanitizeTS($arg)));
       },
-      'ss' => function($arg) use ($like_escape) { 
-        return new MeekroDBParsedQuery('?', array('%' . $like_escape($arg) . '%'));
+      'ss' => function($arg) use ($like_escape, $like) { 
+        return $like('%' . $like_escape($arg) . '%');
       },
-      'ssb' => function($arg) use ($like_escape) { 
-        return new MeekroDBParsedQuery('?', array($like_escape($arg) . '%'));
+      'ssb' => function($arg) use ($like_escape, $like) { 
+        return $like($like_escape($arg) . '%');
       },
-      'sse' => function($arg) use ($like_escape) { 
-        return new MeekroDBParsedQuery('?', array('%' . $like_escape($arg)));
+      'sse' => function($arg) use ($like_escape, $like) { 
+        return $like('%' . $like_escape($arg));
       },
       'ls' => function($arg) use ($placeholders) {
         $arg = array_map('strval', $arg);
