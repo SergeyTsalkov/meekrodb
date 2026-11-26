@@ -98,5 +98,20 @@ class TransactionTest extends SimpleTest {
     
     DB::$nested_transactions = false;
   }
-  
+
+  // * disconnect() ends any open transaction, so the next startTransaction() is a real one (not a SAVEPOINT)
+  // (uses a separate connection, since disconnecting the main one would wipe an in-memory sqlite database)
+  function test_5_disconnect_resets_depth() {
+    $mdb = new MeekroDB();
+    $mdb->nested_transactions = true;
+
+    $this->assert($mdb->startTransaction() === 1);
+    $this->assert($mdb->startTransaction() === 2);
+    $mdb->disconnect();
+    $this->assert($mdb->transactionDepth() === 0);
+
+    $this->assert($mdb->startTransaction() === 1);
+    $this->assert($mdb->rollback() === 0);
+  }
+
 }

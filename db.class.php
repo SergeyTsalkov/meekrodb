@@ -227,6 +227,8 @@ class MeekroDB {
   public function disconnect() {
     $this->internal_pdo = null;
     $this->supports_cache = array();
+    // any open transaction ends with the connection
+    $this->nested_transactions_count = 0;
   }
 
   /**
@@ -1039,7 +1041,10 @@ class MeekroDB {
     $func_name = $opts['name'];
     $is_buffered = !($opts_unbuf || $opts_walk);
 
-    if ($this->reconnect_after > 0 && time() - $this->last_query_at >= $this->reconnect_after) {
+    // never reconnect in the middle of a transaction: that would silently discard it, and run the
+    // rest of the queries outside of it. Better to try the old connection and fail loudly if it's gone.
+    $is_idle = ($this->reconnect_after > 0 && time() - $this->last_query_at >= $this->reconnect_after);
+    if ($is_idle && $this->nested_transactions_count == 0) {
       $this->disconnect();
     }
 
