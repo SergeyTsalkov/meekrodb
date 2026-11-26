@@ -1,620 +1,555 @@
 <?php
-use Carbon\Carbon;
-
-class Person extends MeekroORM {
+// the models use the standard tables (see resetDatabase() in test.php), whose primary keys all have
+// different names (user_id, company_id, profile_id): an association that looks up the wrong key fails
+class User extends MeekroORM {
   static $_columns = [
-    'is_alive' => ['type' => 'bool'],
-    'is_male' => ['type' => 'bool'],
-    'data' => ['type' => 'json'],
+    'is_active' => ['type' => 'bool'],
+    'settings' => ['type' => 'json'],
   ];
   static $_associations = [
-    'House' => ['type' => 'has_many', 'foreign_key' => 'owner_id'],
-    'Soul' => ['type' => 'has_one', 'foreign_key' => 'person_id'],
     'Employer' => ['type' => 'belongs_to', 'foreign_key' => 'employer_id', 'class_name' => 'Company'],
+    'Profile' => ['type' => 'has_one', 'foreign_key' => 'user_id'],
+    'Membership' => ['type' => 'has_many', 'foreign_key' => 'user_id'],
   ];
 
   static function _scopes() {
     return [
-      'living' => function() { return self::where('is_alive=1'); },
-      'male' => function() { return self::where('is_male=1'); },
-      'female' => function() { return self::where('is_male=0'); },
+      'active' => function() { return self::where(['is_active' => true]); },
       'teenager' => function() { return self::where('age>@i AND age<@i', 12, 20); },
       'age' => function($age) { return self::where('age=@i', $age); },
-      'first_teenager' => function() { return self::scope('teenager')->order_by('id')->limit(1); }
+      'first_teenager' => function() { return self::scope('teenager')->order_by('user_id')->limit(1); },
     ];
   }
-
-  static function tsdiff($t1, $t2) {
-    $interval = $t1->diff($t2);
-    return ($interval->days * 24 * 60 * 60) +
-      ($interval->h * 60 * 60) +
-      ($interval->i * 60) +
-      $interval->s +
-      ($interval->f);
-  }
-
-  function _pre_save() {
-    if ($this->name == 'Kevin') {
-      if ($this->age == 53) {
-        return false;
-      }
-
-      $this->age = 28;
-    }
-  }
-}
-
-class Person2 extends MeekroORM {
-  static $_tablename = 'persons';
-
-  function _post_save() {
-    return false;
-  }
-}
-
-class House extends MeekroORM {
-  static function _scopes() {
-    return [
-      'over' => function($over) { return self::where('price >= @i', $over); },
-    ];
-  }
-}
-
-class Soul extends MeekroORM {
-  public $tmp;
-
-  static $_columns = [
-    'heaven_bound' => ['type' => 'bool'],
-  ];
 }
 
 class Company extends MeekroORM {
   static $_tablename = 'companies';
-
-}
-
-class Assignment extends MeekroORM {
-
-}
-
-// primary key is (id, region): id is auto-increment, region has a default value
-class Ticket extends MeekroORM {
-
-}
-
-// Author, Book and Bio all have differently-named primary keys (author_id, book_id, bio_id)
-// and Book's foreign key (writer_id) doesn't match Author's primary key name
-class Author extends MeekroORM {
   static $_associations = [
-    'Book' => ['type' => 'has_many', 'foreign_key' => 'writer_id'],
-    'Bio' => ['type' => 'has_one', 'foreign_key' => 'author_id'],
+    'Employees' => ['type' => 'has_many', 'foreign_key' => 'employer_id', 'class_name' => 'User'],
   ];
 }
 
-class Book extends MeekroORM {
-  static $_associations = [
-    'Writer' => ['type' => 'belongs_to', 'foreign_key' => 'writer_id', 'class_name' => 'Author'],
-  ];
-}
-
-class Bio extends MeekroORM {
+class Profile extends MeekroORM {
   static $_columns = [
     'tags' => ['type' => 'json'],
   ];
+
+  // a blank bio is stored as NULL, and NULL is read back as a blank bio: these per-field methods
+  // take precedence over the ones for bio's type (string)
+  function _marshal_field_bio($key, $value) {
+    return ($value === '' || is_null($value)) ? null : $value;
+  }
+  function _unmarshal_field_bio($key, $value) {
+    return is_null($value) ? '' : $value;
+  }
+}
+
+class Membership extends MeekroORM {}
+
+// primary key is (id, region): id is auto-increment, region has a default value
+class Ticket extends MeekroORM {}
+
+// the users table again, with no column types declared: they all come from the table itself
+class UserRow extends MeekroORM {
+  static $_tablename = 'users';
+}
+
+// the users table again, with every callback: each one is recorded in $log, and the one named
+// in $fail_in returns false
+class LoggedUser extends MeekroORM {
+  static $_tablename = 'users';
+  static $log = [];
+  static $fail_in = null;
+
+  // each entry is the callback name, the fields it was given (if any), and the transaction depth,
+  // e.g. "_pre_save(name,age) d1"
+  private function _log($callback, $fields = null) {
+    if (is_array($fields)) $callback .= '(' . implode(',', $fields) . ')';
+    self::$log[] = $callback . ' d' . DB::transactionDepth();
+  }
+  private function _result($callback) {
+    return ($callback === self::$fail_in) ? false : null;
+  }
+
+  function _validate_name($name) { $this->_log("_validate_name=$name"); return $this->_result('_validate_name'); }
+  function _validate_age($age) { $this->_log("_validate_age=$age"); return $this->_result('_validate_age'); }
+  function _pre_save($fields) { $this->_log(__FUNCTION__, $fields); return $this->_result(__FUNCTION__); }
+  function _post_save($fields) { $this->_log(__FUNCTION__, $fields); return $this->_result(__FUNCTION__); }
+  function _pre_update($fields) { $this->_log(__FUNCTION__, $fields); return $this->_result(__FUNCTION__); }
+  function _post_update($fields) { $this->_log(__FUNCTION__, $fields); return $this->_result(__FUNCTION__); }
+  function _post_create($fields) { $this->_log(__FUNCTION__, $fields); return $this->_result(__FUNCTION__); }
+  function _post_commit($fields) { $this->_log(__FUNCTION__, $fields); return $this->_result(__FUNCTION__); }
+  function _pre_destroy() { $this->_log(__FUNCTION__); return $this->_result(__FUNCTION__); }
+  function _post_destroy() { $this->_log(__FUNCTION__); return $this->_result(__FUNCTION__); }
+
+  // new users start out active: a field that _pre_create makes dirty gets saved too
+  function _pre_create($fields) {
+    $this->_log(__FUNCTION__, $fields);
+    $this->is_active = true;
+    return $this->_result(__FUNCTION__);
+  }
 }
 
 class BasicOrmTest extends SimpleTest {
   function __construct() {
-    // make sure we run the struct discovery code for every database type we test on
-    Person::_orm_struct_reset();
+    $this->resetDatabase();
+
+    // the ORM's own queries must work whatever param_char is
     DB::$param_char = '@';
     DB::$nested_transactions = true;
-
-    foreach (DB::tableList() as $table) {
-      DB::query("DROP TABLE @b", $table);
-    }
   }
 
-  // * can create basic Person objects and save them
-  // * can use Load() to look up an object with a simple primary key
-  // * can use Search() and SearchMany() with either hash or query match
-  // * can Load() with multiple primary keys
-  function test_01_basic() {
-    DB::query($this->get_sql('create_persons'));
-    DB::query($this->get_sql('create_houses'));
-    DB::query($this->get_sql('create_souls'));
-    DB::query($this->get_sql('create_companies_old'));
-    DB::query($this->get_sql('create_assignments'));
+  function names($Users) {
+    $names = [];
+    foreach ($Users as $User) $names[] = $User->name;
+    return $names;
+  }
 
-    $Person = new Person();
-    $Person->name = 'Nick';
-    $Person->age = 23;
-    $Person->height = 1.7;
-    $Person->favorite_color = 'blue';
-    $Person->favorite_animaniacs = 'Yakko';
-    $Person->is_alive = true;
-    $Person->is_male = true;
-    $Person->Save();
+  // * Load() looks up by primary key, including a multi-column one
+  // * Search() and SearchMany() take a hash to match, or a query
+  // * a query can SELECT extra columns, which become plain properties
+  function test_01_load_and_search() {
+    $this->assert(User::Load(1)->name === 'Abe');
+    $this->assert(User::Load(99) === null);
+    $this->assert(Membership::Load(3, 2)->role === 'manager');
+    $this->assertThrows(function() { Membership::Load(1); }, 'Load on Membership must be called with 2 parameters!');
 
-    $House = new House();
-    $House->owner_id = $Person->id;
-    $House->address = '3344 Cedar Road';
-    $House->sqft = 1340;
-    $House->price = 500;
-    $House->Save();
+    $this->assert(User::Search(['name' => 'Cleo'])->age === 41);
+    $this->assert(User::Search("SELECT * FROM @b WHERE name=@s", 'users', 'Cleo')->age === 41);
+    $this->assert(User::Search(['name' => 'nobody']) === null);
+    $this->assert(User::Search() instanceof User);
 
-    $House = new House();
-    $House->owner_id = $Person->id;
-    $House->address = '233 South Wacker Dr';
-    $House->sqft = 2250;
-    $House->price = 1200;
-    $House->Save();
+    $this->assert($this->names(User::SearchMany(['age' => 15])) === ['Bart', "Dana O'Neil"]);
+    $this->assert($this->names(User::SearchMany("SELECT * FROM users WHERE age>20 ORDER BY user_id")) === ['Abe', 'Cleo']);
+    $this->assert(User::SearchMany(['name' => 'nobody']) === []);
+    $this->assert(count(User::SearchMany()) === 4);
 
-    $Soul = new Soul();
-    $Soul->person_id = $Person->id;
-    $Soul->heaven_bound = true;
-    $Soul->Save();
+    $User = User::Search("SELECT *, age+1 AS next_age FROM users WHERE user_id=1");
+    $this->assert($User->name === 'Abe');
+    $this->assert($User->next_age === '31');
+    $this->assert($User->dirtyfields() === []);
+  }
 
+  // * Save() on a new object inserts it, and fills in its auto-increment primary key
+  // * destroy() deletes it
+  function test_02_create_and_destroy() {
     $Company = new Company();
-    $Company->name = 'Acme Shoe Co';
+    $Company->name = 'Initech';
     $Company->Save();
-    $Person->employer_id = $Company->id;
-    $Person->Save();
+    $this->assert($Company->company_id === 3);
 
-    $Assignment = new Assignment();
-    $Assignment->person_id = $Person->id;
-    $Assignment->company_id = $Company->id;
-    $Assignment->name = 'Big Boss';
-    $Assignment->Save();
+    $User = new User();
+    $User->name = 'Eve';
+    $User->age = 22;
+    $User->height = 1.7;
+    $User->is_active = true;
+    $User->employer_id = $Company->company_id;
+    $User->Save();
+    $this->assert($User->user_id === 5);
 
-    $Person = new Person();
-    $Person->name = 'Ellie';
-    $Person->age = 17;
-    $Person->height = 1.2;
-    $Person->is_alive = true;
-    $Person->is_male = false;
-    $Person->Save();
+    $Membership = new Membership();
+    $Membership->user_id = $User->user_id;
+    $Membership->company_id = $Company->company_id;
+    $Membership->role = 'founder';
+    $Membership->Save();
 
-    $Person = new Person();
-    $Person->name = 'Gavin';
-    $Person->age = 15;
-    $Person->height = 1.85;
-    $Person->is_alive = true;
-    $Person->is_male = false;
-    $Person->Save();
+    $User = User::Load(5);
+    $this->assert($User->name === 'Eve');
+    $this->assert($User->age === 22);
+    $this->assert($User->height === 1.7);
+    $this->assert($User->is_active === true);
+    $this->assert($User->Employer->name === 'Initech');
+    $this->assert(Membership::Load(5, 3)->role === 'founder');
 
-    $Person = new Person();
-    $Person->name = 'Abigail';
-    $Person->age = 29;
-    $Person->height = 1.2;
-    $Person->is_alive = false;
-    $Person->is_male = false;
-    $Person->Save();
-
-    $Company = new Company();
-    $Company->name = 'Dead Company Walking';
-    $Company->Save();
-    $Person->employer_id = $Company->id;
-    $Person->Save();
-
-    $Assignment = new Assignment();
-    $Assignment->person_id = $Person->id;
-    $Assignment->company_id = $Company->id;
-    $Assignment->name = 'Trash Guy';
-    $Assignment->Save();
-
-    $Person = Person::Load(1);
-    $this->assert($Person->age === 23);
-
-    $Person = Person::Search(['name' => 'Gavin']);
-    $this->assert($Person->age === 15);
-
-    $Person = Person::Search("SELECT * FROM @b WHERE name=@s", 'persons', 'Gavin');
-    $this->assert($Person->age === 15);
-
-    $Persons = Person::SearchMany(['name' => 'Gavin']);
-    $this->assert(count($Persons) === 1);
-    $this->assert($Persons[0]->age === 15);
-
-    $Persons = Person::SearchMany("SELECT * FROM @b WHERE age>12 AND age<20 ORDER BY id", 'persons');
-    $this->assert(count($Persons) === 2);
-    $this->assert($Persons[0]->name === 'Ellie');
-
-    $Assignment = Assignment::Load(1, 1);
-    $this->assert($Assignment->name === 'Big Boss');
-
-    $Person = Person::Search(['name' => 'Abigail']);
-    $Assignment = Assignment::Load($Person->id, $Person->employer_id);
-    $this->assert($Assignment->name === 'Trash Guy');
-
-    // ORDER is not guaranteed here
-    $Person = Person::Search();
-    $this->assert($Person instanceof Person);
-
-    $Persons = Person::SearchMany();
-    $this->assert(count($Persons) === 4);
+    $User->Destroy();
+    Membership::Load(5, 3)->Destroy();
+    $Company->Destroy();
+    $this->assert(User::Load(5) === null);
+    $this->assert(Membership::Load(5, 3) === null);
+    $this->assert(Company::Load(3) === null);
   }
 
-  // * can SELECT with extra, virtual columns
-  function test_02_extra() {
-    $Person = Person::Search("SELECT *, age+1 as nextage FROM persons WHERE id=1");
-    $this->assert($Person->name === 'Nick');
-    $this->assert($Person->nextage === '24');
+  // * dirtyhash() has the changed fields, as they'll be saved
+  // * update() saves only the fields it's given, leaving other changes unsaved
+  // * reload() discards unsaved changes
+  // * primary keys can't be changed, and fresh objects can't be updated or reloaded
+  function test_03_dirty_and_update() {
+    $User = User::Load(1);
+    $this->assert($User->dirtyhash() === []);
+    $User->is_active = false;
+    $this->assert($User->dirtyhash() === ['is_active' => 0]);
+    $User->is_active = true;
+    $this->assert($User->dirtyhash() === []);
+
+    $User->age = 31;
+    $User->update('height', 2);
+    $this->assert($User->dirtyfields() === ['age']);
+    $User->update(['height' => 3, 'is_active' => false]);
+    $this->assert($User->dirtyfields() === ['age']);
+
+    $User->reload();
+    $this->assert($User->age === 30);
+    $this->assert($User->height === 3.0);
+    $this->assert($User->is_active === false);
+    $User->update(['height' => 1.8, 'is_active' => true]);
+
+    $this->assertThrows(function() use ($User) { $User->user_id = 2; }, "Can't update primary key!");
+    $this->assertThrows(function() { (new User())->update('age', 1); }, 'Unable to update(): record is fresh');
+    $this->assertThrows(function() { (new User())->reload(); }, "Can't reload unsaved record!");
   }
 
-  // * update() works, both with a hash and with a single key/value combo
-  function test_03_update() {
-    $Person = Person::Load(1);
-    $this->assert($Person->age === 23);
+  // * an empty object can be saved, getting the columns' defaults
+  // * lock() reloads the object, like reload()
+  function test_04_empty_and_lock() {
+    $User = new User();
+    $User->Save();
+    $this->assert($User->name === '');
+    $this->assert($User->age === 0);
 
-    $Person->age = 24;
-    $Person->update('height', 2);
-    $this->assert($Person->dirtyfields() == ['age']);
-    $Person->update(['height' => 3, 'is_male' => false]);
-    $this->assert($Person->dirtyfields() == ['age']);
-
-    $Person->reload();
-    $this->assert($Person->age === 23);
-    $this->assert($Person->is_male === false);
-    $this->assert($Person->height === 3.0);
-
-    $Person->update(['height' => 1.7, 'is_male' => true]);
-  }
-
-  // * can save an empty record
-  // * can reload() an object to undo pending changes
-  // * can lock() an object, which reloads it
-  // * can destroy() an object
-  function test_04_empty() {
-    $Person = new Person();
-    $Person->Save();
-
-    $Person = Person::Search(['name' => '']);
-    $this->assert($Person->age === 0);
-    $Person->age = 1;
-    $this->assert($Person->age === 1);
-    $Person->reload();
-    $this->assert($Person->age === 0);
-
+    $User->age = 1;
     DB::startTransaction();
-    $Person->age = 1;
-    $Person->lock();
-    $this->assert($Person->age === 0);
+    $User->lock();
+    $this->assert($User->age === 0);
     DB::commit();
 
-    $Person->Destroy();
-    $Person = Person::Search(['name' => '']);
-    $this->assert($Person === null);
+    $User->Destroy();
+    $this->assert(User::Search(['name' => '']) === null);
   }
 
-  // * _pre_save returning false throws exception
-  // * _pre_save can add a dirty field
-  function test_05_presave() {
-    $error = '';
-    try {
-      $Person = new Person();
-      $Person->name = 'Kevin';
-      $Person->age = 53;
-      $Person->Save();
-    } catch (MeekroORMException $e) {
-      $error = $e->getMessage();
-    }
-    $this->assert($error == '_pre_save returned false');
+  // * declared bool columns are loaded as true/false/null, and saved as 1/0/NULL
+  // * undeclared column types come from the table: on pgsql, a BOOLEAN column is also a bool
+  function test_05_types() {
+    $this->assert(User::Load(2)->is_active === true);
+    $this->assert(User::Load(3)->is_active === false);
+    $this->assert(User::Load(3)->toHash()['is_active'] === false);
+    $this->assert(User::Load(4)->is_active === null);
 
-    $Person = new Person();
-    $Person->name = 'Kevin';
-    $Person->Save();
-    $Person->reload();
-    $this->assert($Person->age === 28);
+    $User = User::Load(3);
+    $User->is_active = true;
+    $User->Save();
+    $this->assert(User::Load(3)->is_active === true);
+    $User->is_active = false;
+    $User->Save();
+    $this->assert(User::Load(3)->is_active === false);
+
+    $Row = UserRow::Load(1);
+    $this->assert($Row->user_id === 1);
+    $this->assert($Row->employer_id === 1);
+    $this->assert($Row->name === 'Abe');
+    $this->assert($Row->age === 30);
+    $this->assert($Row->height === 1.8);
+    $this->assert($Row->settings === '{"theme":"dark"}');
+    $this->assert($Row->signed_up_at instanceof DateTime);
+    $this->assert(UserRow::Load(4)->employer_id === null);
+
+    $true = ($this->db_type == 'pgsql') ? true : 1;
+    $false = ($this->db_type == 'pgsql') ? false : 0;
+    $this->assert($Row->is_active === $true);
+    $this->assert(UserRow::Load(3)->is_active === $false);
+    $this->assert(count(UserRow::SearchMany(['is_active' => true])) === 2);
+
+    $Row->is_active = false;
+    $Row->Save();
+    $this->assert(UserRow::Load(1)->is_active === $false);
+    $Row->is_active = true;
+    $Row->Save();
+    $this->assert(UserRow::Load(1)->is_active === $true);
   }
 
-  // * can search for Person by int value
-  // * bool value is marshalled and unmarshalled correctly
-  // * toHash() works
-  function test_06_bool() {
-    $Person = Person::Search(['age' => 17]);
-    $this->assert($Person->name === 'Ellie');
-    $this->assert($Person->is_alive === true);
-    $this->assert($Person->is_male === false);
-    $this->assert($Person->toHash()['is_male'] === false);
-    $Person->is_alive = false;
-    $Person->Save();
-
-    $Person = Person::Search(['age' => 17]);
-    $this->assert($Person->name === 'Ellie');
-    $this->assert($Person->is_alive === false);
-    $this->assert($Person->is_male === false);
-    $Person->is_alive = true;
-    $Person->Save();
-  }
-
-  // * can use Search() to load entry with extra fields
-  // * can use dirtyhash() to see modified properties
-  function test_07_extravars() {
-    $Person = Person::Search("SELECT *, age+1 AS nextyear FROM persons WHERE age = 17");
-    $this->assert($Person->name === 'Ellie');
-    $this->assert($Person->is_alive === true);
-    $this->assert($Person->nextyear === '18');
-    $Person->is_alive = false;
-
-    $dirty = $Person->dirtyhash();
-    $this->assert(count($dirty) === 1);
-    $this->assert(array_keys($dirty)[0] === 'is_alive');
-    $this->assert(array_values($dirty)[0] === 0);
-    
-    $Person->Save();
-    $Person->is_alive = true;
-    $Person->Save();
-  }
-
-  // * can load and save a timestamp
-  function test_08_timestamp() {
+  // * a timestamp column is loaded as a DateTime, and can be saved as a DateTime or a string
+  // * saving null to a NOT NULL timestamp column saves 1970-01-03 00:00:00 instead
+  function test_06_timestamp() {
     $zerodate = DateTime::createFromFormat('Y-m-d H:i:s', '1970-01-03 00:00:00');
 
-    $Person = Person::Load(1);
-    $this->assert($Person->last_happy_moment == $zerodate);
-    $Person->last_happy_moment = new DateTime();
-    $Person->Save();
+    $User = User::Load(2);
+    $this->assert($User->signed_up_at == $zerodate);
+    $this->assert(User::Load(3)->signed_up_at == new DateTime('2020-01-02 03:04:05'));
 
-    $Person = Person::Load(1);
-    $this->assert($Person->last_happy_moment instanceof DateTime);
+    $User->signed_up_at = new DateTime();
+    $User->Save();
+    $User = User::Load(2);
+    $this->assert($User->signed_up_at instanceof DateTime);
+    $this->assert(abs($User->signed_up_at->getTimestamp() - time()) <= 1);
 
-    $diff = Person::tsdiff(new DateTime(), $Person->last_happy_moment);
-    $this->assert($diff <= 1);
+    $User->signed_up_at = null;
+    $User->Save();
+    $this->assert(User::Load(2)->signed_up_at == $zerodate);
 
-    $Person->last_happy_moment = null;
-    $Person->Save();
-    $Person = Person::Load(1);
-    $this->assert($Person->last_happy_moment == $zerodate);
-    $Person->last_happy_moment = '1970-01-03 00:00:00';
-    $Person->Save();
-    $Person = Person::Load(1);
-    $this->assert($Person->last_happy_moment == $zerodate);
+    $User->signed_up_at = '2021-05-06 07:08:09';
+    $User->Save();
+    $this->assert(User::Load(2)->signed_up_at == new DateTime('2021-05-06 07:08:09'));
   }
 
-  // * json type can be used/loaded/saved
-  // * json type can be appended to with "var[] = val"
-  function test_09_json() {
-    $Person = Person::Load(1);
-    $Person->data = [1,3,5];
-    $Person->Save();
+  // * a json column is decoded when loaded and encoded when saved
+  // * it can be changed in place, e.g. $User->settings['key'] = 'value'
+  function test_07_json() {
+    $User = User::Load(1);
+    $this->assert($User->settings === ['theme' => 'dark']);
+    $User->settings['font'] = 'serif';
+    $User->Save();
 
-    $Person = Person::Load(1);
-    $this->assert($Person->data === [1,3,5]);
-    $Person->data[] = 7;
-    $Person->Save();
+    $User = User::Load(1);
+    $this->assert($User->settings === ['theme' => 'dark', 'font' => 'serif']);
+    $this->assert(DB::queryFirstField("SELECT settings FROM users WHERE user_id=1") === '{"theme":"dark","font":"serif"}');
 
-    $Person = Person::Load(1);
-    $this->assert($Person->data === [1,3,5,7]);
+    $User->settings = [1, 3, 5];
+    $User->settings[] = 7;
+    $User->Save();
+    $this->assert(User::Load(1)->settings === [1, 3, 5, 7]);
   }
 
-  // * NULL values can be set to either NULL, or empty string, and those are different
-  // * NOT NULL values will be set to empty string (or equivalent) when we try to null them
-  function test_10_null() {
-    $Person = Person::Search(['name' => 'Nick']);
-    $this->assert($Person->favorite_color === 'blue');
-    $this->assert($Person->favorite_animaniacs === 'Yakko');
-    $this->assert($Person->is_alive === true);
-    $this->assert($Person->age === 23);
-    $this->assert($Person->height === 1.7);
-    $Person->favorite_color = '';
-    $Person->favorite_animaniacs = '';
-    $Person->is_alive = '';
-    $Person->age = '';
-    $Person->height = '';
-    $Person->Save();
-    $Person = Person::Search(['name' => 'Nick']);
-    $this->assert($Person->favorite_color === '');
-    $this->assert($Person->favorite_animaniacs === '');
-    $this->assert($Person->is_alive === false);
-    $this->assert($Person->age === 0);
-    $this->assert($Person->height === 0.0);
-    $Person->favorite_color = null;
-    $Person->favorite_animaniacs = null;
-    $Person->is_alive = null;
-    $Person->age = null;
-    $Person->height = null;
-    $Person->Save();
-    $Person = Person::Search(['name' => 'Nick']);
-    $this->assert($Person->favorite_color === null);
-    $this->assert($Person->favorite_animaniacs === '');
-    $this->assert($Person->is_alive === null);
-    $this->assert($Person->age === 0);
-    $this->assert($Person->height === 0.0);
-    $Person->is_alive = true;
-    $Person->favorite_color = 'blue';
-    $Person->favorite_animaniacs = 'Yakko';
-    $Person->age = 23;
-    $Person->height = 1.7;
-    $Person->Save();
+  // * nullable columns can be set to either NULL or empty string, and those are different
+  // * NOT NULL columns get the type's empty value (0, '', etc.) when set to NULL
+  function test_08_null() {
+    $User = User::Load(4);
+    $this->assert($User->nickname === 'Dee');
+
+    foreach (['nickname', 'name', 'is_active', 'age', 'height'] as $field) $User->$field = '';
+    $User->Save();
+    $User = User::Load(4);
+    $this->assert($User->nickname === '');
+    $this->assert($User->name === '');
+    $this->assert($User->is_active === false);
+    $this->assert($User->age === 0);
+    $this->assert($User->height === 0.0);
+
+    foreach (['nickname', 'name', 'is_active', 'age', 'height'] as $field) $User->$field = null;
+    $User->Save();
+    $User = User::Load(4);
+    $this->assert($User->nickname === null);
+    $this->assert($User->name === '');
+    $this->assert($User->is_active === null);
+    $this->assert($User->age === 0);
+    $this->assert($User->height === 0.0);
+
+    // later tests need Dana back the way she was
+    $User->update(['nickname' => 'Dee', 'name' => "Dana O'Neil", 'age' => 15, 'height' => 1.5]);
   }
 
-  function test_11_scope() {
-    $All = Person::all();
-    $this->assert(count($All) === 5);
+  // * scopes combine; with order_by() and limit() (with an optional offset)
+  // * order_by() and limit() after a scope has already run discard the cached results
+  // * a scope is countable, iterable and indexable, but read-only
+  function test_09_scopes() {
+    $this->assert(count(User::all()) === 4);
+    $this->assert($this->names(User::scope('active')->order_by('user_id')) === ['Abe', 'Bart']);
+    $this->assert(User::scope('age', 30)->first()->name === 'Abe');
 
-    $Living = Person::scope('living');
-    $this->assert(count($Living) === 3);
+    $Empty = User::where('name=@s', 'nobody');
+    $this->assert(count($Empty) === 0);
+    $this->assert($Empty->first() === null);
+    $this->assert($Empty->last() === null);
 
-    $EmptyScope = Person::where('name=@s', 'abcde');
-    $this->assert(count($EmptyScope) === 0);
-    $this->assert($EmptyScope->first() === null);
-    $this->assert($EmptyScope->last() === null);
+    $Teens = User::scope('teenager')->order_by('user_id');
+    $this->assert($this->names($Teens) === ['Bart', "Dana O'Neil"]);
+    $this->assert($Teens[0]->name === 'Bart');
+    $this->assert($Teens->first()->name === 'Bart');
+    $this->assert($Teens->last()->name === "Dana O'Neil");
+    $this->assert($this->names(User::scope('active')->scope('teenager')) === ['Bart']);
+    $this->assert($this->names(User::scope('teenager')->order_by(['user_id' => 'desc'])->limit(1)) === ["Dana O'Neil"]);
+    $this->assert($this->names(User::all()->order_by('user_id')->limit(1, 2)) === ['Bart', 'Cleo']);
+    $this->assert($this->names(User::scope('first_teenager')) === ['Bart']);
 
-    $Person = Person::scope('age', 23);
-    $this->assert(count($Person) === 1);
-    $this->assert($Person->first()->name === 'Nick');
+    $Teens->order_by(['user_id' => 'desc']);
+    $this->assert($Teens[0]->name === "Dana O'Neil");
+    $Teens->limit(1);
+    $this->assert(count($Teens) === 1);
 
-    $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');
-    $this->assert(count($LivingTeens) === 2);
-    $this->assert($LivingTeens[0]->name === 'Ellie');
-    $this->assert($LivingTeens->first()->name === 'Ellie');
-    $this->assert($LivingTeens->last()->name === 'Gavin');
+    $array = $Teens->toArray();
+    $this->assert(is_array($array) && $array[0]->name === "Dana O'Neil");
 
-    $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id')->limit(1);
-    $this->assert(count($LivingTeens) === 1);
-    $this->assert($LivingTeens[0]->name === 'Ellie');
-
-    $LivingTeens = Person::scope('living')->scope('teenager')->order_by(['id' => 'desc'])->limit(1);
-    $this->assert(count($LivingTeens) === 1);
-    $this->assert($LivingTeens[0]->name === 'Gavin');
-
-    // limit() with an offset
-    $Living = Person::scope('living')->order_by('id')->limit(1, 2);
-    $this->assert(count($Living) === 2);
-    $this->assert($Living[0]->name === 'Ellie');
-    $this->assert($Living[1]->name === 'Gavin');
-
-    // order_by() and limit() after the scope has already run discard the cached results
-    $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');
-    $this->assert($LivingTeens[0]->name === 'Ellie');
-    $LivingTeens->order_by(['id' => 'desc']);
-    $this->assert($LivingTeens[0]->name === 'Gavin');
-    $LivingTeens->limit(1);
-    $this->assert(count($LivingTeens) === 1);
-
-    $FirstTeenager = Person::scope('first_teenager');
-    $this->assert(count($FirstTeenager) === 1);
-    $this->assert($FirstTeenager[0]->name === 'Ellie');
-
-    $array = $FirstTeenager->toArray();
-    $this->assert(!is_array($FirstTeenager));
-    $this->assert(is_array($array));
-    $this->assert($array[0]->name === 'Ellie');
+    $this->assertThrows(function() { User::scope('nope'); }, 'Scope not available: nope');
+    $this->assertThrows(function() use ($Teens) { $Teens[0] = null; }, 'Unable to edit scoped result set');
   }
 
-  // * has_many: works with scoping
-  // * has_many: no results means empty scope/array
-  // * has_one: assocs properly loaded only once
-  // * belongs_to: class_name works
-  function test_12_assoc() {
-    $Person = Person::Search(['name' => 'Nick']);
-    $Houses = $Person->House->order_by('price');
+  // * belongs_to, with a class_name and a foreign key named differently from their primary key
+  // * has_many, with a class_name, scopes, and no results; also to a class with a multi-column primary key
+  // * has_one, including with no result; either way, it's only looked up once
+  function test_10_associations() {
+    $Abe = User::Load(1);
+    $this->assert($Abe->Employer->name === 'Acme');
+    $this->assert(User::Load(3)->Employer->name === 'Globex');
+    $this->assert(User::Load(4)->Employer === null);
 
-    $this->assert(count($Houses) === 2);
-    $this->assert($Houses[0]->sqft === 1340);
+    $Acme = Company::Load(1);
+    $this->assert($this->names($Acme->Employees->order_by('user_id')) === ['Abe', 'Bart']);
+    $this->assert($this->names($Acme->Employees->scope('teenager')) === ['Bart']);
+    $this->assert($this->names(Company::Load(2)->Employees) === ['Cleo']);
 
-    $Houses = $Person->House->scope('over', 1000);
-    $this->assert(count($Houses) === 1);
-    $this->assert($Houses[0]->sqft === 2250);
+    $this->assert(count($Abe->Membership) === 1);
+    $this->assert($Abe->Membership[0]->role === 'owner');
+    $this->assert(count(User::Load(4)->Membership) === 0);
 
-    $Person2 = Person::Search(['name' => 'Ellie']);
-    $this->assert(count($Person2->House) === 0);
+    $this->assert($Abe->Profile->bio === 'Founder of Acme');
+    $this->assert($Abe->Profile === $Abe->Profile);
+    $this->assert(User::Load(3)->Profile->profile_id === 2);
 
-    $this->assert($Person->Soul->heaven_bound === true);
-    
-    $Person->Soul->tmp = true;
-    $this->assert($Person->Soul->tmp === true);
-
-    $this->assert($Person->Employer->name === 'Acme Shoe Co');
+    $Bart = User::Load(2);
+    $queries = 0;
+    DB::addHook('pre_run', function() use (&$queries) { $queries++; });
+    try {
+      $this->assert($Bart->Profile === null);
+      $this->assert($Bart->Profile === null);
+    } finally {
+      DB::removeHooks('pre_run');
+    }
+    $this->assert($queries === 1);
   }
 
+  // * the callbacks run in order, with the fields being saved, inside the transaction
+  //   (except _post_commit, which runs after it)
+  // * fields that a _pre callback changes get saved too
+  // * update() runs the callbacks for the fields it saves; save(false) runs none
+  function test_11_callbacks() {
+    LoggedUser::$log = [];
+    $User = new LoggedUser();
+    $User->name = 'Zed';
+    $User->Save();
+    $this->assert(LoggedUser::$log === ['_validate_name=Zed d1', '_pre_save(name) d1', '_pre_create(name) d1',
+      '_post_create(name,is_active) d1', '_post_save(name,is_active) d1', '_post_commit(name,is_active) d0']);
+    $this->assert(DB::queryFirstField("SELECT name FROM users WHERE user_id=@i AND is_active=@?", $User->user_id, true) === 'Zed');
+
+    LoggedUser::$log = [];
+    $User->age = 50;
+    $User->Save();
+    $this->assert(LoggedUser::$log === ['_validate_age=50 d1', '_pre_save(age) d1', '_pre_update(age) d1',
+      '_post_update(age) d1', '_post_save(age) d1', '_post_commit(age) d0']);
+
+    LoggedUser::$log = [];
+    $User->name = 'Zedd';
+    $User->update('age', 51);
+    $this->assert(LoggedUser::$log === ['_validate_age=51 d1', '_pre_save(age) d1', '_pre_update(age) d1',
+      '_post_update(age) d1', '_post_save(age) d1', '_post_commit(age) d0']);
+    $this->assert($User->dirtyfields() === ['name']);
+
+    LoggedUser::$log = [];
+    $User->Save(false);
+    $this->assert(LoggedUser::$log === []);
+    $this->assert(LoggedUser::Load($User->user_id)->name === 'Zedd');
+
+    $User->Destroy();
+    $this->assert(LoggedUser::$log === ['_pre_destroy d1', '_post_destroy d1']);
+    $this->assert(LoggedUser::Load($User->user_id) === null);
+  }
+
+  // * a callback that returns false throws, and stops the save or destroy
+  function test_12_callback_returns_false() {
+    $count = function() { return DB::queryFirstField("SELECT COUNT(*) FROM users"); };
+
+    foreach (['_validate_name', '_pre_save', '_pre_create'] as $callback) {
+      LoggedUser::$fail_in = $callback;
+      $User = new LoggedUser();
+      $User->name = 'Zed';
+      $this->assertThrows(function() use ($User) { $User->Save(); }, "$callback returned false");
+      $this->assert($User->isFresh());
+      $this->assert($count() == 4);
+    }
+
+    LoggedUser::$fail_in = '_pre_destroy';
+    $this->assertThrows(function() { LoggedUser::Load(1)->Destroy(); }, '_pre_destroy returned false');
+    $this->assert($count() == 4);
+    LoggedUser::$fail_in = null;
+  }
+
+  // * save() runs inside a transaction if nested_transactions is on, so it's undone if a
+  //   callback throws; $_use_transactions overrides that, either way
   function test_13_transactions() {
-    DB::$nested_transactions = true;
-    
+    LoggedUser::$fail_in = '_post_save';
+    $cases = [
+      // [nested_transactions, _use_transactions, is the row still there?]
+      [true, null, false],
+      [false, null, true],
+      [false, true, false],
+      [true, false, true],
+    ];
+
     try {
-      $Person = new Person2();
-      $Person->name = 'FrankieJoe';
-      $Person->Save();
-    } catch (Exception $e) {}
+      foreach ($cases as list($nested, $use_transactions, $is_saved)) {
+        DB::$nested_transactions = $nested;
+        $User = new LoggedUser();
+        $User->_use_transactions = $use_transactions;
+        $User->name = 'FrankieJoe';
+        $this->assertThrows(function() use ($User) { $User->Save(); }, '_post_save returned false');
+        $this->assert(DB::transactionDepth() === 0);
 
-    $Search = Person::Search(['name' => 'FrankieJoe']);
-    $this->assert($Search === null);
-
-    DB::$nested_transactions = false;
-    try {
-      $Person = new Person2();
-      $Person->name = 'FrankieJoe';
-      $Person->Save();
-    } catch (Exception $e) {}
-    $Search = Person::Search(['name' => 'FrankieJoe']);
-    $this->assert($Search instanceof Person);
-    
-    $Search->Destroy();
-    $Search = Person::Search(['name' => 'FrankieJoe']);
-    $this->assert($Search === null);
-
-    DB::$nested_transactions = true;
+        $Saved = User::Search(['name' => 'FrankieJoe']);
+        $this->assert(($Saved !== null) === $is_saved);
+        if ($Saved) $Saved->Destroy();
+      }
+    } finally {
+      LoggedUser::$fail_in = null;
+      DB::$nested_transactions = true;
+    }
   }
 
-  // * isset() returns true for set ORM fields, false for null ones
-  // * unset() clears a field so getter returns null
+  // * isset() is true for fields that are set, and false for null ones
+  // * unset() clears a field
   function test_14_isset_unset() {
-    $Person = Person::Search(['name' => 'Nick']);
-    $this->assert(isset($Person->name));
-    $this->assert(isset($Person->favorite_color));
+    $User = User::Load(1);
+    $this->assert(isset($User->name));
+    $this->assert(isset($User->nickname));
+    $this->assert(isset($User->Employer));
+    $this->assert(!isset($User->nonsense));
 
-    $Person->favorite_color = null;
-    $this->assert(!isset($Person->favorite_color));
-
-    unset($Person->age);
-    $this->assert($Person->age === null);
+    $User->nickname = null;
+    $this->assert(!isset($User->nickname));
+    unset($User->age);
+    $this->assert($User->age === null);
   }
 
-  // * clone produces a fresh object with primary key unset, which saves as a new row
-  // * clone doesn't share DateTime objects with the original
-  // * clone works with multi-column primary keys
+  // * a clone is fresh, with its primary key unset, so it saves as a new row
+  // * it doesn't share DateTime objects or associations with the original
+  // * it works with multi-column primary keys
   function test_15_clone() {
-    $Person = Person::Search(['name' => 'Nick']);
-    $original_id = $Person->id;
-    $original_moment = $Person->last_happy_moment;
-
-    $Clone = clone $Person;
+    $User = User::Load(1);
+    $Clone = clone $User;
     $this->assert($Clone->isFresh());
-    $this->assert(!$Person->isFresh());
-    $this->assert($Clone->id === null);
-    $this->assert($Person->id === $original_id);
-    $this->assert($Clone->name === 'Nick');
-    $this->assert($Clone->age === 23);
-    $this->assert($Clone->data === $Person->data);
-    $this->assert($Clone->last_happy_moment == $original_moment);
-    $this->assert($Clone->last_happy_moment !== $Person->last_happy_moment);
+    $this->assert(!$User->isFresh());
+    $this->assert($Clone->user_id === null);
+    $this->assert($User->user_id === 1);
+    $this->assert($Clone->name === 'Abe');
+    $this->assert($Clone->settings === $User->settings);
+    $this->assert($Clone->signed_up_at == $User->signed_up_at);
+    $this->assert($Clone->signed_up_at !== $User->signed_up_at);
 
-    $Clone->name = 'Nick Clone';
+    $Clone->name = 'Abe Clone';
     $Clone->Save();
     $this->assert(!$Clone->isFresh());
-    $this->assert($Clone->id && $Clone->id != $original_id);
+    $this->assert($Clone->user_id > 4);
 
-    $Loaded = Person::Load($Clone->id);
-    $this->assert($Loaded->name === 'Nick Clone');
-    $this->assert($Loaded->age === 23);
-    $this->assert($Loaded->favorite_color === 'blue');
-    $this->assert(Person::Load($original_id)->name === 'Nick');
-
-    // the clone's House association refers to the clone, not the original
-    $this->assert(count($Person->House) === 2);
-    $this->assert(count($Clone->House) === 0);
+    $Loaded = User::Load($Clone->user_id);
+    $this->assert($Loaded->name === 'Abe Clone');
+    $this->assert($Loaded->age === 30);
+    $this->assert(User::Load(1)->name === 'Abe');
+    $this->assert(count($User->Membership) === 1);
+    $this->assert(count($Clone->Membership) === 0);
     $Loaded->Destroy();
 
-    $Assignment = Assignment::Load(1, 1);
-    $Clone = clone $Assignment;
-    $this->assert($Clone->person_id === null);
+    $Clone = clone Membership::Load(1, 1);
+    $this->assert($Clone->user_id === null);
     $this->assert($Clone->company_id === null);
-    $this->assert($Clone->name === 'Big Boss');
-    $Clone->person_id = 2;
-    $Clone->company_id = 1;
+    $this->assert($Clone->role === 'owner');
+    $Clone->user_id = 4;
+    $Clone->company_id = 2;
     $Clone->Save();
-
-    $Loaded = Assignment::Load(2, 1);
-    $this->assert($Loaded->name === 'Big Boss');
-    $this->assert(Assignment::Load(1, 1)->name === 'Big Boss');
-    $Loaded->Destroy();
+    $this->assert(Membership::Load(4, 2)->role === 'owner');
+    $this->assert(Membership::Load(1, 1)->role === 'owner');
+    $Clone->Destroy();
   }
 
-  // * saving a new object fills in database defaults
-  // * where RETURNING is supported, saving a new object doesn't need a reload() SELECT
+  // * saving a new object fills in the database's defaults
+  // * where RETURNING is supported, that doesn't need a separate SELECT
   function test_16_save_without_reload() {
     $queries = [];
-    $hook_id = DB::addHook('pre_run', function($hash) use (&$queries) {
+    DB::addHook('pre_run', function($hash) use (&$queries) {
       $queries[] = trim($hash['query']);
     });
 
     try {
-      $Person = new Person();
-      $Person->name = 'Nora';
-      $Person->Save();
+      $User = new User();
+      $User->name = 'Nora';
+      $User->Save();
     } finally {
-      DB::removeHook('pre_run', $hook_id);
+      DB::removeHooks('pre_run');
     }
 
     $selects = array_filter($queries, function($query) {
@@ -623,17 +558,17 @@ class BasicOrmTest extends SimpleTest {
     if (DB::supports('returning')) $this->assert(count($selects) === 0);
     else $this->assert(count($selects) > 0);
 
-    $this->assert(!$Person->isFresh());
-    $this->assert($Person->id > 0);
-    $this->assert($Person->age === 0);
-    $this->assert($Person->favorite_animaniacs === '');
-    $this->assert($Person->favorite_color === null);
-    $this->assert($Person->last_happy_moment instanceof DateTime);
-    $this->assert($Person->dirtyfields() === []);
+    $this->assert(!$User->isFresh());
+    $this->assert($User->user_id > 4);
+    $this->assert($User->age === 0);
+    $this->assert($User->nickname === 'buddy');
+    $this->assert($User->employer_id === null);
+    $this->assert($User->is_active === null);
+    $this->assert($User->signed_up_at instanceof DateTime);
+    $this->assert($User->dirtyfields() === []);
 
-    $Loaded = Person::Load($Person->id);
-    $this->assert($Loaded->name === 'Nora');
-    $this->assert($Loaded->toHash() == $Person->toHash());
+    $Loaded = User::Load($User->user_id);
+    $this->assert($Loaded->toHash() == $User->toHash());
     $Loaded->Destroy();
   }
 
@@ -648,13 +583,7 @@ class BasicOrmTest extends SimpleTest {
     $Ticket->name = 'First';
 
     if (! DB::supports('returning')) {
-      $error = '';
-      try {
-        $Ticket->Save();
-      } catch (MeekroORMException $e) {
-        $error = $e->getMessage();
-      }
-      $this->assert(substr_count($error, 'primary key(s) region were not set') === 1);
+      $this->assertThrows(function() use ($Ticket) { $Ticket->Save(); }, 'primary key(s) region were not set');
       $this->assert(DB::queryFirstField("SELECT COUNT(*) FROM tickets") === '0');
       return;
     }
@@ -680,89 +609,37 @@ class BasicOrmTest extends SimpleTest {
     $this->assert(Ticket::Load($Ticket->id, 1)->name === 'First Updated');
   }
 
-  // * associations work when the primary keys of the two classes have different names
-  // * belongs_to works when our foreign key name doesn't match their primary key name
-  function test_18_assoc_primary_key_names() {
-    DB::query($this->get_sql('create_authors'));
-    DB::query($this->get_sql('create_books'));
-    DB::query($this->get_sql('create_bios'));
+  // * a nullable json column stores null as SQL NULL, not as the string 'null'
+  function test_18_json_null() {
+    $Profile = Profile::Load(2);
+    $this->assert($Profile->tags === null);
 
-    $Author = new Author();
-    $Author->name = 'Ursula';
-    $Author->Save();
+    $Profile->tags = ['fantasy', 'scifi'];
+    $Profile->Save();
+    $this->assert(Profile::Load(2)->tags === ['fantasy', 'scifi']);
 
-    $Author2 = new Author();
-    $Author2->name = 'Terry';
-    $Author2->Save();
-    $this->assert($Author->author_id !== $Author2->author_id);
-
-    // book_id values won't line up with author_id values, so a lookup on the wrong key would be caught
-    foreach (['Filler 1', 'Filler 2', 'Filler 3'] as $title) {
-      $Book = new Book();
-      $Book->writer_id = $Author2->author_id;
-      $Book->title = $title;
-      $Book->Save();
-    }
-    foreach (['Earthsea', 'The Dispossessed'] as $title) {
-      $Book = new Book();
-      $Book->writer_id = $Author->author_id;
-      $Book->title = $title;
-      $Book->Save();
-    }
-
-    $Bio = new Bio();
-    $Bio->author_id = $Author->author_id;
-    $Bio->summary = 'Wrote about wizards';
-    $Bio->Save();
-
-    $Author = Author::Load($Author->author_id);
-
-    // has_many
-    $Books = $Author->Book->order_by('book_id');
-    $this->assert(count($Books) === 2);
-    $this->assert($Books[0]->title === 'Earthsea');
-    $this->assert($Books[1]->title === 'The Dispossessed');
-    $this->assert(count($Author2->Book) === 3);
-
-    // has_one
-    $this->assert($Author->Bio->summary === 'Wrote about wizards');
-    $this->assert($Author2->Bio === null);
-
-    // has_one with no match: the null result is cached, so the lookup query runs only once
-    $Author2 = Author::Load($Author2->author_id);
-    $queries = 0;
-    $hook_id = DB::addHook('pre_run', function() use (&$queries) { $queries++; });
-    try {
-      $this->assert($Author2->Bio === null);
-      $this->assert($Author2->Bio === null);
-    } finally {
-      DB::removeHook('pre_run', $hook_id);
-    }
-    $this->assert($queries === 1);
-
-    // belongs_to
-    $this->assert($Books[0]->Writer->name === 'Ursula');
+    $Profile->tags = null;
+    $Profile->Save();
+    $this->assert(Profile::Load(2)->tags === null);
+    $this->assert(DB::queryFirstField("SELECT tags FROM profiles WHERE profile_id=2") === null);
   }
 
-  // * json columns: null is stored as SQL NULL if the column is nullable, not as the string 'null'
-  function test_19_json_null() {
-    $Bio = new Bio();
-    $Bio->summary = 'No tags yet';
-    $Bio->tags = null;
-    $Bio->Save();
-    $this->assert($Bio->tags === null);
-    $this->assert(DB::queryFirstField("SELECT tags FROM bios WHERE bio_id=@i", $Bio->bio_id) === null);
+  // * _marshal_field_* and _unmarshal_field_* methods override the column type's
+  // * dirty tracking compares fields as they'd be saved: '' and null are the same for bio
+  function test_19_field_marshal() {
+    $Profile = Profile::Load(2);
+    $this->assert($Profile->bio === '');
+    $Profile->bio = null;
+    $this->assert($Profile->dirtyfields() === []);
 
-    $Bio->tags = ['fantasy', 'scifi'];
-    $Bio->Save();
-    $Bio = Bio::Load($Bio->bio_id);
-    $this->assert($Bio->tags === ['fantasy', 'scifi']);
+    $Profile->bio = 'Manager at Globex';
+    $Profile->Save();
+    $this->assert(DB::queryFirstField("SELECT bio FROM profiles WHERE profile_id=2") === 'Manager at Globex');
 
-    $Bio->tags = null;
-    $Bio->Save();
-    $Bio = Bio::Load($Bio->bio_id);
-    $this->assert($Bio->tags === null);
-    $this->assert(DB::queryFirstField("SELECT tags FROM bios WHERE bio_id=@i", $Bio->bio_id) === null);
+    $Profile->bio = '';
+    $this->assert($Profile->dirtyhash() === ['bio' => null]);
+    $Profile->Save();
+    $this->assert(DB::queryFirstField("SELECT bio FROM profiles WHERE profile_id=2") === null);
+    $this->assert(Profile::Load(2)->bio === '');
   }
-
 }

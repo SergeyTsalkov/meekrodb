@@ -54,6 +54,7 @@ class SimpleTest {
     foreach (DB::tableList() as $table) {
       DB::query("DROP TABLE %b", $table);
     }
+    MeekroORM::_orm_struct_reset(); // the ORM's cached table structures are out of date now
     foreach (['users', 'companies', 'profiles', 'memberships', 'weird'] as $table) {
       DB::query($this->get_sql("create_{$table}"));
     }
@@ -191,7 +192,6 @@ $classes_to_test = array(
   'HookTest',
   'TransactionTest',
   'BasicOrmTest',
-  'PgsqlBoolTest',
   'PgsqlSchemaTest',
 );
 
