@@ -713,6 +713,18 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Author->Bio->summary === 'Wrote about wizards');
     $this->assert($Author2->Bio === null);
 
+    // has_one with no match: the null result is cached, so the lookup query runs only once
+    $Author2 = Author::Load($Author2->author_id);
+    $queries = 0;
+    $hook_id = DB::addHook('pre_run', function() use (&$queries) { $queries++; });
+    try {
+      $this->assert($Author2->Bio === null);
+      $this->assert($Author2->Bio === null);
+    } finally {
+      DB::removeHook('pre_run', $hook_id);
+    }
+    $this->assert($queries === 1);
+
     // belongs_to
     $this->assert($Books[0]->Writer->name === 'Ursula');
   }

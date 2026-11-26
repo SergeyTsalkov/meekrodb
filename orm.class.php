@@ -302,7 +302,7 @@ abstract class MeekroORM {
 
   public function assoc($name) {
     if (! static::is_assoc($name)) return null;
-    if (! isset($this->_orm_assoc_load[$name])) {
+    if (! array_key_exists($name, $this->_orm_assoc_load)) {
       $this->_orm_assoc_load[$name] = $this->_load_assoc($name);
     }
     
