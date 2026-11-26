@@ -1200,10 +1200,14 @@ class MeekroDB {
   }
 
   // *************** HOOKS
-  function addHook($type, $fn) {
+  protected function checkHookType($type) {
     if (! array_key_exists($type, $this->hooks)) {
       throw new MeekroDBException("Hook type $type is not recognized");
     }
+  }
+
+  function addHook($type, $fn) {
+    $this->checkHookType($type);
 
     if (! is_callable($fn)) {
       throw new MeekroDBException("Second arg to addHook() must be callable");
@@ -1215,9 +1219,7 @@ class MeekroDB {
   }
 
   function removeHook($type, $index) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
+    $this->checkHookType($type);
 
     if (! array_key_exists($index, $this->hooks[$type])) {
       throw new MeekroDBException("That hook does not exist");
@@ -1227,17 +1229,12 @@ class MeekroDB {
   }
 
   function removeHooks($type) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
-
+    $this->checkHookType($type);
     $this->hooks[$type] = array();
   }
 
   protected function runHook($type, $args=array()) {
-    if (! array_key_exists($type, $this->hooks)) {
-      throw new MeekroDBException("Hook type $type is not recognized");
-    }
+    $this->checkHookType($type);
 
     if ($type == 'pre_run') {
       foreach ($this->hooks[$type] as $hook) {
@@ -1255,27 +1252,12 @@ class MeekroDB {
 
       return array($args['query'], $args['params']);
     }
-    else if ($type == 'post_run') {
 
-      foreach ($this->hooks[$type] as $hook) {
-        call_user_func($hook, $args);
-      }
-    }
-    else if ($type == 'run_success') {
-      
-      foreach ($this->hooks[$type] as $hook) {
-        call_user_func($hook, $args);
-      }
-    }
-    else if ($type == 'run_failed') {
-      
-      foreach ($this->hooks[$type] as $hook) {
-        $result = call_user_func($hook, $args);
-        if ($result === false) return false;
-      }
-    }
-    else {
-      throw new MeekroDBException("runHook() type $type not recognized");
+    // run_failed: any hook returning false suppresses the exception, and skips the remaining hooks
+    // post_run, run_success: return values are ignored
+    foreach ($this->hooks[$type] as $hook) {
+      $result = call_user_func($hook, $args);
+      if ($type == 'run_failed' && $result === false) return false;
     }
   }
 
