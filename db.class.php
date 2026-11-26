@@ -1017,11 +1017,11 @@ class MeekroDB {
     if (!isset($opts['name'])) {
       throw new MeekroDBException("queryHelper() must get source function name");
     }
-    $opts_fullcols = (isset($opts['fullcols']) && $opts['fullcols']);
-    $opts_raw = (isset($opts['raw']) && $opts['raw']);
-    $opts_unbuf = (isset($opts['unbuf']) && $opts['unbuf']);
-    $opts_assoc = (isset($opts['assoc']) && $opts['assoc']);
-    $opts_walk = (isset($opts['walk']) && $opts['walk']);
+    $opts_fullcols = !empty($opts['fullcols']);
+    $opts_raw = !empty($opts['raw']);
+    $opts_unbuf = !empty($opts['unbuf']);
+    $opts_assoc = !empty($opts['assoc']);
+    $opts_walk = !empty($opts['walk']);
     $func_name = $opts['name'];
     $is_buffered = !($opts_unbuf || $opts_walk);
 
@@ -1051,33 +1051,11 @@ class MeekroDB {
     $result = $Exception = null;
 
     try {
-      $pdo = $this->get();
-      $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-      switch ($this->dbType()) {
-        case 'mysql':
-          $pdo->setAttribute(PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_USE_BUFFERED_QUERY : PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
-          break;
-        
-        case 'pgsql':
-          $pdo->setAttribute(PHP_VERSION_ID >= 80500 ? Pdo\Pgsql::ATTR_DISABLE_PREPARES : PDO::PGSQL_ATTR_DISABLE_PREPARES, 1);
-          break;
-      }
+      $pdo = $this->getForQuery($is_buffered);
 
       if ($params) {
         $result = $pdo->prepare($query);
-        foreach ($params as $i => $param) {
-          if (is_int($param)) {
-            $data_type = PDO::PARAM_INT;
-          }
-          else if (is_string($param) && $this->dbType() == 'pgsql' && !mb_check_encoding($param)) {
-            $data_type = PDO::PARAM_LOB;
-          }
-          else {
-            $data_type = PDO::PARAM_STR;
-          }
-          $result->bindValue($i+1, $param, $data_type);
-        }
-
+        $this->bindParams($result, $params);
         $result->execute();
       }
       else {
@@ -1123,26 +1101,7 @@ class MeekroDB {
     $skip_result_fetch = ($opts_walk || $opts_raw);
     
     if (!$skip_result_fetch && $got_result_set) {
-      $return = array();
-
-      $infos = null;
-      if ($opts_fullcols) {
-        $infos = array();
-        for ($i = 0; $i < $result->columnCount(); $i++) {
-          $info = $result->getColumnMeta($i);
-          if (isset($info['table']) && strlen($info['table'])) {
-            $infos[$i] = $info['table'] . '.' . $info['name'];
-          }
-          else {
-            $infos[$i] = $info['name'];
-          }
-        }
-      }
-
-      while ($row = $result->fetch($opts_assoc ? PDO::FETCH_ASSOC : PDO::FETCH_NUM)) {
-        if ($infos) $row = array_combine($infos, $row);
-        $return[] = $row;
-      }
+      $return = $this->fetchRows($result, $opts_assoc, $opts_fullcols);
     }
 
     if (is_array($return)) {
@@ -1166,6 +1125,63 @@ class MeekroDB {
 
     if (is_array($return)) return $return;
     return $this->affected_rows;
+  }
+
+  // PDO connection, configured for the next query
+  protected function getForQuery($is_buffered) {
+    $pdo = $this->get();
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    switch ($this->dbType()) {
+      case 'mysql':
+        $pdo->setAttribute(PHP_VERSION_ID >= 80500 ? Pdo\Mysql::ATTR_USE_BUFFERED_QUERY : PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $is_buffered);
+        break;
+      
+      case 'pgsql':
+        $pdo->setAttribute(PHP_VERSION_ID >= 80500 ? Pdo\Pgsql::ATTR_DISABLE_PREPARES : PDO::PGSQL_ATTR_DISABLE_PREPARES, 1);
+        break;
+    }
+    return $pdo;
+  }
+
+  protected function bindParams(PDOStatement $statement, array $params) {
+    foreach ($params as $i => $param) {
+      if (is_int($param)) {
+        $data_type = PDO::PARAM_INT;
+      }
+      else if (is_string($param) && $this->dbType() == 'pgsql' && !mb_check_encoding($param)) {
+        // binary data on pgsql (e.g. for BYTEA columns)
+        $data_type = PDO::PARAM_LOB;
+      }
+      else {
+        $data_type = PDO::PARAM_STR;
+      }
+      $statement->bindValue($i+1, $param, $data_type);
+    }
+  }
+
+  // all rows of the result set; with $fullcols, rows are keyed by "table.column"
+  // instead of just "column" (where the driver knows the column's table)
+  protected function fetchRows(PDOStatement $result, $assoc, $fullcols) {
+    $columns = null;
+    if ($fullcols) {
+      $columns = array();
+      for ($i = 0; $i < $result->columnCount(); $i++) {
+        $info = $result->getColumnMeta($i);
+        if (isset($info['table']) && strlen($info['table'])) {
+          $columns[$i] = $info['table'] . '.' . $info['name'];
+        }
+        else {
+          $columns[$i] = $info['name'];
+        }
+      }
+    }
+
+    $rows = array();
+    while ($row = $result->fetch($assoc ? PDO::FETCH_ASSOC : PDO::FETCH_NUM)) {
+      if ($columns) $row = array_combine($columns, $row);
+      $rows[] = $row;
+    }
+    return $rows;
   }
 
   // *************** HOOKS
