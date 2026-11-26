@@ -18,7 +18,7 @@ abstract class MeekroORM {
   private static function _orm_struct() {
     $table_name = static::_tablename();
     if (! array_key_exists($table_name, self::$_orm_struct)) {
-      self::$_orm_struct[$table_name] = new MeekroORMTable(get_called_class());
+      self::$_orm_struct[$table_name] = new MeekroORMTable(static::class);
     }
     return self::$_orm_struct[$table_name];
   }
@@ -30,9 +30,8 @@ abstract class MeekroORM {
   public static function _tablename() {
     if (static::$_tablename) return static::$_tablename;
     
-    $table = strtolower(get_called_class());
-    $last_char = substr($table, strlen($table)-1, 1);
-    if ($last_char != 's') $table .= 's';
+    $table = strtolower(static::class);
+    if (substr($table, -1) != 's') $table .= 's';
     return $table;
   }
 
@@ -342,7 +341,7 @@ abstract class MeekroORM {
     $primary_value = $this->getraw($primary_key);
 
     if (! is_subclass_of($class_name, __CLASS__)) {
-      throw new MeekroORMException(sprintf('%s is not a class that inherits from %s', $class_name, get_class()));
+      throw new MeekroORMException(sprintf('%s is not a class that inherits from %s', $class_name, __CLASS__));
     }
 
     if ($assoc['type'] == 'belongs_to') {
@@ -398,8 +397,7 @@ abstract class MeekroORM {
   }
 
   public static function LoadFromHash(array $row = []) {
-    $class_name = get_called_class();
-    $Obj = new $class_name();
+    $Obj = new static();
     $Obj->_load_hash($row);
     return $Obj;
   }
@@ -408,7 +406,7 @@ abstract class MeekroORM {
     $keys = static::_orm_struct()->primary_keys();
     if (count($values) != count($keys)) {
       throw new Exception(sprintf("Load on %s must be called with %d parameters!", 
-        get_called_class(), count($keys)));
+        static::class, count($keys)));
     }
 
     return static::Search(array_combine($keys, $values));
@@ -477,17 +475,17 @@ abstract class MeekroORM {
   }
 
   public static function all() {
-    return new MeekroORMScope(get_called_class());
+    return new MeekroORMScope(static::class);
   }
 
   public static function where(...$args) {
-    $Scope = new MeekroORMScope(get_called_class());
+    $Scope = new MeekroORMScope(static::class);
     $Scope->where(...$args);
     return $Scope;
   }
 
   public static function scope(...$scopes) {
-    $Scope = new MeekroORMScope(get_called_class());
+    $Scope = new MeekroORMScope(static::class);
     $Scope->scope(...$scopes);
     return $Scope;
   }
@@ -602,15 +600,15 @@ abstract class MeekroORM {
 
   public function lock() { $this->reload(true); }
 
-  public function update($one, $two=null) {
+  public function update($key_or_hash, $value=null) {
     if ($this->isFresh()) {
       throw new MeekroORMException("Unable to update(): record is fresh");
     }
-    if (is_array($one)) $hash = $one;
-    else $hash = [$one => $two];
+    if (is_array($key_or_hash)) $hash = $key_or_hash;
+    else $hash = [$key_or_hash => $value];
 
-    foreach ($hash as $key => $value) {
-      $this->set($key, $value);
+    foreach ($hash as $key => $val) {
+      $this->set($key, $val);
     }
 
     return $this->_save(array_keys($hash));
@@ -644,7 +642,7 @@ abstract class MeekroORM {
   }
 
   public function __toString() {
-    return get_called_class();
+    return static::class;
   }
 
 }
@@ -854,12 +852,13 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     return $this;
   }
 
-  function limit(int $one, ?int $two=null) {
-    if (is_null($two)) {
-      $this->limit_rowcount = $one;
+  // limit($rowcount) or limit($offset, $rowcount), same as SQL LIMIT
+  function limit(int $offset_or_rowcount, ?int $rowcount=null) {
+    if (is_null($rowcount)) {
+      $this->limit_rowcount = $offset_or_rowcount;
     } else {
-      $this->limit_offset = $one;
-      $this->limit_rowcount = $two;
+      $this->limit_offset = $offset_or_rowcount;
+      $this->limit_rowcount = $rowcount;
     }
     return $this;
   }
