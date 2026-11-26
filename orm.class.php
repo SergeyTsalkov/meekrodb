@@ -824,8 +824,7 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   }
 
   function where(...$args) {
-    $this->Objects = null;
-    $this->position = 0;
+    $this->invalidate();
 
     if (is_array($args[0])) {
       $this->Where->add($this->query_cleanup(':ha'), $args[0]);
@@ -837,6 +836,8 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   }
 
   function order_by(...$items) {
+    $this->invalidate();
+
     if (is_array($items[0])) {
       $this->order_by = $items[0];
     }
@@ -848,6 +849,8 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
 
   // limit($rowcount) or limit($offset, $rowcount), same as SQL LIMIT
   function limit(int $offset_or_rowcount, ?int $rowcount=null) {
+    $this->invalidate();
+
     if (is_null($rowcount)) {
       $this->limit_rowcount = $offset_or_rowcount;
     } else {
@@ -858,8 +861,7 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
   }
 
   function scope($scope, ...$args) {
-    $this->Objects = null;
-    $this->position = 0;
+    $this->invalidate();
 
     $Scope = $this->class_name::_orm_runscope($scope, ...$args);
 
@@ -887,20 +889,19 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     $args = [$table_name, $this->Where];
 
     if (count($this->order_by) > 0) {
-      // array_is_list
-      if ($this->order_by == array_values($this->order_by)) {
-        $c_string = array_fill(0, count($this->order_by), ':c');
-        $query .= ' ORDER BY ' . implode(',', $c_string);
-        $args = array_merge($args, array_values($this->order_by));
-      }
-      else {
-        $c_string = [];
-        foreach ($this->order_by as $column => $order) {
-          $c_string[] = ':c ' . (strtolower($order) == 'desc' ? 'desc' : 'asc');
+      // order_by is either a list of columns ['a', 'b'], or a hash of column => direction ['a' => 'desc']
+      $is_list = ($this->order_by == array_values($this->order_by)); // array_is_list() needs PHP 8.1
+      $c_string = [];
+      foreach ($this->order_by as $key => $value) {
+        if ($is_list) {
+          $c_string[] = ':c';
+          $args[] = $value;
+        } else {
+          $c_string[] = ':c ' . (strtolower($value) == 'desc' ? 'desc' : 'asc');
+          $args[] = $key;
         }
-        $query .= ' ORDER BY ' . implode(',', $c_string);
-        $args = array_merge($args, array_keys($this->order_by));
       }
+      $query .= ' ORDER BY ' . implode(',', $c_string);
     }
 
     if (!is_null($this->limit_rowcount)) {
@@ -915,6 +916,12 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
     $query = $this->query_cleanup($query);
     $this->Objects = $this->class_name::SearchMany($query, ...$args);
     return $this->Objects;
+  }
+
+  // discard cached results, so the next access re-runs the query
+  protected function invalidate() {
+    $this->Objects = null;
+    $this->position = 0;
   }
 
   protected function run_if_missing() {

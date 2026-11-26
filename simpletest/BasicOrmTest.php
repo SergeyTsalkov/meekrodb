@@ -430,7 +430,15 @@ class BasicOrmTest extends SimpleTest {
     $LivingTeens = Person::scope('living')->scope('teenager')->order_by(['id' => 'desc'])->limit(1);
     $this->assert(count($LivingTeens) === 1);
     $this->assert($LivingTeens[0]->name === 'Gavin');
-    
+
+    // order_by() and limit() after the scope has already run discard the cached results
+    $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');
+    $this->assert($LivingTeens[0]->name === 'Ellie');
+    $LivingTeens->order_by(['id' => 'desc']);
+    $this->assert($LivingTeens[0]->name === 'Gavin');
+    $LivingTeens->limit(1);
+    $this->assert(count($LivingTeens) === 1);
+
     $FirstTeenager = Person::scope('first_teenager');
     $this->assert(count($FirstTeenager) === 1);
     $this->assert($FirstTeenager[0]->name === 'Ellie');
