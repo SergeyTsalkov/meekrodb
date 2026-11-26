@@ -768,8 +768,11 @@ class MeekroORMTable {
       WHERE
         tc.constraint_type = 'PRIMARY KEY'
         AND tc.table_name = :s
-        AND tc.table_schema = 'public';
-    ", $this->table_name);
+        AND tc.table_schema = (
+          SELECT n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relname = :s AND pg_table_is_visible(c.oid)
+        );
+    ", $this->table_name, $this->table_name);
 
     foreach ($primary_keys as $primary_key) {
       $struct[$primary_key]->is_primary = true;

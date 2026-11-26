@@ -574,22 +574,30 @@ class MeekroDB {
   public function columnList($table) {
     $db_type = $this->dbType();
 
+    $args = array($table);
     if ($db_type == 'sqlite') {
       $query = 'PRAGMA table_info(:b)';
       $primary = 'name';
     }
     else if ($db_type == 'pgsql') {
+      // the same table name can exist in several schemas: use the one an unqualified query would
+      // reach, i.e. the first one on search_path
       $query = 'SELECT column_name, data_type, is_nullable, column_default 
         FROM information_schema.columns WHERE table_name=:s
+        AND table_schema = (
+          SELECT n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relname = :s AND pg_table_is_visible(c.oid)
+        )
         ORDER BY ordinal_position';
       $primary = 'column_name';
+      $args[] = $table;
     }
     else {
       $query = 'SHOW COLUMNS FROM :b';
       $primary = 'Field';
     }
 
-    $data = $this->_query('columnList', $query, $table);
+    $data = $this->_query('columnList', $query, ...$args);
     $columns = array();
     foreach ($data as $row) {
       $key = $row[$primary];
@@ -613,9 +621,12 @@ class MeekroDB {
         WHERE type='table' AND name NOT LIKE 'sqlite_%'", $tbl);
     }
     else if ($this->dbType() == 'pgsql') {
+      // tables from every schema on search_path; if a name exists in several of them, only
+      // the one an unqualified query would reach (the first on search_path) is visible
       $result = $this->_query('tableList', "SELECT table_name
         FROM information_schema.tables
-        WHERE table_schema='public'
+        WHERE table_schema = ANY(current_schemas(false))
+        AND pg_table_is_visible((quote_ident(table_schema) || '.' || quote_ident(table_name))::regclass)
         ORDER BY table_name");
     }
     else {

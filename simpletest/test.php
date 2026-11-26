@@ -130,6 +130,7 @@ $classes_to_test = array(
   'TransactionTest',
   'BasicOrmTest',
   'PgsqlBoolTest',
+  'PgsqlSchemaTest',
 );
 
 foreach ($contexts as $name => $fn) {
