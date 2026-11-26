@@ -631,13 +631,14 @@ class MeekroDB {
 
   // *************** PARSER AND QUERY RUNNER
   protected function paramsMap() {
-    $t = $this;
-
+    // "(?,?,?)" with $count question marks, repeated $batches times: "(?,?),(?,?)"
     $placeholders = function($count, $batches = 1) {
       $question_marks = '(' . implode(',', array_fill(0, $count, '?')) . ')';
       return implode(',', array_fill(0, $batches, $question_marks));
     };
 
+    // combine several ParsedQueries into one: their SQL joined by $glue and wrapped in $start/$end,
+    // and their params concatenated in order
     $join = function(array $Queries, $glue=',', $start='', $end='') {
       $Master = new MeekroDBParsedQuery();
       $parts = array();
@@ -650,75 +651,86 @@ class MeekroDB {
       return $Master;
     };
 
+    // escape LIKE wildcards, so the string is matched literally
+    $like_escape = function($arg) {
+      return str_replace(array('%', '_'), array('\%', '\_'), $arg);
+    };
+
+    // column => value pairs, joined by $glue (for SET, or WHERE with AND/OR)
+    $hash = function($arg, $glue) use ($join) {
+      $Queries = array();
+      foreach ($arg as $key => $value) {
+        $key = $this->formatName($key);
+        $Query = $this->sanitize($value);
+        $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
+      }
+      return $join($Queries, $glue);
+    };
+
+    // list of quoted table/column names: "(`a`,`b`)"
+    $name_list = function($arg) {
+      $str = '('. implode(',', array_map(array($this, 'formatName'), $arg)) . ')';
+      return new MeekroDBParsedQuery($str);
+    };
+
     return array(
-      's' => function($arg) use ($t) { 
+      's' => function($arg) { 
         return new MeekroDBParsedQuery('?', array(strval($arg)));
       },
-      'i' => function($arg) use ($t) { 
-        return new MeekroDBParsedQuery('?', array($t->intval($arg)));
+      'i' => function($arg) { 
+        return new MeekroDBParsedQuery('?', array($this->intval($arg)));
       },
-      'd' => function($arg) use ($t) { 
+      'd' => function($arg) { 
         return new MeekroDBParsedQuery('?', array(floatval($arg)));
       },
-      'b' => function($arg) use ($t) { 
-        return new MeekroDBParsedQuery($t->formatName($arg, true));
+      'b' => function($arg) { 
+        return new MeekroDBParsedQuery($this->formatName($arg, true));
       },
-      'c' => function($arg) use ($t) {
-        return new MeekroDBParsedQuery($t->formatName($arg));
+      'c' => function($arg) {
+        return new MeekroDBParsedQuery($this->formatName($arg));
       },
-      'l' => function($arg) use ($t) { 
+      'l' => function($arg) { 
         return new MeekroDBParsedQuery(strval($arg));
       },
-      't' => function($arg) use ($t) {
-        return new MeekroDBParsedQuery('?', array($t->sanitizeTS($arg)));
+      't' => function($arg) {
+        return new MeekroDBParsedQuery('?', array($this->sanitizeTS($arg)));
       },
-      'ss' => function($arg) use ($t) { 
-        $str = '%' . str_replace(array('%', '_'), array('\%', '\_'), $arg) . '%';
-        return new MeekroDBParsedQuery('?', array($str));
+      'ss' => function($arg) use ($like_escape) { 
+        return new MeekroDBParsedQuery('?', array('%' . $like_escape($arg) . '%'));
       },
-      'ssb' => function($arg) use ($t) { 
-        $str = str_replace(array('%', '_'), array('\%', '\_'), $arg) . '%';
-        return new MeekroDBParsedQuery('?', array($str));
+      'ssb' => function($arg) use ($like_escape) { 
+        return new MeekroDBParsedQuery('?', array($like_escape($arg) . '%'));
       },
-      'sse' => function($arg) use ($t) { 
-        $str = '%' . str_replace(array('%', '_'), array('\%', '\_'), $arg);
-        return new MeekroDBParsedQuery('?', array($str));
+      'sse' => function($arg) use ($like_escape) { 
+        return new MeekroDBParsedQuery('?', array('%' . $like_escape($arg)));
       },
-      'ls' => function($arg) use ($t, $placeholders) {
+      'ls' => function($arg) use ($placeholders) {
         $arg = array_map('strval', $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
-      'li' => function($arg) use ($t, $placeholders) { 
-        $arg = array_map(array($t, 'intval'), $arg);
+      'li' => function($arg) use ($placeholders) { 
+        $arg = array_map(array($this, 'intval'), $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
-      'ld' => function($arg) use ($t, $placeholders) {
+      'ld' => function($arg) use ($placeholders) {
         $arg = array_map('floatval', $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
-      'lb' => function($arg) use ($t) { 
-        $str = '('. implode(',', array_map(array($t, 'formatName'), $arg)) . ')';
-        return new MeekroDBParsedQuery($str);
-      },
-      'lc' => function($arg) use ($t) { 
-        $str = '('. implode(',', array_map(array($t, 'formatName'), $arg)) . ')';
-        return new MeekroDBParsedQuery($str);
-      },
-      'lt' => function($arg) use ($t, $placeholders) { 
-        $arg = array_map(array($t, 'sanitizeTS'), $arg);
+      'lb' => $name_list,
+      'lc' => $name_list,
+      'lt' => function($arg) use ($placeholders) { 
+        $arg = array_map(array($this, 'sanitizeTS'), $arg);
         return new MeekroDBParsedQuery($placeholders(count($arg)), $arg);
       },
-      '?' => function($arg) use ($t) {
-        return $t->sanitize($arg);
+      '?' => function($arg) {
+        return $this->sanitize($arg);
       },
-      'l?' => function($arg) use ($t, $join) {
-        $Queries = array_map(array($t, 'sanitize'), $arg);
+      'l?' => function($arg) use ($join) {
+        $Queries = array_map(array($this, 'sanitize'), $arg);
         return $join($Queries, ',', '(', ')');
       },
-      'll?' => function($arg) use ($t, $join) {
+      'll?' => function($arg) use ($join) {
         $arg = array_values($arg);
-        
-        $count = count($arg); // number of entries to insret
         $length = null; // length of entry
         $Master = array(); // list of queries
 
@@ -733,42 +745,18 @@ class MeekroDB {
             throw new MeekroDBException("ll?: all entries must be the same length");
           }
 
-          $Queries = array_map(array($t, 'sanitize'), $entry);
+          $Queries = array_map(array($this, 'sanitize'), $entry);
           $Master[] = $join($Queries, ',', '(', ')');
         }
 
         return $join($Master, ',');
       },
-      'hc' => function($arg) use ($t, $join) {
-        $Queries = array();
-        foreach ($arg as $key => $value) {
-          $key = $t->formatName($key);
-          $Query = $t->sanitize($value);
-          $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
-        }
-        return $join($Queries, ',');
-      },
-      'ha' => function($arg) use ($t, $join) {
-        $Queries = array();
-        foreach ($arg as $key => $value) {
-          $key = $t->formatName($key);
-          $Query = $t->sanitize($value);
-          $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
-        }
-        return $join($Queries, ' AND ');
-      },
-      'ho' => function($arg) use ($t, $join) {
-        $Queries = array();
-        foreach ($arg as $key => $value) {
-          $key = $t->formatName($key);
-          $Query = $t->sanitize($value);
-          $Queries[] = new MeekroDBParsedQuery($key . '=' . $Query->query, $Query->params);
-        }
-        return $join($Queries, ' OR ');
-      },
+      'hc' => function($arg) use ($hash) { return $hash($arg, ','); },
+      'ha' => function($arg) use ($hash) { return $hash($arg, ' AND '); },
+      'ho' => function($arg) use ($hash) { return $hash($arg, ' OR '); },
 
-      $this->param_char => function($arg) use ($t) {
-        return new MeekroDBParsedQuery($t->param_char);
+      $this->param_char => function($arg) {
+        return new MeekroDBParsedQuery($this->param_char);
       },
     );
   }
