@@ -14,7 +14,7 @@ abstract class MeekroORM {
   protected static $_columns = [];
   public $_use_transactions = null;
 
-  // -------------- SIMPLE HELPER FUNCTIONS
+  // -------------- TABLE AND DATABASE HELPERS
   private static function _orm_struct() {
     $table_name = static::_tablename();
     if (! array_key_exists($table_name, self::$_orm_struct)) {
@@ -49,6 +49,23 @@ abstract class MeekroORM {
     }
   }
 
+  // -------------- COLUMN INFO
+  private static function _orm_colinfo($column, $type) {
+    if (! is_array(static::$_columns)) return;
+    if (! array_key_exists($column, static::$_columns)) return;
+
+    $info = static::$_columns[$column];
+    return $info[$type] ?? null;
+  }
+
+  private static function _orm_coltype($column) {
+    if ($type = static::_orm_colinfo($column, 'type')) {
+      return $type;
+    }
+    return static::_orm_struct()->column_type($column);
+  }
+
+  // -------------- TRANSACTIONS
   private function _tr_enabled() {
     if (is_bool($this->_use_transactions)) {
       return $this->_use_transactions;
@@ -66,6 +83,11 @@ abstract class MeekroORM {
   private function _tr_rollback() {
     if (! $this->_tr_enabled()) return;
     static::_meekrodb()->rollback();
+  }
+
+  // -------------- STATE AND DIRTY TRACKING
+  public function isFresh() {
+    return $this->_orm_is_fresh;
   }
 
   public function dirtyhash() {
@@ -91,34 +113,7 @@ abstract class MeekroORM {
     return array_keys($this->_dirtyhash($fields));
   }
 
-  protected function _whereHash() {
-    $hash = [];
-    $primary_keys = static::_orm_struct()->primary_keys();
-    if (! $primary_keys) {
-      throw new MeekroORMException("$this has no primary keys");
-    }
-    foreach ($primary_keys as $key) {
-      $hash[$key] = $this->getraw($key);
-    }
-    return $hash;
-  }
-
-  private function _orm_run_callback($func_name, ...$args) {
-    if (method_exists($this, $func_name)) {
-      $result = $this->$func_name(...$args);
-      if ($result === false) {
-        throw new MeekroORMException("{$func_name} returned false");
-      }
-      return $result;
-    }
-  }
-
-
-  public function isFresh() {
-    return $this->_orm_is_fresh;
-  }
-
-  // -------------- GET/SET AND MARSHAL / UNMARSHAL
+  // -------------- MAGIC PROPERTY ACCESS
   public function __set($key, $value) {
     if (!$this->isFresh() && static::_orm_struct()->is_primary_key($key)) {
       throw new MeekroORMException("Can't update primary key!");
@@ -161,6 +156,7 @@ abstract class MeekroORM {
     }
   }
 
+  // -------------- GET / SET
   public function has($key) {
     return !! static::_orm_coltype($key);
   }
@@ -199,6 +195,7 @@ abstract class MeekroORM {
     $this->_orm_row[$key] = $this->_unmarshal($key, $value);
   }
 
+  // -------------- MARSHAL / UNMARSHAL
   // marshal: PHP value -> database value
   public function _marshal($key, $value) {
     return $this->_orm_marshal_dispatch('_marshal', $key, $value);
@@ -285,21 +282,6 @@ abstract class MeekroORM {
     return json_decode($value, true);
   }
 
-  private static function _orm_colinfo($column, $type) {
-    if (! is_array(static::$_columns)) return;
-    if (! array_key_exists($column, static::$_columns)) return;
-
-    $info = static::$_columns[$column];
-    return $info[$type] ?? null;
-  }
-
-  private static function _orm_coltype($column) {
-    if ($type = static::_orm_colinfo($column, 'type')) {
-      return $type;
-    }
-    return static::_orm_struct()->column_type($column);
-  }
-
   // -------------- ASSOCIATIONS
   public static function is_assoc($name) { return !! static::_orm_assoc($name); }
   private static function _orm_assoc($name) {
@@ -350,7 +332,7 @@ abstract class MeekroORM {
     }
   }
 
-  // -------------- CONSTRUCTORS
+  // -------------- LOADING AND SEARCHING
   private function _load_hash(array $row) {
     $this->_orm_is_fresh = false;
     $this->_orm_row_orig = [];
@@ -362,26 +344,6 @@ abstract class MeekroORM {
         $this->_orm_row_orig[$key] = $this->_marshal($key, $this->_orm_row[$key]);
       } else {
         $this->$key = $value;
-      }
-    }
-  }
-
-  // clone produces a fresh (unsaved) copy with primary keys unset
-  // it can be saved as a new record, either with new primary keys set manually
-  // or with auto-increment
-  public function __clone() {
-    $this->_orm_is_fresh = true;
-    $this->_orm_row_orig = [];
-    $this->_orm_assoc_load = [];
-
-    foreach (static::_orm_struct()->primary_keys() as $key) {
-      unset($this->_orm_row[$key]);
-    }
-
-    // don't share mutable objects (e.g. DateTime) with the original
-    foreach ($this->_orm_row as $key => $value) {
-      if (is_object($value)) {
-        $this->_orm_row[$key] = clone $value;
       }
     }
   }
@@ -439,6 +401,28 @@ abstract class MeekroORM {
     return static::_Search(true, $query, ...$args);
   }
 
+  // -------------- CLONING
+  // clone produces a fresh (unsaved) copy with primary keys unset
+  // it can be saved as a new record, either with new primary keys set manually
+  // or with auto-increment
+  public function __clone() {
+    $this->_orm_is_fresh = true;
+    $this->_orm_row_orig = [];
+    $this->_orm_assoc_load = [];
+
+    foreach (static::_orm_struct()->primary_keys() as $key) {
+      unset($this->_orm_row[$key]);
+    }
+
+    // don't share mutable objects (e.g. DateTime) with the original
+    foreach ($this->_orm_row as $key => $value) {
+      if (is_object($value)) {
+        $this->_orm_row[$key] = clone $value;
+      }
+    }
+  }
+
+  // -------------- SCOPES
   public static function _scopes() {
     return [];
   }
@@ -480,6 +464,7 @@ abstract class MeekroORM {
     return $Scope;
   }
 
+  // -------------- SAVE / UPDATE / DESTROY
   public function save($run_callbacks=null) {
     return $this->_save(null, $run_callbacks);
   }
@@ -619,6 +604,29 @@ abstract class MeekroORM {
     }
   }
 
+  protected function _whereHash() {
+    $hash = [];
+    $primary_keys = static::_orm_struct()->primary_keys();
+    if (! $primary_keys) {
+      throw new MeekroORMException("$this has no primary keys");
+    }
+    foreach ($primary_keys as $key) {
+      $hash[$key] = $this->getraw($key);
+    }
+    return $hash;
+  }
+
+  private function _orm_run_callback($func_name, ...$args) {
+    if (method_exists($this, $func_name)) {
+      $result = $this->$func_name(...$args);
+      if ($result === false) {
+        throw new MeekroORMException("{$func_name} returned false");
+      }
+      return $result;
+    }
+  }
+
+  // -------------- SERIALIZATION
   public function toHash() {
     return $this->_orm_row;
   }
