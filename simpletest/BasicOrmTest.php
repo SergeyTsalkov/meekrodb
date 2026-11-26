@@ -263,6 +263,7 @@ class BasicOrmTest extends SimpleTest {
 
   // * can save an empty record
   // * can reload() an object to undo pending changes
+  // * can lock() an object, which reloads it
   // * can destroy() an object
   function test_04_empty() {
     $Person = new Person();
@@ -274,6 +275,12 @@ class BasicOrmTest extends SimpleTest {
     $this->assert($Person->age === 1);
     $Person->reload();
     $this->assert($Person->age === 0);
+
+    DB::startTransaction();
+    $Person->age = 1;
+    $Person->lock();
+    $this->assert($Person->age === 0);
+    DB::commit();
 
     $Person->Destroy();
     $Person = Person::Search(['name' => '']);
@@ -451,6 +458,12 @@ class BasicOrmTest extends SimpleTest {
     $LivingTeens = Person::scope('living')->scope('teenager')->order_by(['id' => 'desc'])->limit(1);
     $this->assert(count($LivingTeens) === 1);
     $this->assert($LivingTeens[0]->name === 'Gavin');
+
+    // limit() with an offset
+    $Living = Person::scope('living')->order_by('id')->limit(1, 2);
+    $this->assert(count($Living) === 2);
+    $this->assert($Living[0]->name === 'Ellie');
+    $this->assert($Living[1]->name === 'Gavin');
 
     // order_by() and limit() after the scope has already run discard the cached results
     $LivingTeens = Person::scope('living')->scope('teenager')->order_by('id');

@@ -572,9 +572,13 @@ abstract class MeekroORM {
       throw new MeekroORMException("Can't reload unsaved record!");
     }
 
+    // sqlite has no row locks (and no FOR UPDATE): a write transaction already locks the whole database
+    $lock_str = '';
+    if ($lock && static::_meekrodb()->dbType() != 'sqlite') $lock_str = 'FOR UPDATE';
+
     $table = static::_tablename();
     $row = static::_orm_query('queryFirstRow', 'SELECT * FROM :b WHERE :ha LIMIT 1 :l', 
-      $table, $this->_whereHash(), $lock ? 'FOR UPDATE' : '');
+      $table, $this->_whereHash(), $lock_str);
 
     if (! $row) {
       throw new MeekroORMException("Unable to reload(): missing row");
@@ -915,7 +919,8 @@ class MeekroORMScope implements ArrayAccess, Iterator, Countable {
 
     if (!is_null($this->limit_rowcount)) {
       if (!is_null($this->limit_offset)) {
-        $query .= sprintf(' LIMIT %u, %u', $this->limit_offset, $this->limit_rowcount);
+        // not "LIMIT offset, rowcount": pgsql doesn't support that form
+        $query .= sprintf(' LIMIT %u OFFSET %u', $this->limit_rowcount, $this->limit_offset);
       }
       else {
         $query .= sprintf(' LIMIT %u', $this->limit_rowcount);

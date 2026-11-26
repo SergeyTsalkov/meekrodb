@@ -233,10 +233,10 @@ class MeekroDB {
 
   /**
    * Check whether the connected database supports a feature.
-   * Features: 'returning', 'insert_ignore', 'insert_update'
+   * Features: 'returning', 'insert_ignore', 'insert_update', 'replace'
    */
   public function supports($feature) {
-    if (! in_array($feature, array('returning', 'insert_ignore', 'insert_update'), true)) {
+    if (! in_array($feature, array('returning', 'insert_ignore', 'insert_update', 'replace'), true)) {
       throw new MeekroDBException("supports(): unknown feature: {$feature}");
     }
     if (! array_key_exists($feature, $this->supports_cache)) {
@@ -262,6 +262,7 @@ class MeekroDB {
         return $mariadb_version && version_compare($mariadb_version, '10.5', '>=');
 
       case 'insert_ignore':
+      case 'replace':
         return $db_type != 'pgsql';
 
       case 'insert_update':
@@ -433,6 +434,9 @@ class MeekroDB {
       }
     } else if ($mode == 'replace') {
       $fn_name = 'replace';
+      if (! $this->supports('replace')) {
+        throw new MeekroDBException("postgres does not support replace()");
+      }
       $action = 'REPLACE';
     } else {
       throw new MeekroDBException("insertOrReplace() mode must be: insert, ignore, replace");

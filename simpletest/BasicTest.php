@@ -479,5 +479,30 @@ class BasicTest extends SimpleTest {
 
     DB::query("DELETE FROM accounts WHERE username IN %ls", ['Ret1', 'Ret2', 'Ret3']);
   }
+
+  // * replace() inserts a new row, or replaces an existing one with the same primary key
+  // * where REPLACE isn't supported (pgsql), replace() throws a clear error
+  function test_20_replace() {
+    if (! DB::supports('replace')) {
+      $got_error = false;
+      try {
+        DB::replace('accounts', ['id' => 500, 'username' => 'Replaced']);
+      } catch (MeekroDBException $e) {
+        $got_error = substr_count($e->getMessage(), 'does not support replace()') > 0;
+      }
+      $this->assert($got_error);
+      return;
+    }
+
+    DB::replace('accounts', ['id' => 500, 'username' => 'Replaced', 'age' => 50]);
+    $this->assert($this->last_func === 'replace');
+    DB::replace('accounts', ['id' => 500, 'username' => 'Replaced Again']);
+
+    $rows = DB::query("SELECT * FROM accounts WHERE id=%i", 500);
+    $this->assert(count($rows) === 1);
+    $this->assert($rows[0]['username'] === 'Replaced Again');
+    $this->assert($rows[0]['age'] === '10'); // replaced, not updated: back to the column default
+    DB::delete('accounts', ['id' => 500]);
+  }
   
 }
