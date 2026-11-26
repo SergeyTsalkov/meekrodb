@@ -323,34 +323,30 @@ abstract class MeekroORM {
     return $this->_orm_assoc_load[$name];
   }
 
+  // only called from assoc(), which has already checked that $name is a valid association
   private function _load_assoc($name) {
     $assoc = static::_orm_assoc($name);
-    if (! $assoc) {
-      throw new MeekroORMException("Unknown assocation: $name");
-    }
-
     $class_name = $assoc['class_name'];
     $foreign_key = $assoc['foreign_key'];
-    $primary_key = $class_name::_orm_struct()->primary_key();
-    $primary_value = $this->getraw($primary_key);
 
     if (! is_subclass_of($class_name, __CLASS__)) {
       throw new MeekroORMException(sprintf('%s is not a class that inherits from %s', $class_name, __CLASS__));
     }
 
+    $primary_key = $class_name::_orm_struct()->primary_key();
+    $primary_value = $this->getraw($primary_key);
+
     if ($assoc['type'] == 'belongs_to') {
       return $class_name::Load($this->$foreign_key);
     }
     else if ($assoc['type'] == 'has_one') {
-      return $class_name::Search([
-        $assoc['foreign_key'] => $primary_value,
-      ]);
+      return $class_name::Search([$foreign_key => $primary_value]);
     }
     else if ($assoc['type'] == 'has_many') {
-      return $class_name::Where([$assoc['foreign_key'] => $primary_value]);
+      return $class_name::Where([$foreign_key => $primary_value]);
     }
     else {
-      throw new Exception("Invalid type for $name association");
+      throw new MeekroORMException("Invalid type for $name association");
     }
   }
 
@@ -399,7 +395,7 @@ abstract class MeekroORM {
   public static function Load(...$values) {
     $keys = static::_orm_struct()->primary_keys();
     if (count($values) != count($keys)) {
-      throw new Exception(sprintf("Load on %s must be called with %d parameters!", 
+      throw new MeekroORMException(sprintf("Load on %s must be called with %d parameters!", 
         static::class, count($keys)));
     }
 
