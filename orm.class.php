@@ -165,11 +165,15 @@ abstract class MeekroORM {
     return !! static::_orm_coltype($key);
   }
 
-  // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
-  public function &get($key) {
+  private function _orm_require_key($key) {
     if (! $this->has($key)) {
       throw new MeekroORMException("$this does not have key $key");
     }
+  }
+
+  // return by ref on __get() lets $Obj->var[] = 'array_element' work properly
+  public function &get($key) {
+    $this->_orm_require_key($key);
     if (! array_key_exists($key, $this->_orm_row)) {
       // only variables can be returned by reference
       $null = null;
@@ -180,24 +184,18 @@ abstract class MeekroORM {
   }
 
   public function getraw($key) {
-    if (! $this->has($key)) {
-      throw new MeekroORMException("$this does not have key $key");
-    }
+    $this->_orm_require_key($key);
     $value = $this->_orm_row[$key] ?? null;
     return $this->_marshal($key, $value);
   }
 
   public function set($key, $value) {
-    if (! $this->has($key)) {
-      throw new MeekroORMException("$this does not have key $key");
-    }
+    $this->_orm_require_key($key);
     $this->_orm_row[$key] = $value;
   }
 
   public function setraw($key, $value) {
-    if (! $this->has($key)) {
-      throw new MeekroORMException("$this does not have key $key");
-    }
+    $this->_orm_require_key($key);
     $this->_orm_row[$key] = $this->_unmarshal($key, $value);
   }
 
