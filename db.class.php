@@ -306,32 +306,27 @@ class MeekroDB {
   }
   
   public function commit($all=false) {
-    $this->nested_transactions_count--;
-    if ($all || $this->nested_transactions_count < 0) {
-      $this->nested_transactions_count = 0;
-    }
-
-    if ($this->nested_transactions_count > 0) {
-      $this->_query('commit', "RELEASE SAVEPOINT LEVEL{$this->nested_transactions_count}");
-    } else {
-      $this->_query('commit', 'COMMIT');
-    }
-    
-    return $this->nested_transactions_count;
+    return $this->endTransaction('commit', $all, 'RELEASE SAVEPOINT', 'COMMIT');
   }
-  
+
   public function rollback($all=false) {
+    return $this->endTransaction('rollback', $all, 'ROLLBACK TO SAVEPOINT', 'ROLLBACK');
+  }
+
+  // shared by commit() and rollback(): ends the innermost savepoint if we're still nested
+  // (or the whole transaction if $all is set, or if we're at the outermost level)
+  protected function endTransaction($func_name, $all, $savepoint_sql, $transaction_sql) {
     $this->nested_transactions_count--;
     if ($all || $this->nested_transactions_count < 0) {
       $this->nested_transactions_count = 0;
     }
 
     if ($this->nested_transactions_count > 0) {
-      $this->_query('rollback', "ROLLBACK TO SAVEPOINT LEVEL{$this->nested_transactions_count}");
+      $this->_query($func_name, "{$savepoint_sql} LEVEL{$this->nested_transactions_count}");
     } else {
-      $this->_query('rollback', 'ROLLBACK');
+      $this->_query($func_name, $transaction_sql);
     }
-    
+
     return $this->nested_transactions_count;
   }
 
