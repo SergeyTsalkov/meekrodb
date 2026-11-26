@@ -360,22 +360,14 @@ class MeekroDB {
   
   public function queryFirstColumn() { 
     $results = $this->queryHelper(['name' => 'queryFirstColumn'], func_get_args()); 
-    $ret = [];
-    if (!count($results) || !count($results[0])) return $ret;
-    
-    foreach ($results as $row) {
-      $ret[] = $row[0];
-    }
-    
-    return $ret;
+    if (!$results || !is_array($results)) return [];
+    return array_column($results, 0);
   }
   
   public function queryFirstField() {
     $results = $this->queryHelper(['name' => 'queryFirstField'], func_get_args());
-    if (!is_array($results) || !$results) return null;
-    $row = $results[0];
-    if (!is_array($row) || !$row) return null;
-    return $row[0];
+    if (!$results || !is_array($results)) return null;
+    return $results[0][0];
   }
   
   public function update() {

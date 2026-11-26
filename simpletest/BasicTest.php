@@ -98,6 +98,10 @@ class BasicTest extends SimpleTest {
     $this->assert(count($passwords) === 1);
     $this->assert($passwords[0] === 'hello');
 
+    // queries that return no rows, or no result set at all, give an empty column
+    $this->assert(DB::queryFirstColumn("SELECT password FROM accounts WHERE username=%s", 'Nobody') === []);
+    $this->assert(DB::queryFirstColumn("UPDATE accounts SET age=age WHERE username=%s", 'Nobody') === []);
+
     list($username, $password) = DB::queryFirstList("SELECT username, password FROM accounts WHERE id=%i", 1);
     $this->assert($this->last_func === 'queryFirstList');
     $this->assert($username === 'Abe');
